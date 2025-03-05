@@ -207,6 +207,13 @@ misc:
     experts:
         - Jason Lowe-Power <jason@lowepower.com>
 
+pickle:
+    desc: >-
+        The Pickle Device
+    status: maintained
+    maintainers:
+        - Hoa Nguyen <hn@hnpl.org>
+
 python:
     desc: >-
         Python SimObject wrapping and infrastructure
