@@ -32,6 +32,7 @@
 #include "pickle/device/pickle_device.hh"
 
 #include "base/trace.hh"
+#include "debug/PickleDeviceControl.hh"
 #include "debug/PickleDeviceEvent.hh"
 #include "debug/PickleDeviceState.hh"
 #include "debug/PickleDeviceUncacheableForwarding.hh"
@@ -49,6 +50,9 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
     core_to_pickle_latency_in_ticks(params.core_to_pickle_latency_in_ticks),
     ticks_per_cycle(params.ticks_per_cycle),
     request_port(params.name + ".request_port", this),
+    remaining_control_message_length(0),
+    remaining_control_data_length(0),
+    receiving_command_type(PickleDeviceCommandType::INVALID),
     uncacheable_response_queues(num_cores),
     uncacheable_response_queue_capacity(
         params.uncacheable_response_queue_capacity
@@ -106,6 +110,9 @@ PickleDevice::processEvent()
     {
         case PickleDeviceState::IDLE:
             this->doIdle();
+            this->operate();
+            break;
+        case PickleDeviceState::RECEIVING_COMMAND:
             this->operate();
             break;
         case PickleDeviceState::SLEEP:
@@ -236,13 +243,31 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
                 pkt->req->getPaddr()
             );
     {
+        // 0x10110000 sends:
+        //   uint64_t: command type
+        //   uint64_t: command length
         if (pkt->req->hasPaddr() && pkt->req->getPaddr() == 0x10110000) {
             const uint8_t* ptr = pkt->getConstPtr<uint8_t>();
             uint8_t data = ptr[0];
-            owner->enqueueWatchRange(data);
+            owner->enqueueControlMessage(data);
             DPRINTF(
                 PickleDeviceUncacheableForwarding,
-                "Received command data: addr = 0x%llx, data = 0x%x\n",
+                "Received control message: addr = 0x%llx, data = 0x%x\n",
+                pkt->req->getPaddr(), data
+            );
+            if (pkt->needsResponse()) {
+                pkt->makeResponse();
+                owner->enqueueResponse(pkt, internal_id);
+            }
+        }
+        // 0x10110008 sends data accordingly to command type and length
+        else if (pkt->req->hasPaddr() && pkt->req->getPaddr() == 0x10110008) {
+            const uint8_t* ptr = pkt->getConstPtr<uint8_t>();
+            uint8_t data = ptr[0];
+            owner->enqueueControlData(data);
+            DPRINTF(
+                PickleDeviceUncacheableForwarding,
+                "Received control data: addr = 0x%llx, data = 0x%x\n",
                 pkt->req->getPaddr(), data
             );
             if (pkt->needsResponse()) {
@@ -271,20 +296,66 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
 }
 
 void
-PickleDevice::enqueueWatchRange(uint8_t data)
+PickleDevice::enqueueControlMessage(uint8_t message)
 {
-    watch_range_vector.push_back(data);
-    if (watch_range_vector.size() == 16) {
-        uint8_t* ptr8 = watch_range_vector.data();
-        uint64_t* ptr64 = (uint64_t*) ptr8;
-        setWatchRange(AddrRange(ptr64[0], ptr64[1]));
+    if (device_state == PickleDeviceState::IDLE) {
+        remaining_control_message_length = 16;
+        changeToState(PickleDeviceState::RECEIVING_COMMAND);
         DPRINTF(
-            PickleDeviceUncacheableForwarding,
-            "Listening to uncacheable request of range [0x%llx, 0x%llx)\n",
-            ptr64[0], ptr64[1]
+            PickleDeviceControl,
+            "Start receiving command\n"
         );
-        watch_range_vector.clear();
     }
+    remaining_control_message_length -= 1;
+    received_control_message.push_back(message);
+    if (remaining_control_message_length == 0) {
+        uint8_t* ptr8 = received_control_message.data();
+        uint64_t* ptr64 = (uint64_t*) ptr8;
+        receiving_command_type = PickleDeviceCommandType(ptr64[0]);
+        remaining_control_data_length = ptr64[1];
+        remaining_control_message_length = 0;
+        received_control_message.clear();
+        DPRINTF(
+            PickleDeviceControl,
+            "Received command type 0x%llx, length %lld\n",
+            receiving_command_type, remaining_control_data_length
+        );
+    }
+}
+
+void
+PickleDevice::enqueueControlData(uint8_t data)
+{
+    remaining_control_data_length -= 1;
+    received_control_data.push_back(data);
+    if (remaining_control_data_length == 0) {
+        if (
+            receiving_command_type == PickleDeviceCommandType::ADD_WATCH_RANGE
+        ) {
+            uint8_t* ptr8 = received_control_data.data();
+            uint64_t* ptr64 = (uint64_t*) ptr8;
+            addWatchRange(AddrRange(ptr64[0], ptr64[1]));
+            DPRINTF(
+                PickleDeviceControl,
+                "Added watch range %s\n",
+                watch_ranges.back().to_string()
+            );
+        } else if (
+            receiving_command_type == PickleDeviceCommandType::JOB_DESCRIPTOR
+        ) {
+            processJobDescriptor(received_control_data);
+        } else {
+            panic("Unknown Command Type %lld\n", receiving_command_type);
+        }
+        received_control_data.clear();
+        receiving_command_type = PickleDeviceCommandType::INVALID;
+        changeToState(PickleDeviceState::IDLE);
+    }
+    DPRINTF(
+        PickleDeviceControl,
+        "Received command data 0x%x, remaining %lld\n",
+        data, remaining_control_data_length
+    );
 }
 
 bool
@@ -301,9 +372,14 @@ PickleDevice::enqueueResponse(PacketPtr pkt, uint8_t internal_port_id)
 }
 
 void
-PickleDevice::setWatchRange(AddrRange r)
+PickleDevice::addWatchRange(AddrRange r)
 {
-    watch_range = r;
+    watch_ranges.push_back(r);
+}
+
+void
+PickleDevice::processJobDescriptor(std::vector<uint8_t>& job_descriptor)
+{
 }
 
 }; // namespace gem5

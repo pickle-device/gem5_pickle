@@ -55,7 +55,15 @@ namespace gem5
 enum PickleDeviceState
 {
     SLEEP = 0,
-    IDLE = 1
+    IDLE = 1,
+    RECEIVING_COMMAND = 2
+};
+
+enum PickleDeviceCommandType
+{
+    INVALID = 0,
+    ADD_WATCH_RANGE = 1,
+    JOB_DESCRIPTOR = 2
 };
 
 class PickleDevice: public ClockedObject
@@ -136,15 +144,21 @@ class PickleDevice: public ClockedObject
         void doBusy();
         void changeToState(const PickleDeviceState new_state);
         Port& getPort(const std::string &if_name, PortID idx) override;
-        void setWatchRange(AddrRange r);
+        void addWatchRange(AddrRange r);
     private:
-        std::vector<uint8_t> watch_range_vector;
-        AddrRange watch_range;
+        uint64_t remaining_control_message_length;
+        uint64_t remaining_control_data_length;
+        PickleDeviceCommandType receiving_command_type;
+        std::vector<uint8_t> received_control_message;
+        std::vector<uint8_t> received_control_data;
+        std::vector<AddrRange> watch_ranges;
         std::vector<std::queue<PacketPtr>> uncacheable_response_queues;
         uint64_t uncacheable_response_queue_capacity;
         uint64_t response_queue_progress_per_cycle;
+        void processJobDescriptor(std::vector<uint8_t>& job_descriptor);
     public:
-        void enqueueWatchRange(uint8_t data);
+        void enqueueControlMessage(uint8_t message);
+        void enqueueControlData(uint8_t data);
         bool enqueueResponse(PacketPtr pkt, uint8_t internal_port_id);
     public:
         struct PickleDeviceStats : public statistics::Group

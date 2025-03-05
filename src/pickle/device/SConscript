@@ -33,6 +33,7 @@ Import('*')
 
 SimObject('PickleDevice.py', sim_objects=['PickleDevice'])
 
+DebugFlag('PickleDeviceControl')
 DebugFlag('PickleDeviceEvent')
 DebugFlag('PickleDeviceState')
 DebugFlag('PickleDeviceUncacheableForwarding')
