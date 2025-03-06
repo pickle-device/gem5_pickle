@@ -189,7 +189,7 @@ PickleDevice::getPort(const std::string &if_name, PortID idx)
     } else if (if_name == "uncacheable_snoop_port") {
         return *uncacheable_snoop_ports[idx];
     }
-    return request_port; // TODO
+    return request_port;
 }
 
 PickleDevice::PickleDeviceStats::PickleDeviceStats(statistics::Group *parent)
@@ -292,6 +292,10 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
                     "Received store request: addr = 0x%llx, data = 0x%llx\n",
                     pkt->req->getPaddr(), data
                 );
+            }
+            if (pkt->needsResponse()) {
+                pkt->makeResponse();
+                owner->enqueueResponse(pkt, internal_id);
             }
         }
     }
