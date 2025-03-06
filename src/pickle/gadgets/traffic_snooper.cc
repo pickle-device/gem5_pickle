@@ -217,6 +217,8 @@ void
 TrafficSnooper::addWatchRange(AddrRange range)
 {
     watch_ranges.push_back(range);
+    DPRINTF(TrafficSnooperDebug, "Added watch range %s\n",
+            range.to_string());
 }
 bool
 TrafficSnooper::inRange(Addr addr)

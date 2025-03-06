@@ -50,6 +50,7 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
     core_to_pickle_latency_in_ticks(params.core_to_pickle_latency_in_ticks),
     ticks_per_cycle(params.ticks_per_cycle),
     request_port(params.name + ".request_port", this),
+    uncacheable_forwarders(params.uncacheable_forwarders),
     remaining_control_message_length(0),
     remaining_control_data_length(0),
     receiving_command_type(PickleDeviceCommandType::INVALID),
@@ -275,6 +276,24 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
                 owner->enqueueResponse(pkt, internal_id);
             }
         }
+        else {
+            bool isLoad = pkt->isRead();
+            if (isLoad) {
+                DPRINTF(
+                    PickleDeviceUncacheableForwarding,
+                    "Received load request: addr = 0x%llx\n",
+                    pkt->req->getPaddr()
+                );
+            } else {
+                const uint64_t* ptr = pkt->getConstPtr<uint64_t>();
+                uint64_t data = ptr[0];
+                DPRINTF(
+                    PickleDeviceUncacheableForwarding,
+                    "Received store request: addr = 0x%llx, data = 0x%llx\n",
+                    pkt->req->getPaddr(), data
+                );
+            }
+        }
     }
 
     /*
@@ -324,6 +343,14 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvAtomic(PacketPtr pkt)
                 "addr = 0x%llx, data = 0x%x\n",
                 pkt->req->getPaddr(), data
             );
+        } else {
+            bool isLoad = pkt->isRead();
+            std::string type = isLoad ? "Load" : "Store";
+            DPRINTF(
+                PickleDeviceUncacheableForwarding,
+                "Received request [atomic]: addr = 0x%llx, type = %s\n",
+                pkt->req->getPaddr()
+            );
         }
     }
     return 0;
@@ -358,6 +385,25 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvFunctional(PacketPtr pkt)
                 "addr = 0x%llx, data = 0x%x\n",
                 pkt->req->getPaddr(), data
             );
+        } else {
+            bool isLoad = pkt->isRead();
+            if (isLoad) {
+                DPRINTF(
+                    PickleDeviceUncacheableForwarding,
+                    "Received load request [functional]: "
+                    "addr = 0x%llx\n",
+                    pkt->req->getPaddr()
+                );
+            } else {
+                const uint64_t* ptr = pkt->getConstPtr<uint64_t>();
+                uint64_t data = ptr[0];
+                DPRINTF(
+                    PickleDeviceUncacheableForwarding,
+                    "Received store request [functional]: "
+                    "addr = 0x%llx, data = 0x%llx\n",
+                    pkt->req->getPaddr(), data
+                );
+            }
         }
     }
 }
@@ -404,8 +450,8 @@ PickleDevice::enqueueControlData(uint8_t data)
             addWatchRange(AddrRange(ptr64[0], ptr64[1]));
             DPRINTF(
                 PickleDeviceControl,
-                "Added watch range %s\n",
-                watch_ranges.back().to_string()
+                "Added watch range 0x%llx - 0x%llx\n",
+                ptr64[0], ptr64[1]
             );
         } else if (
             receiving_command_type == PickleDeviceCommandType::JOB_DESCRIPTOR
@@ -441,7 +487,11 @@ PickleDevice::enqueueResponse(PacketPtr pkt, uint8_t internal_port_id)
 void
 PickleDevice::addWatchRange(AddrRange r)
 {
-    watch_ranges.push_back(r);
+    //watch_ranges.push_back(r);
+    for (auto forwarder: uncacheable_forwarders)
+    {
+        forwarder->addWatchRange(r);
+    }
 }
 
 void

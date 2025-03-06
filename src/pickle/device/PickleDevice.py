@@ -53,7 +53,7 @@ class PickleDevice(ClockedObject):
     uncacheable_snoop_port = VectorResponsePort(
         "port for uncacheable req bypassing Ruby"
     )
-    uncacheable_forwarder = VectorParam.TrafficSnooper("UncacheableForwarder")
+    uncacheable_forwarders = VectorParam.TrafficSnooper("UncacheableForwarder")
 
     # design parameters
     # prefetcher = Param.CerebellumPrefetcher(NULL, "Prefetcher")

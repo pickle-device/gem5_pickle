@@ -45,6 +45,7 @@
 #include "cpu/thread_context.hh"
 #include "mem/ruby/protocol/CHI/Cache_Controller.hh"
 #include "params/PickleDevice.hh"
+#include "pickle/gadgets/traffic_snooper.hh"
 #include "sim/clocked_object.hh"
 #include "sim/eventq.hh"
 #include "sim/sim_object.hh"
@@ -136,6 +137,7 @@ class PickleDevice: public ClockedObject
         };
         PickleDeviceRequestPort request_port;
         std::vector<PickleDeviceUncacheableSnoopPort*> uncacheable_snoop_ports;
+        std::vector<TrafficSnooper*> uncacheable_forwarders;
     public:
         RequestorID requestor_id;
     private:
