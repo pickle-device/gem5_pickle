@@ -110,17 +110,16 @@ TrafficSnooper::recvAtomicBackdoor(PacketPtr pkt, MemBackdoorPtr &backdoor)
 void
 TrafficSnooper::recvFunctional(PacketPtr pkt)
 {
-    if (isActivated && pkt->hasData() && pkt->cmd.isWrite())
-    {
-        PacketPtr new_pkt = duplicatePkt(pkt);
-        snoop_port->sendFunctional(new_pkt);
+    if (isActivated
+        && pkt->req->isUncacheable()
+        && inRange(pkt->req->getPaddr())) {
         DPRINTF(
             TrafficSnooperDebug,
-            "Snooping functional packet 0x%llx\n",
-            pkt->req->getPaddr()
-        );
+            "Snooping functional packet 0x%llx\n", pkt->req->getPaddr());
+        return snoop_port->sendFunctional(pkt);
+    } else {
+        return out_port->sendFunctional(pkt);
     }
-    out_port->sendFunctional(pkt);
 }
 
 void

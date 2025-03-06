@@ -126,8 +126,8 @@ class PickleDevice: public ClockedObject
                 bool recvTimingReq(PacketPtr pkt) override;
                 void recvRespRetry() override {};
                 // found return 0 in many existing codes
-                Tick recvAtomic(PacketPtr pkt) override { return 0;}
-                void recvFunctional(PacketPtr pkt) override {};
+                Tick recvAtomic(PacketPtr pkt) override;
+                void recvFunctional(PacketPtr pkt) override;
                 AddrRangeList getAddrRanges() const override {
                     AddrRangeList ranges;
                     ranges.push_back(AddrRange(0,MaxAddr));

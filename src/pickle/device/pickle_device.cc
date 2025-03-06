@@ -295,6 +295,73 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
     return true;
 }
 
+Tick
+PickleDevice::PickleDeviceUncacheableSnoopPort::recvAtomic(PacketPtr pkt)
+{
+    {
+        // 0x10110000 sends:
+        //   uint64_t: command type
+        //   uint64_t: command length
+        if (pkt->req->hasPaddr() && pkt->req->getPaddr() == 0x10110000) {
+            const uint8_t* ptr = pkt->getConstPtr<uint8_t>();
+            uint8_t data = ptr[0];
+            owner->enqueueControlMessage(data);
+            DPRINTF(
+                PickleDeviceUncacheableForwarding,
+                "Received control message [atomic]: "
+                "addr = 0x%llx, data = 0x%x\n",
+                pkt->req->getPaddr(), data
+            );
+        }
+        // 0x10110008 sends data accordingly to command type and length
+        else if (pkt->req->hasPaddr() && pkt->req->getPaddr() == 0x10110008) {
+            const uint8_t* ptr = pkt->getConstPtr<uint8_t>();
+            uint8_t data = ptr[0];
+            owner->enqueueControlData(data);
+            DPRINTF(
+                PickleDeviceUncacheableForwarding,
+                "Received control data [atomic]: "
+                "addr = 0x%llx, data = 0x%x\n",
+                pkt->req->getPaddr(), data
+            );
+        }
+    }
+    return 0;
+}
+
+void
+PickleDevice::PickleDeviceUncacheableSnoopPort::recvFunctional(PacketPtr pkt)
+{
+    {
+        // 0x10110000 sends:
+        //   uint64_t: command type
+        //   uint64_t: command length
+        if (pkt->req->hasPaddr() && pkt->req->getPaddr() == 0x10110000) {
+            const uint8_t* ptr = pkt->getConstPtr<uint8_t>();
+            uint8_t data = ptr[0];
+            owner->enqueueControlMessage(data);
+            DPRINTF(
+                PickleDeviceUncacheableForwarding,
+                "Received control message [functional]: "
+                "addr = 0x%llx, data = 0x%x\n",
+                pkt->req->getPaddr(), data
+            );
+        }
+        // 0x10110008 sends data accordingly to command type and length
+        else if (pkt->req->hasPaddr() && pkt->req->getPaddr() == 0x10110008) {
+            const uint8_t* ptr = pkt->getConstPtr<uint8_t>();
+            uint8_t data = ptr[0];
+            owner->enqueueControlData(data);
+            DPRINTF(
+                PickleDeviceUncacheableForwarding,
+                "Received control data [functional]: "
+                "addr = 0x%llx, data = 0x%x\n",
+                pkt->req->getPaddr(), data
+            );
+        }
+    }
+}
+
 void
 PickleDevice::enqueueControlMessage(uint8_t message)
 {
