@@ -45,6 +45,10 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
   : ClockedObject(params),
     event([this]{processEvent();}, name() + ".event"),
     system(params.system),
+    mmu(params.mmu),
+    isa(params.isa),
+    decoder(params.decoder),
+    associated_cores(params.associated_cores),
     num_cores(params.num_cores),
     device_id(params.device_id),
     core_to_pickle_latency_in_ticks(params.core_to_pickle_latency_in_ticks),
@@ -61,6 +65,7 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
     response_queue_progress_per_cycle(
         params.response_queue_progress_per_cycle
     ),
+    device_thread_context(nullptr),
     device_stats(this)
 {
     requestor_id = system->getRequestorId(this);
@@ -238,11 +243,6 @@ bool
 PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
 {
     // handle when the engine receives an uncacheable load/store
-     DPRINTF(
-                PickleDeviceUncacheableForwarding,
-                "Received command data: addr = 0x%llx\n",
-                pkt->req->getPaddr()
-            );
     {
         // 0x10110000 sends:
         //   uint64_t: command type
@@ -277,6 +277,7 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
             }
         }
         else {
+            owner->trySetThreadContextFromCore(internal_id);
             bool isLoad = pkt->isRead();
             if (isLoad) {
                 DPRINTF(
@@ -348,6 +349,7 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvAtomic(PacketPtr pkt)
                 pkt->req->getPaddr(), data
             );
         } else {
+            owner->trySetThreadContextFromCore(internal_id);
             bool isLoad = pkt->isRead();
             std::string type = isLoad ? "Load" : "Store";
             DPRINTF(
@@ -390,6 +392,7 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvFunctional(PacketPtr pkt)
                 pkt->req->getPaddr(), data
             );
         } else {
+            owner->trySetThreadContextFromCore(internal_id);
             bool isLoad = pkt->isRead();
             if (isLoad) {
                 DPRINTF(
@@ -501,6 +504,49 @@ PickleDevice::addWatchRange(AddrRange r)
 void
 PickleDevice::processJobDescriptor(std::vector<uint8_t>& job_descriptor)
 {
+}
+
+void
+PickleDevice::trySetThreadContextFromCore(uint64_t core_id)
+{
+    if (device_thread_context == nullptr) {
+        device_thread_context = std::unique_ptr<PickleDeviceThreadContext>(
+            new PickleDeviceThreadContext(this)
+        );
+        isa->setThreadContext(device_thread_context.get());
+        device_thread_context->copyArchRegs(
+            associated_cores[core_id]->getContext(0)
+        );
+        DPRINTF(
+            PickleDeviceUncacheableForwarding,
+            "Copy the arch regs to device_thread_context from core %lld\n",
+            core_id
+        );
+    }
+}
+
+System *
+PickleDevice::getSystem()
+{
+    return system;
+}
+
+BaseMMU *
+PickleDevice::getMMUPtr()
+{
+    return mmu;
+}
+
+BaseISA *
+PickleDevice::getIsaPtr()
+{
+    return isa;
+}
+
+InstDecoder *
+PickleDevice::getDecoderPtr()
+{
+    return decoder;
 }
 
 }; // namespace gem5

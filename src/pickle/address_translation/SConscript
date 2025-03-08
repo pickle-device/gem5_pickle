@@ -31,12 +31,9 @@
 
 Import('*')
 
-SimObject('PickleDevice.py', sim_objects=['PickleDevice'])
+SimObject('PickleDeviceAddressTranslationManager.py',
+           sim_objects=['PickleDeviceAddressTranslationManager'])
 
-DebugFlag('PickleDeviceControl')
-DebugFlag('PickleDeviceEvent')
-DebugFlag('PickleDeviceState')
-DebugFlag('PickleDeviceUncacheableForwarding')
+DebugFlag('PickleDeviceAddressTranslationManagerDebug')
 
-Source('device_thread_context.cc')
-Source('pickle_device.cc')
+Source('manager.cc')

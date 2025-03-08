@@ -39,12 +39,16 @@
 #include <utility>
 #include <vector>
 
+#include "arch/generic/decoder.hh"
+#include "arch/generic/isa.hh"
 #include "base/logging.hh"
 #include "base/trace.hh"
 #include "cpu/base.hh"
+#include "cpu/o3/thread_context.hh"
 #include "cpu/thread_context.hh"
 #include "mem/ruby/protocol/CHI/Cache_Controller.hh"
 #include "params/PickleDevice.hh"
+#include "pickle/device/device_thread_context.hh"
 #include "pickle/gadgets/traffic_snooper.hh"
 #include "sim/clocked_object.hh"
 #include "sim/eventq.hh"
@@ -84,6 +88,10 @@ class PickleDevice: public ClockedObject
         PARAMS(PickleDevice);
         EventFunctionWrapper event;
         System * system;
+        BaseMMU * mmu;
+        BaseISA * isa;
+        InstDecoder * decoder;
+        std::vector<BaseCPU*> associated_cores;
         uint64_t num_cores;
         uint64_t device_id;
         uint64_t core_to_pickle_latency_in_ticks;
@@ -157,11 +165,20 @@ class PickleDevice: public ClockedObject
         std::vector<std::queue<PacketPtr>> uncacheable_response_queues;
         uint64_t uncacheable_response_queue_capacity;
         uint64_t response_queue_progress_per_cycle;
+        std::unique_ptr<PickleDeviceThreadContext> device_thread_context;
         void processJobDescriptor(std::vector<uint8_t>& job_descriptor);
     public:
         void enqueueControlMessage(uint8_t message);
         void enqueueControlData(uint8_t data);
         bool enqueueResponse(PacketPtr pkt, uint8_t internal_port_id);
+        // copying the core thread context when the core is executing the
+        // target workloads, required for address translation of the
+        // workload
+        void trySetThreadContextFromCore(uint64_t core_id);
+        System *getSystem();
+        BaseMMU *getMMUPtr();
+        BaseISA *getIsaPtr();
+        InstDecoder *getDecoderPtr();
     public:
         struct PickleDeviceStats : public statistics::Group
         {
