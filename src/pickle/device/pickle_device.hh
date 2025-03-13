@@ -39,6 +39,8 @@
 #include <utility>
 #include <vector>
 
+#include "arch/arm/isa.hh"
+#include "arch/arm/mmu.hh"
 #include "arch/generic/decoder.hh"
 #include "arch/generic/isa.hh"
 #include "base/logging.hh"
@@ -88,8 +90,10 @@ class PickleDevice: public ClockedObject
         PARAMS(PickleDevice);
         EventFunctionWrapper event;
         System * system;
-        BaseMMU * mmu;
-        BaseISA * isa;
+        //BaseMMU * mmu;
+        ArmISA::MMU * mmu;
+        //BaseISA * isa;
+        ArmISA::ISA * isa;
         InstDecoder * decoder;
         std::vector<BaseCPU*> associated_cores;
         uint64_t num_cores;
@@ -179,6 +183,7 @@ class PickleDevice: public ClockedObject
         BaseMMU *getMMUPtr();
         BaseISA *getIsaPtr();
         InstDecoder *getDecoderPtr();
+        PacketPtr zeroCycleLoad(const Addr& addr, bool& success);
     public:
         struct PickleDeviceStats : public statistics::Group
         {

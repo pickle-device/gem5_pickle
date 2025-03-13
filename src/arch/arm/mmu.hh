@@ -419,9 +419,9 @@ class MMU : public BaseMMU
 
   public:
     CachedState s1State, s2State;
+    uint64_t _attr;      // Memory attributes for last accessed TLB entry
 
   protected:
-    uint64_t _attr;      // Memory attributes for last accessed TLB entry
 
     // Cached copies of system-level properties
     const ArmRelease *_release;

@@ -31,12 +31,17 @@
 
 #include "pickle/device/pickle_device.hh"
 
+#include "arch/arm/regs/misc.hh"
 #include "base/trace.hh"
+#include "debug/PickleDeviceAddressTranslation.hh"
 #include "debug/PickleDeviceControl.hh"
 #include "debug/PickleDeviceEvent.hh"
 #include "debug/PickleDeviceState.hh"
 #include "debug/PickleDeviceUncacheableForwarding.hh"
+#include "debug/PickleDeviceZeroCycleAddressTranslation.hh"
+#include "mem/request.hh"
 #include "mem/ruby/system/RubySystem.hh"
+#include "pickle/application_specific/pickle_job.hh"
 
 namespace gem5
 {
@@ -45,8 +50,8 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
   : ClockedObject(params),
     event([this]{processEvent();}, name() + ".event"),
     system(params.system),
-    mmu(params.mmu),
-    isa(params.isa),
+    //mmu(params.mmu),
+    //isa(params.isa),
     decoder(params.decoder),
     associated_cores(params.associated_cores),
     num_cores(params.num_cores),
@@ -68,6 +73,9 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
     device_thread_context(nullptr),
     device_stats(this)
 {
+    mmu = dynamic_cast<ArmISA::MMU*>(params.mmu);
+    isa = dynamic_cast<ArmISA::ISA*>(params.isa);
+
     requestor_id = system->getRequestorId(this);
 
     for (int i = 0; i < num_cores; ++i) {
@@ -504,6 +512,12 @@ PickleDevice::addWatchRange(AddrRange r)
 void
 PickleDevice::processJobDescriptor(std::vector<uint8_t>& job_descriptor)
 {
+    PickleJobCollection job_collection(job_descriptor);
+    DPRINTF(
+        PickleDeviceControl,
+        "Received job descriptor: %s\n",
+        job_collection.to_string()
+    );
 }
 
 void
@@ -514,14 +528,53 @@ PickleDevice::trySetThreadContextFromCore(uint64_t core_id)
             new PickleDeviceThreadContext(this)
         );
         isa->setThreadContext(device_thread_context.get());
-        device_thread_context->copyArchRegs(
+        device_thread_context->copyState(
             associated_cores[core_id]->getContext(0)
         );
+        // MMU::takeOverFrom
+        auto *other_mmu = dynamic_cast<ArmISA::MMU*>(
+            associated_cores[core_id]->getContext(0)->getMMUPtr()
+        );
+        mmu->s1State = other_mmu->s1State;
+        mmu->s2State = other_mmu->s2State;
+        mmu->_attr = other_mmu->_attr;
         DPRINTF(
-            PickleDeviceUncacheableForwarding,
+            PickleDeviceAddressTranslation,
+            "core thread_id: 0x%llx, device thread_id: 0x%llx\n",
+            associated_cores[core_id]->getContext(0)->contextId(),
+            device_thread_context->contextId()
+        );
+        // ISA::takeOverFrom
+        isa->takeOverFrom(device_thread_context.get(), nullptr);
+        DPRINTF(
+            PickleDeviceAddressTranslation,
             "Copy the arch regs to device_thread_context from core %lld\n",
             core_id
         );
+        DPRINTF(
+            PickleDeviceAddressTranslation,
+            "TTBR0_EL1: 0x%llx\n",
+            device_thread_context->readMiscReg(ArmISA::MISCREG_TTBR0_EL1)
+        );
+        // testing address translation
+        /*
+        Addr va = 0x7ff7ff6000ULL;
+        RequestPtr req = std::shared_ptr<Request>(
+            new Request(va, 64, Request::Flags(0), this->requestor_id, -1, 0)
+        );
+        Fault f = mmu->translateFunctional(
+            req, device_thread_context.get(), BaseMMU::Mode::Read
+        );
+        if (f != NoFault) {
+            DPRINTF(PickleDeviceAddressTranslation, "fault: %s\n", f->name());
+        }
+        Addr pa = req->getPaddr();
+        DPRINTF(
+            PickleDeviceAddressTranslation,
+            "Testing translation: paddr = 0x%llx, vaddr = 0x%llx",
+            va, pa
+        );
+        */
     }
 }
 
@@ -547,6 +600,22 @@ InstDecoder *
 PickleDevice::getDecoderPtr()
 {
     return decoder;
+}
+
+PacketPtr
+PickleDevice::zeroCycleLoad(const Addr& addr, bool& success)
+{
+    const Addr BLOCK_SIZE = 64;
+    Request::Flags flags = 0;
+    MemCmd cmd = MemCmd::ReadReq;
+    RequestPtr req = std::make_shared<Request>(
+        (addr >> 6) << 6, BLOCK_SIZE, flags, requestor_id);
+    uint8_t* data = new uint8_t[BLOCK_SIZE];
+    PacketPtr pkt = new Packet(req, cmd, BLOCK_SIZE);
+    pkt->dataDynamic<uint8_t>(data);
+    request_port.sendFunctional(pkt);
+    success = true;
+    return pkt;
 }
 
 }; // namespace gem5
