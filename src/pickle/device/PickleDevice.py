@@ -77,3 +77,13 @@ class PickleDevice(ClockedObject):
         "Number of responses to be sent per cycle."
         "0 means infinite responses per cycle.",
     )
+    coalesce_requests = Param.Bool(
+        False,
+        "Whether to coalesce requests to the same address into a single "
+        "request.",
+    )
+    coalesce_address_translations = Param.Bool(
+        False,
+        "Whether to coalesce responses to the same address into a single "
+        "response.",
+    )

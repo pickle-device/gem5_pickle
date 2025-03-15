@@ -1,5 +1,3 @@
-# -*- mode:python -*-
-
 # Copyright (c) 2025 The Regents of the University of California
 # All rights reserved.
 #
@@ -29,11 +27,21 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-Import('*')
+from m5.objects import BaseMMU
+from m5.objects.SimObject import SimObject
+from m5.params import *
+from m5.proxy import *
+from m5.SimObject import (
+    PyBindMethod,
+    SimObject,
+)
 
-SimObject('PickleDeviceAddressTranslationManager.py',
-           sim_objects=['PickleDeviceAddressTranslationManager'])
 
-DebugFlag('PickleDeviceAddressTranslationManagerDebug')
+class PickleDeviceRequestManager(SimObject):
+    type = "PickleDeviceRequestManager"
+    cxx_header = "pickle/request_manager/manager.hh"
+    cxx_class = "gem5::PickleDeviceRequestManager"
+    cxx_exports = [PyBindMethod("switchOn"), PyBindMethod("switchOff")]
 
-Source('manager.cc')
+    system = Param.System(Parent.any, "system object")
+    mmu = Param.BaseMMU("The engine MMU")

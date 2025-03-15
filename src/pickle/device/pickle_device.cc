@@ -71,6 +71,8 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
         params.response_queue_progress_per_cycle
     ),
     device_thread_context(nullptr),
+    coalesce_requests(params.coalesce_requests),
+    coalesce_address_translations(params.coalesce_address_translations),
     device_stats(this)
 {
     mmu = dynamic_cast<ArmISA::MMU*>(params.mmu);
@@ -600,6 +602,12 @@ InstDecoder *
 PickleDevice::getDecoderPtr()
 {
     return decoder;
+}
+
+ThreadContext *
+PickleDevice::getThreadContextPtr()
+{
+    return device_thread_context.get();
 }
 
 PacketPtr

@@ -170,8 +170,10 @@ class PickleDevice: public ClockedObject
         uint64_t uncacheable_response_queue_capacity;
         uint64_t response_queue_progress_per_cycle;
         std::unique_ptr<PickleDeviceThreadContext> device_thread_context;
-        void processJobDescriptor(std::vector<uint8_t>& job_descriptor);
+        bool coalesce_requests;
+        bool coalesce_address_translations;
     public:
+        void processJobDescriptor(std::vector<uint8_t>& job_descriptor);
         void enqueueControlMessage(uint8_t message);
         void enqueueControlData(uint8_t data);
         bool enqueueResponse(PacketPtr pkt, uint8_t internal_port_id);
@@ -183,6 +185,7 @@ class PickleDevice: public ClockedObject
         BaseMMU *getMMUPtr();
         BaseISA *getIsaPtr();
         InstDecoder *getDecoderPtr();
+        ThreadContext *getThreadContextPtr();
         PacketPtr zeroCycleLoad(const Addr& addr, bool& success);
     public:
         struct PickleDeviceStats : public statistics::Group
