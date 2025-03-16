@@ -43,5 +43,4 @@ class PickleDeviceRequestManager(SimObject):
     cxx_class = "gem5::PickleDeviceRequestManager"
     cxx_exports = [PyBindMethod("switchOn"), PyBindMethod("switchOff")]
 
-    system = Param.System(Parent.any, "system object")
-    mmu = Param.BaseMMU("The engine MMU")
+    system = Param.System(Parent.any, "Sqystem object")

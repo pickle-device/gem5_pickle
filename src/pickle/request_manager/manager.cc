@@ -40,6 +40,8 @@ PickleDeviceRequestManager::PickleDeviceRequestManager(
     const PickleDeviceRequestManagerParams &params
 ) : SimObject(params),
     is_activated(false),
+    owner(nullptr),
+    mmu(nullptr),
     retry_handle_translation_completion_event(
         [this]{retryHandleTranslationCompletion();}, name() + ".retry_event"
     )
@@ -63,16 +65,36 @@ PickleDeviceRequestManager::switchOff()
 }
 
 bool
-PickleDeviceRequestManager::enqueueRequest(
-    const Addr vaddr, bool is_load, std::unique_ptr<uint8_t[]> data_ptr
+PickleDeviceRequestManager::enqueueLoadRequest(const Addr vaddr)
+{
+    // Enqueue a load request to the request manager.
+    return enqueueRequest(vaddr, true, nullptr);
+}
+
+bool
+PickleDeviceRequestManager::enqueueStoreRequest(
+    const Addr vaddr, std::unique_ptr<uint8_t*> data_ptr
 )
 {
+    assert(data_ptr != nullptr);
+    return enqueueRequest(vaddr, false, std::move(data_ptr));
+}
+
+bool
+PickleDeviceRequestManager::enqueueRequest(
+    const Addr vaddr, bool is_load, std::unique_ptr<uint8_t*> data_ptr
+)
+{
+    DPRINTF(PickleDeviceRequestManagerDebug,
+        "enqueueRequest: vaddr = 0x%llx, isLoad = %d\n", vaddr, is_load
+    );
     Addr block_aligned_vaddr = (vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
     bool already_requested = false;
-    if (outstanding_requests.find(vaddr) == outstanding_requests.end()) {
+    if (outstanding_requests.find(block_aligned_vaddr) == \
+            outstanding_requests.end()) {
         already_requested = true;
     }
-    outstanding_requests[vaddr] = \
+    outstanding_requests[block_aligned_vaddr] = \
         std::vector<std::shared_ptr<RequestBookkeeper>>();
 
     // If the request is a load and the block has already been requested,
@@ -82,22 +104,9 @@ PickleDeviceRequestManager::enqueueRequest(
     }
 
     Request::Flags flags = 0;
-    MemCmd cmd = is_load ? MemCmd::ReadReq : MemCmd::WriteReq;
     RequestPtr req = std::make_shared<Request>(
-        block_aligned_vaddr, BLOCK_SIZE, flags, requestor_id
+        block_aligned_vaddr, BLOCK_SIZE, flags, requestor_id, 0, 0
     );
-    PacketPtr pkt = new Packet(req, cmd, BLOCK_SIZE);
-    if (is_load) {
-        // For load requests, we need to set the data to be received.
-        assert(data_ptr == nullptr);
-        pkt->dataDynamic<uint8_t>(new uint8_t[BLOCK_SIZE]);
-        // The data will be set to the request when the response is received.
-        // The pointer will be deleted when the response is back.
-    } else {
-        // For store requests, we need to set the data to be sent.
-        assert(data_ptr != nullptr);
-        pkt->dataStatic<uint8_t>(data_ptr.get());
-    }
 
     AddressTranslationDoneCallbackType done_callback = std::bind(
         &PickleDeviceRequestManager::handleTranslationCompletion,
@@ -110,13 +119,15 @@ PickleDeviceRequestManager::enqueueRequest(
     );
 
     // Add the request
-    outstanding_requests[vaddr].emplace_back(
-        new RequestBookkeeper(done_callback, fault_callback, pkt)
+    outstanding_requests[block_aligned_vaddr].emplace_back(
+        new RequestBookkeeper(
+            done_callback, fault_callback, req, is_load, std::move(data_ptr)
+        )
     );
 
     mmu->translateTiming(
         req, owner->getThreadContextPtr(), new PickleDeviceAddressTranslation(
-            outstanding_requests[vaddr].back(), requestor_id
+            outstanding_requests[block_aligned_vaddr].back(), requestor_id
         ),
         BaseMMU::Read
     );
@@ -131,6 +142,11 @@ PickleDeviceRequestManager::handleTranslationCompletion(
 {
     // When the translation is done, we'll send the request to the cache
     // hierarchy.
+    DPRINTF(PickleDeviceRequestManagerDebug,
+        "Translation done for vaddr 0x%llx, paddr 0x%llx\n",
+        request_bookkeeper->getPkt()->req->getVaddr(),
+        request_bookkeeper->getPkt()->req->getPaddr()
+    );
     bool success = owner->request_port.sendTimingReq(
         request_bookkeeper->getPkt()
     );
@@ -218,6 +234,33 @@ PickleDeviceRequestManager::handleTranslationFault(
             }
         ),
         outstanding_requests[vaddr].end()
+    );
+}
+
+void
+PickleDeviceRequestManager::setOwner(PickleDevice* owner)
+{
+    this->owner = owner;
+    DPRINTF(PickleDeviceRequestManagerDebug,
+        "Set owner to %s\n", owner->name()
+    );
+}
+
+void
+PickleDeviceRequestManager::setMMU(BaseMMU* mmu)
+{
+    this->mmu = mmu;
+    DPRINTF(PickleDeviceRequestManagerDebug,
+        "Set MMU to %s\n", mmu->name()
+    );
+}
+
+void
+PickleDeviceRequestManager::setRequestorID(const RequestorID requestor_id)
+{
+    this->requestor_id = requestor_id;
+    DPRINTF(PickleDeviceRequestManagerDebug,
+        "Set requestor id to %d\n", requestor_id
     );
 }
 

@@ -42,6 +42,7 @@
 #include "mem/request.hh"
 #include "mem/ruby/system/RubySystem.hh"
 #include "pickle/application_specific/pickle_job.hh"
+#include "pickle/request_manager/manager.hh"
 
 namespace gem5
 {
@@ -60,6 +61,7 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
     ticks_per_cycle(params.ticks_per_cycle),
     request_port(params.name + ".request_port", this),
     uncacheable_forwarders(params.uncacheable_forwarders),
+    request_manager(params.request_manager),
     remaining_control_message_length(0),
     remaining_control_data_length(0),
     receiving_command_type(PickleDeviceCommandType::INVALID),
@@ -71,6 +73,7 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
         params.response_queue_progress_per_cycle
     ),
     device_thread_context(nullptr),
+    device_command_address(0),
     coalesce_requests(params.coalesce_requests),
     coalesce_address_translations(params.coalesce_address_translations),
     device_stats(this)
@@ -94,6 +97,9 @@ PickleDevice::~PickleDevice()
 void
 PickleDevice::startup()
 {
+    request_manager->setOwner(this);
+    request_manager->setMMU(mmu);
+    request_manager->setRequestorID(requestor_id);
 }
 
 void
@@ -238,6 +244,18 @@ PickleDevice::PickleDeviceRequestPort::recvTimingResp(PacketPtr pkt)
     //    owner->receiveStoreResponse(pkt);
     //}
     //
+    auto req = pkt->req;
+    DPRINTF(PickleDeviceRequestManagerDebug,
+        "Received response: vaddr = 0x%llx, paddr = 0x%llx\n",
+        req->getVaddr(), req->getPaddr()
+    );
+    auto pkt_data = pkt->getConstPtr<uint64_t>();
+    for (uint64_t i = 0; i < pkt->getSize() / sizeof(uint64_t); i++) {
+        DPRINTF(PickleDeviceRequestManagerDebug,
+            "Received response data: 0x%llx\n", pkt_data[i]
+        );
+    }
+    delete pkt;
     return true;
 }
 
@@ -302,6 +320,9 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
                     PickleDeviceUncacheableForwarding,
                     "Received store request: addr = 0x%llx, data = 0x%llx\n",
                     pkt->req->getPaddr(), data
+                );
+                owner->request_manager->enqueueLoadRequest(
+                    data
                 );
             }
             if (pkt->needsResponse()) {
@@ -465,6 +486,7 @@ PickleDevice::enqueueControlData(uint8_t data)
             uint8_t* ptr8 = received_control_data.data();
             uint64_t* ptr64 = (uint64_t*) ptr8;
             addWatchRange(AddrRange(ptr64[0], ptr64[1]));
+            device_command_address = ptr64[0];
             DPRINTF(
                 PickleDeviceControl,
                 "Added watch range 0x%llx - 0x%llx\n",
@@ -608,6 +630,12 @@ ThreadContext *
 PickleDevice::getThreadContextPtr()
 {
     return device_thread_context.get();
+}
+
+Addr
+PickleDevice::getCommandAddr() const
+{
+    return device_command_address;
 }
 
 PacketPtr

@@ -71,6 +71,8 @@ class RequestBookkeeper: public std::enable_shared_from_this<RequestBookkeeper>
         AddressTranslationFaultCallbackType fault_callback;
         PacketPtr pkt;
         RequestPtr req;
+        bool is_load;
+        std::unique_ptr<uint8_t*> data_ptr;
         Fault fault;
         Addr vaddr;
         Addr paddr;
@@ -79,21 +81,32 @@ class RequestBookkeeper: public std::enable_shared_from_this<RequestBookkeeper>
         RequestBookkeeper(
             AddressTranslationDoneCallbackType _done_callback,
             AddressTranslationFaultCallbackType _fault_callback,
-            PacketPtr _pkt
+            RequestPtr _req,
+            bool _is_load,
+            std::unique_ptr<uint8_t*> _data_ptr
         ) : done_callback(_done_callback), fault_callback(_fault_callback),
-            pkt(_pkt), req(_pkt->req), fault(NoFault), paddr(0xBADADD),
-            status(RequestStatus::TRANSLATION_PENDING)
-        {}
+            pkt(NULL), req(_req), is_load(_is_load), fault(NoFault),
+            paddr(0xBADADD), status(RequestStatus::TRANSLATION_PENDING)
+        {
+            data_ptr = std::move(_data_ptr);
+        }
         void translationSent() { status = RequestStatus::TRANSLATION_SENT; }
         void requestPending() { status = RequestStatus::REQUEST_PENDING; }
         void requestSent() { status = RequestStatus::REQUEST_SENT; }
         void respondReady() { status = RequestStatus::RESPONSE_READY; }
-        void setResult(const Fault& _fault, const RequestPtr &req)
+        void setTranslationResult(const Fault& _fault, const RequestPtr &req)
         {
             status = RequestStatus::REQUEST_PENDING;
             fault = _fault;
             if (fault == NoFault) {
                 paddr = req->getPaddr();
+                if (is_load) {
+                    pkt = Packet::createRead(req);
+                    pkt->allocate();
+                } else {
+                    pkt = Packet::createWrite(req);
+                    pkt->dataDynamic(data_ptr.get());
+                }
                 done_callback(shared_from_this());
             } else {
                 fault_callback(shared_from_this(), fault);
@@ -132,7 +145,7 @@ class PickleDeviceAddressTranslation : public BaseMMU::Translation
             const Fault &fault, const RequestPtr &req, ThreadContext *tc,
             BaseMMU::Mode mode
         ) override {
-            bookkeeper->setResult(fault, req);
+            bookkeeper->setTranslationResult(fault, req);
             delete this;
         }
 };

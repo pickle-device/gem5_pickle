@@ -73,6 +73,8 @@ enum PickleDeviceCommandType
     JOB_DESCRIPTOR = 2
 };
 
+class PickleDeviceRequestManager;
+
 class PickleDevice: public ClockedObject
 {
     public:
@@ -152,6 +154,7 @@ class PickleDevice: public ClockedObject
         std::vector<TrafficSnooper*> uncacheable_forwarders;
     public:
         RequestorID requestor_id;
+        PickleDeviceRequestManager* request_manager;
     private:
         void doIdle();
         void doReceivingCommand();
@@ -170,6 +173,7 @@ class PickleDevice: public ClockedObject
         uint64_t uncacheable_response_queue_capacity;
         uint64_t response_queue_progress_per_cycle;
         std::unique_ptr<PickleDeviceThreadContext> device_thread_context;
+        Addr device_command_address;
         bool coalesce_requests;
         bool coalesce_address_translations;
     public:
@@ -187,6 +191,7 @@ class PickleDevice: public ClockedObject
         InstDecoder *getDecoderPtr();
         ThreadContext *getThreadContextPtr();
         PacketPtr zeroCycleLoad(const Addr& addr, bool& success);
+        Addr getCommandAddr() const;
     public:
         struct PickleDeviceStats : public statistics::Group
         {

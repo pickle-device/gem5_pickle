@@ -54,10 +54,17 @@ class PickleDeviceRequestManager : public SimObject
     public:
         void switchOn();
         void switchOff();
+        bool enqueueLoadRequest(const Addr vaddr);
+        bool enqueueStoreRequest(
+            const Addr vaddr, std::unique_ptr<uint8_t*> data_ptr
+        );
         bool enqueueRequest(
             const Addr vaddr, bool is_load,
-            std::unique_ptr<uint8_t[]> data_ptr
+            std::unique_ptr<uint8_t*> data_ptr
         );
+        void setRequestorID(const RequestorID requestor_id);
+        void setMMU(BaseMMU* mmu);
+        void setOwner(PickleDevice* owner);
     private:
         bool is_activated;
         PickleDevice* owner;

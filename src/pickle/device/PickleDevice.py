@@ -48,6 +48,9 @@ class PickleDevice(ClockedObject):
     mmu = Param.BaseMMU("The engine MMU")
     isa = Param.BaseISA("The ISA")
     decoder = Param.InstDecoder("The ISA decoder")
+    request_manager = Param.PickleDeviceRequestManager(
+        "The request manager to handle requests from the device."
+    )
     associated_cores = VectorParam.BaseCPU("Associated cores")
     num_cores = Param.Int(1, "Number of cores")
     request_port = RequestPort(
