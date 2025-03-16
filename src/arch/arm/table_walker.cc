@@ -2239,11 +2239,11 @@ TableWalker::fetchDescriptor(Addr desc_addr,
 
         if (currState->timing) {
             port->sendTimingReq(req, data,
-                currState->tc->getCpuPtr()->clockPeriod(), event);
+                this->clockPeriod(), event);
 
         } else if (!currState->functional) {
             port->sendAtomicReq(req, data,
-                currState->tc->getCpuPtr()->clockPeriod());
+                this->clockPeriod());
 
             (this->*doDescriptor)();
         } else {
@@ -2552,7 +2552,7 @@ TableWalker::Stage2Walk::finish(const Fault &_fault,
 
     if (_fault == NoFault && !req->getFlags().isSet(Request::NO_ACCESS)) {
         parent.getTableWalkerPort().sendTimingReq(req, data,
-            tc->getCpuPtr()->clockPeriod(), event);
+            parent.clockPeriod(), event);
     } else {
         // We can't do the DMA access as there's been a problem, so tell the
         // event we're done
