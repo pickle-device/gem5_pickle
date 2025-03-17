@@ -534,13 +534,13 @@ PickleDevice::addWatchRange(AddrRange r)
 }
 
 void
-PickleDevice::processJobDescriptor(std::vector<uint8_t>& job_descriptor)
+PickleDevice::processJobDescriptor(std::vector<uint8_t>& _job_descriptor)
 {
-    PickleJobCollection job_collection(job_descriptor);
+    PickleJobDescriptor job_descriptor(_job_descriptor);
     DPRINTF(
         PickleDeviceControl,
         "Received job descriptor: %s\n",
-        job_collection.to_string()
+        job_descriptor.to_string()
     );
 }
 

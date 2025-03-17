@@ -71,14 +71,14 @@ class PickleJobArrayDescriptor
                << ", is_index_access: " << is_index_access;
             return ss.str();
         }
-}; // class PickleJob
+}; // class PickleJobArrayDescriptor
 
-class PickleJobCollection
+class PickleJobDescriptor
 {
     public:
         std::vector<PickleJobArrayDescriptor> arrays;
-        PickleJobCollection() {}
-        PickleJobCollection(std::vector<uint8_t> &job_ptr)
+        PickleJobDescriptor() {}
+        PickleJobDescriptor(std::vector<uint8_t> &job_ptr)
         {
             // job_ptr[0] is the number of arrays
             const uint8_t num_arrays = job_ptr[0];
@@ -119,7 +119,7 @@ class PickleJobCollection
             }
             return ss.str();
         }
-}; // class PickleJobCollection
+}; // class PickleJobDescriptor
 
 }; // namespace gem5
 
