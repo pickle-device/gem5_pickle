@@ -43,3 +43,5 @@ class PrefetcherInterface(ClockedObject):
     )
     cxx_class = "gem5::PrefetcherInterface"
     cxx_exports = [PyBindMethod("switchOn"), PyBindMethod("switchOff")]
+
+    prefetch_distance = Param.Int(1, "Prefetch distance")

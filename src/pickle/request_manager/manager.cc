@@ -90,7 +90,7 @@ PickleDeviceRequestManager::enqueueRequest(
     );
     Addr block_aligned_vaddr = (vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
     bool already_requested = false;
-    if (outstanding_requests.find(block_aligned_vaddr) == \
+    if (outstanding_requests.find(block_aligned_vaddr) != \
             outstanding_requests.end()) {
         already_requested = true;
     }
@@ -132,6 +132,10 @@ PickleDeviceRequestManager::enqueueRequest(
         BaseMMU::Read
     );
 
+    DPRINTF(PickleDeviceRequestManagerDebug,
+        "Started translation for vaddr 0x%llx\n", block_aligned_vaddr
+    );
+
     return true;
 }
 
@@ -152,11 +156,16 @@ PickleDeviceRequestManager::handleTranslationCompletion(
     );
     if (success) {
         request_bookkeeper->translationSent();
+        DPRINTF(PickleDeviceRequestManagerDebug,
+            "Done translation for vaddr 0x%llx\n",
+            request_bookkeeper->getReq()->getVaddr()
+        );
     } else {
         addRetryHandleTranslationCompletion(request_bookkeeper);
-        //DPRINTF(PickleDeviceRequestManagerDebug,
-        //    "Retrying translation completion for vaddr 0x%llx\n", vaddr
-        //);
+        DPRINTF(PickleDeviceRequestManagerDebug,
+            "Retrying translation completion for vaddr 0x%llx\n",
+            request_bookkeeper->getReq()->getVaddr()
+        );
     }
 }
 
@@ -173,10 +182,15 @@ PickleDeviceRequestManager::addRetryHandleTranslationCompletion(
             retry_handle_translation_completion_event,
             curTick() + 1000
         );
+        DPRINTF(PickleDeviceRequestManagerDebug,
+            "Scheduled retrying translation completion for vaddr 0x%llx\n",
+            request_bookkeeper->getReq()->getVaddr()
+        );
     }
-    //DPRINTF(PickleDeviceRequestManagerDebug,
-    //    "Retrying translation completion for vaddr 0x%llx\n", vaddr
-    //);
+    DPRINTF(PickleDeviceRequestManagerDebug,
+        "Add retrying translation completion for vaddr 0x%llx\n",
+        request_bookkeeper->getReq()->getVaddr()
+    );
 }
 
 void
@@ -195,16 +209,18 @@ PickleDeviceRequestManager::retryHandleTranslationCompletion()
                 retry_handle_translation_completion_event,
                 curTick() + 1000
             );
-            //DPRINTF(PickleDeviceRequestManagerDebug,
-            //    "Retrying translation completion for vaddr 0x%llx\n", vaddr
-            //);
+            DPRINTF(PickleDeviceRequestManagerDebug,
+                "Retrying translation completion for vaddr 0x%llx\n",
+                request_bookkeeper->getReq()->getVaddr()
+            );
             break;
         }
         need_retry_handle_translation_completion.pop();
         request_bookkeeper->requestPending();
-        //DPRINTF(PickleDeviceRequestManagerDebug,
-        //    "Retrying translation completion for vaddr 0x%llx\n", vaddr
-        //);
+        DPRINTF(PickleDeviceRequestManagerDebug,
+            "Retrying translation completion for vaddr 0x%llx\n",
+            request_bookkeeper->getReq()->getVaddr()
+        );
     }
 }
 
@@ -235,6 +251,7 @@ PickleDeviceRequestManager::handleTranslationFault(
         ),
         outstanding_requests[vaddr].end()
     );
+    owner->device_stats.numTranslationFaults++;
 }
 
 void
@@ -261,6 +278,36 @@ PickleDeviceRequestManager::setRequestorID(const RequestorID requestor_id)
     this->requestor_id = requestor_id;
     DPRINTF(PickleDeviceRequestManagerDebug,
         "Set requestor id to %d\n", requestor_id
+    );
+}
+
+void
+PickleDeviceRequestManager::handleRequestCompletion(PacketPtr pkt)
+{
+    Addr vaddr = pkt->req->getVaddr();
+    Addr block_aligned_vaddr = (vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+    if (outstanding_requests.find(block_aligned_vaddr) == \
+            outstanding_requests.end()) {
+        return;
+    }
+
+
+    outstanding_requests[block_aligned_vaddr].erase(
+        std::remove_if(
+            outstanding_requests[block_aligned_vaddr].begin(),
+            outstanding_requests[block_aligned_vaddr].end(),
+            [pkt](
+                const std::shared_ptr<RequestBookkeeper>& rbk
+            ) {
+                return rbk->getPkt() == pkt;
+            }
+        ),
+        outstanding_requests[block_aligned_vaddr].end()
+    );
+
+    // When the request is done, we'll notify the requestor.
+    DPRINTF(PickleDeviceRequestManagerDebug,
+        "Request done for vaddr 0x%llx\n", block_aligned_vaddr
     );
 }
 

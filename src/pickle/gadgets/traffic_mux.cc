@@ -41,7 +41,7 @@ TrafficMux::TrafficMux(const TrafficMuxParams &params)
   : ClockedObject(params),
     reqPort(params.name + ".reqPort", *this),
     isActivated(false),
-    event([this]{processRetry();}, name() + ".event")
+    retryEvent([this]{processRetry();}, name() + ".retryEvent")
 {
                                      // python port name here
      for (int i = 0; i < params.port_rsp_ports_connection_count; ++i) {
@@ -70,16 +70,21 @@ TrafficMux::recvFunctional(PacketPtr pkt)
 }
 
 bool
-TrafficMux::recvTimingReq(PacketPtr pkt, std::size_t port_id)
+TrafficMux::recvTimingReq(PacketPtr pkt, uint64_t port_id)
 {
     if (reqPort.sendTimingReq(pkt)) {
         pktId2Port[pkt->id] = port_id;
         return true;
     }
 
-    if (port_id ==0) {
-        DPRINTF(TrafficMuxDebug, "schedule retry %ld\n", 0);
-        schedule(event, curTick() + 250);
+    // Have to retry
+    if (!retryEvent.scheduled()) {
+        DPRINTF(
+            TrafficMuxDebug,
+            "schedule retry at %lld\n", curTick() + 250
+        );
+        schedule(retryEvent, curTick() + 250);
+        retryQueue.push(port_id);
     }
 
     return false;
@@ -89,7 +94,18 @@ void
 TrafficMux::processRetry()
 {
     DPRINTF(TrafficMuxDebug, "process retry\n");
-    rspPorts[0].sendRetryReq();
+    if (!retryQueue.empty()) {
+        rspPorts[retryQueue.pop()].sendRetryReq();
+    }
+    if (!retryQueue.empty()) {
+        if (!retryEvent.scheduled()) {
+            DPRINTF(
+                TrafficMuxDebug,
+                "schedule retry at %lld\n", curTick() + 250
+            );
+            schedule(retryEvent, curTick() + 250);
+        }
+    }
 }
 
 // RequestPort

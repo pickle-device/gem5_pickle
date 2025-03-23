@@ -50,6 +50,7 @@
 #include "cpu/thread_context.hh"
 #include "mem/ruby/protocol/CHI/Cache_Controller.hh"
 #include "params/PickleDevice.hh"
+#include "pickle/application_specific/prefetcher/prefetcher_interface.hh"
 #include "pickle/device/device_thread_context.hh"
 #include "pickle/gadgets/traffic_snooper.hh"
 #include "sim/clocked_object.hh"
@@ -71,6 +72,12 @@ enum PickleDeviceCommandType
     INVALID = 0,
     ADD_WATCH_RANGE = 1,
     JOB_DESCRIPTOR = 2
+};
+
+enum MemMode
+{
+    ATOMIC = 0,
+    TIMING = 1
 };
 
 class PickleDeviceRequestManager;
@@ -103,6 +110,7 @@ class PickleDevice: public ClockedObject
         uint64_t core_to_pickle_latency_in_ticks;
         uint64_t ticks_per_cycle;
         PickleDeviceState device_state;
+        MemMode mem_mode;
     public:
         // this is a request port from the engine to its controller
         // this port allows the engine to make requests to controller as if
@@ -190,8 +198,13 @@ class PickleDevice: public ClockedObject
         BaseISA *getIsaPtr();
         InstDecoder *getDecoderPtr();
         ThreadContext *getThreadContextPtr();
+        PickleDeviceState getDeviceState() const;
+        PrefetcherInterface *getPrefetcher();
+        MemMode getMemMode() const { return mem_mode; }
         PacketPtr zeroCycleLoad(const Addr& addr, bool& success);
         Addr getCommandAddr() const;
+    public: // application speicific
+        PrefetcherInterface* prefetcher_interface;
     public:
         struct PickleDeviceStats : public statistics::Group
         {

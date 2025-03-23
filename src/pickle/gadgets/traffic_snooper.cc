@@ -42,7 +42,6 @@ TrafficSnooper::TrafficSnooper(const TrafficSnooperParams &params)
 {
     in_port = new TrafficSnooperResponsePort(".in_port", *this, 0);
     out_port = new TrafficSnooperRequestPort(".out_port", *this, 0);
-    //snoop_port = new TrafficSnooperPassiveRequestPort(".snoop_port",*this,0);
     snoop_port = new TrafficSnooperRequestPort(".snoop_port", *this, 0);
 }
 

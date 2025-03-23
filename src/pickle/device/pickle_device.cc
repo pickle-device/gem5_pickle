@@ -59,6 +59,7 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
     device_id(params.device_id),
     core_to_pickle_latency_in_ticks(params.core_to_pickle_latency_in_ticks),
     ticks_per_cycle(params.ticks_per_cycle),
+    device_state(PickleDeviceState::SLEEP),
     request_port(params.name + ".request_port", this),
     uncacheable_forwarders(params.uncacheable_forwarders),
     request_manager(params.request_manager),
@@ -76,6 +77,7 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
     device_command_address(0),
     coalesce_requests(params.coalesce_requests),
     coalesce_address_translations(params.coalesce_address_translations),
+    prefetcher_interface(params.prefetcher),
     device_stats(this)
 {
     mmu = dynamic_cast<ArmISA::MMU*>(params.mmu);
@@ -86,7 +88,7 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
     for (int i = 0; i < num_cores; ++i) {
         uncacheable_snoop_ports.push_back(
             new PickleDeviceUncacheableSnoopPort(
-                csprintf("%s%d", "uncacheable_snoop_port", i),this, i, i));
+                csprintf("%s%d", "uncacheable_snoop_port", i), this, i, i));
     }
 }
 
@@ -100,6 +102,7 @@ PickleDevice::startup()
     request_manager->setOwner(this);
     request_manager->setMMU(mmu);
     request_manager->setRequestorID(requestor_id);
+    prefetcher_interface->setOwner(this);
 }
 
 void
@@ -148,6 +151,9 @@ PickleDevice::operate()
 {
     schedule(event, curTick() + ticks_per_cycle);
     operateResponseQueue();
+    if (prefetcher_interface) {
+        prefetcher_interface->clockTick();
+    }
     DPRINTF(
         PickleDeviceEvent, "Operate: schedule event at %lld\n",
         curTick() + ticks_per_cycle
@@ -237,25 +243,18 @@ PickleDevice::regStats()
 bool
 PickleDevice::PickleDeviceRequestPort::recvTimingResp(PacketPtr pkt)
 {
-    // if we receive a load, it's a prefetch
-    // if we receive a store receipt, it's a cache block-write
-    //if (pkt->isRead())
-    //{
-    //    owner->receiveStoreResponse(pkt);
-    //}
-    //
     auto req = pkt->req;
     DPRINTF(PickleDeviceRequestManagerDebug,
         "Received response: vaddr = 0x%llx, paddr = 0x%llx\n",
         req->getVaddr(), req->getPaddr()
     );
-    auto pkt_data = pkt->getConstPtr<uint64_t>();
-    for (uint64_t i = 0; i < pkt->getSize() / sizeof(uint64_t); i++) {
-        DPRINTF(PickleDeviceRequestManagerDebug,
-            "Received response data: 0x%llx\n", pkt_data[i]
-        );
-    }
-    delete pkt;
+    const uint8_t* pkt_data = pkt->getConstPtr<uint8_t>();
+    uint8_t* data = new uint8_t[req->getSize()];
+    std::memcpy(data, pkt_data, req->getSize());
+    owner->request_manager->handleRequestCompletion(pkt);
+    owner->prefetcher_interface->receivePrefetch(
+        req->getVaddr(), std::unique_ptr<uint8_t[]>(data)
+    );
     return true;
 }
 
@@ -303,8 +302,32 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
                 pkt->makeResponse();
                 owner->enqueueResponse(pkt, internal_id);
             }
-        }
-        else {
+        } // device specs
+        else if (
+            pkt->req->hasPaddr()
+                && (pkt->req->getPaddr() >= 0x10110010
+                    && pkt->req->getPaddr() <= 0x10110020)
+        ) {
+            uint64_t data = -1;
+            Addr paddr = pkt->req->getPaddr();
+            switch (paddr) {
+                case 0x10110010:
+                    data = owner->getDeviceState() != PickleDeviceState::SLEEP;
+                    break;
+                case 0x10110018:
+                    data = owner->getPrefetcher()->getPrefetchDistance();
+                    break;
+            };
+            uint8_t* data_ptr = (uint8_t*) &data;
+            pkt->makeResponse();
+            pkt->setData(data_ptr);
+            DPRINTF(
+                PickleDeviceControl,
+                "Sent to paddr: 0x%llx, size: %ld, data: 0x%ld\n",
+                paddr, pkt->req->getSize(), data
+            );
+            owner->enqueueResponse(pkt, internal_id);
+        } else {
             owner->trySetThreadContextFromCore(internal_id);
             bool isLoad = pkt->isRead();
             if (isLoad) {
@@ -316,13 +339,11 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
             } else {
                 const uint64_t* ptr = pkt->getConstPtr<uint64_t>();
                 uint64_t data = ptr[0];
+                owner->prefetcher_interface->enqueueWork(data);
                 DPRINTF(
                     PickleDeviceUncacheableForwarding,
                     "Received store request: addr = 0x%llx, data = 0x%llx\n",
                     pkt->req->getPaddr(), data
-                );
-                owner->request_manager->enqueueLoadRequest(
-                    data
                 );
             }
             if (pkt->needsResponse()) {
@@ -331,21 +352,6 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
             }
         }
     }
-
-    /*
-    if (pkt->cmd.isWrite()) {
-        if (owner->thread_context == nullptr) {
-            owner->setThreadContext(pkt->req->requestorId());
-        }
-        this->owner->queueCommand(pkt,getId());
-        if (pkt->needsResponse()) {
-            pkt->makeResponse();
-            this->owner->queueCommandResponse(pkt,getId());
-        }
-    } else {
-        this->owner->queueReadResponse(pkt,getId());
-    }
-        */
 
     return true;
 }
@@ -379,6 +385,30 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvAtomic(PacketPtr pkt)
                 "addr = 0x%llx, data = 0x%x\n",
                 pkt->req->getPaddr(), data
             );
+        } // device specs
+        else if (
+            pkt->req->hasPaddr()
+                && (pkt->req->getPaddr() >= 0x10110010
+                    && pkt->req->getPaddr() <= 0x10110020)
+        ) {
+            uint64_t data = -1;
+            Addr paddr = pkt->req->getPaddr();
+            switch (paddr) {
+                case 0x10110010:
+                    data = owner->getDeviceState() != PickleDeviceState::SLEEP;
+                    break;
+                case 0x10110018:
+                    data = owner->getPrefetcher()->getPrefetchDistance();
+                    break;
+            };
+            uint8_t* data_ptr = (uint8_t*) &data;
+            pkt->makeResponse();
+            pkt->setData(data_ptr);
+            DPRINTF(
+                PickleDeviceControl,
+                "Sent to paddr: 0x%llx, size: %ld, data: 0x%ld\n",
+                paddr, pkt->req->getSize(), data
+            );
         } else {
             owner->trySetThreadContextFromCore(internal_id);
             bool isLoad = pkt->isRead();
@@ -386,7 +416,7 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvAtomic(PacketPtr pkt)
             DPRINTF(
                 PickleDeviceUncacheableForwarding,
                 "Received request [atomic]: addr = 0x%llx, type = %s\n",
-                pkt->req->getPaddr()
+                pkt->req->getPaddr(), type.c_str()
             );
         }
     }
@@ -421,6 +451,30 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvFunctional(PacketPtr pkt)
                 "Received control data [functional]: "
                 "addr = 0x%llx, data = 0x%x\n",
                 pkt->req->getPaddr(), data
+            );
+        } // device specs
+        else if (
+            pkt->req->hasPaddr()
+                && (pkt->req->getPaddr() >= 0x10110010
+                    && pkt->req->getPaddr() <= 0x10110020)
+        ) {
+            uint64_t data = -1;
+            Addr paddr = pkt->req->getPaddr();
+            switch (paddr) {
+                case 0x10110010:
+                    data = owner->getDeviceState() != PickleDeviceState::SLEEP;
+                    break;
+                case 0x10110018:
+                    data = owner->getPrefetcher()->getPrefetchDistance();
+                    break;
+            };
+            uint8_t* data_ptr = (uint8_t*) &data;
+            pkt->makeResponse();
+            pkt->setData(data_ptr);
+            DPRINTF(
+                PickleDeviceControl,
+                "Sent to paddr: 0x%llx, size: %ld, data: 0x%ld\n",
+                paddr, pkt->req->getSize(), data
             );
         } else {
             owner->trySetThreadContextFromCore(internal_id);
@@ -526,9 +580,18 @@ PickleDevice::enqueueResponse(PacketPtr pkt, uint8_t internal_port_id)
 void
 PickleDevice::addWatchRange(AddrRange r)
 {
-    //watch_ranges.push_back(r);
+    DPRINTF(
+        PickleDeviceControl,
+        "Boardcasting new range 0x%llx - 0x%llx\n",
+        r.start(), r.end()
+    );
     for (auto forwarder: uncacheable_forwarders)
     {
+        DPRINTF(
+            PickleDeviceControl,
+            " -> to %s\n",
+            forwarder->name()
+        );
         forwarder->addWatchRange(r);
     }
 }
@@ -537,6 +600,7 @@ void
 PickleDevice::processJobDescriptor(std::vector<uint8_t>& _job_descriptor)
 {
     PickleJobDescriptor job_descriptor(_job_descriptor);
+    prefetcher_interface->configure(job_descriptor);
     DPRINTF(
         PickleDeviceControl,
         "Received job descriptor: %s\n",
@@ -630,6 +694,18 @@ ThreadContext *
 PickleDevice::getThreadContextPtr()
 {
     return device_thread_context.get();
+}
+
+PickleDeviceState
+PickleDevice::getDeviceState() const
+{
+    return device_state;
+}
+
+PrefetcherInterface *
+PickleDevice::getPrefetcher()
+{
+    return prefetcher_interface;
 }
 
 Addr

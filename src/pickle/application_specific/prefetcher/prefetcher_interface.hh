@@ -43,6 +43,9 @@
 #include "sim/clocked_object.hh"
 #include "sim/sim_object.hh"
 
+
+class c_cerebellum;
+
 namespace gem5
 {
 
@@ -60,7 +63,7 @@ class PrefetcherInterface: public ClockedObject
         uint64_t prefetch_distance;
         PARAMS(PrefetcherInterface);
     private:
-        //c_cerebellum prefetcher;
+        std::unique_ptr<c_cerebellum> prefetcher;
         std::unordered_map<Addr, std::unique_ptr<uint8_t[]>> packet_data;
         std::unordered_map<Addr, PacketStatus> packet_status;
         bool prefetcher_initialized;
@@ -68,7 +71,6 @@ class PrefetcherInterface: public ClockedObject
         void processPrefetcherOutQueue();
         // check and receive prefetch requests for every cycle
         void processPrefetcherInQueue();
-
     public:
         PickleDevice* owner;
     public:
@@ -81,20 +83,21 @@ class PrefetcherInterface: public ClockedObject
         void configure(const PickleJobDescriptor& job);
         void switchOn();
         void switchOff();
+        bool isActivated() const { return prefetcher_initialized; }
+        uint64_t getPrefetchDistance() const;
     public: // the interface
         bool enqueueWork(const uint64_t& node_id);
         void receivePrefetch(
             const uint64_t& vaddr, std::unique_ptr<uint8_t[]> p
         );
     public:
+        uint64_t workCount;
         void regStats() override;
         struct PrefetcherStats : public statistics::Group
         {
             PrefetcherStats(statistics::Group *parent);
             void regStats() override;
             // See the .cc for the description of each stat
-            statistics::Scalar activatedTick;
-            statistics::Scalar activatedCycle;
             statistics::Scalar numReceivedWork;
             statistics::Scalar numPrefetches;
             statistics::Histogram histInQueueLength;

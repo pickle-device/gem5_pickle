@@ -29,6 +29,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
 **/
 
+#ifndef __PICKLE_DEVICE_REQUEST_MANAGER_HH__
+#define __PICKLE_DEVICE_REQUEST_MANAGER_HH__
+
 #include <memory>
 #include <queue>
 
@@ -65,6 +68,7 @@ class PickleDeviceRequestManager : public SimObject
         void setRequestorID(const RequestorID requestor_id);
         void setMMU(BaseMMU* mmu);
         void setOwner(PickleDevice* owner);
+        void handleRequestCompletion(PacketPtr pkt);
     private:
         bool is_activated;
         PickleDevice* owner;
@@ -92,7 +96,8 @@ class PickleDeviceRequestManager : public SimObject
         void addRetryHandleTranslationCompletion(
             std::shared_ptr<RequestBookkeeper> request_bookkeeper
         );
-
-}; // class PickleDeviceAddressTranslationManager
+}; // class PickleDeviceRequestManager
 
 }; // namespace gem5
+
+#endif // __PICKLE_DEVICE_REQUEST_MANAGER_HH__

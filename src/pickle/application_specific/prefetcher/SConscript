@@ -34,5 +34,8 @@ Import('*')
 SimObject('PrefetcherInterface.py', sim_objects=['PrefetcherInterface'])
 
 DebugFlag('PickleDevicePrefetcherDebug')
+DebugFlag('PickleDevicePrefetcherProgressTracker')
 
 Source('prefetcher_interface.cc')
+Source('backend/cerebellum.cpp')
+Source('backend/descriptiveDataPf.cpp')

@@ -61,6 +61,9 @@ class PickleDevice(ClockedObject):
     )
     uncacheable_forwarders = VectorParam.TrafficSnooper("UncacheableForwarder")
 
+    # application specifics
+    prefetcher = Param.PrefetcherInterface("Prefetcher")
+
     # design parameters
     # prefetcher = Param.CerebellumPrefetcher(NULL, "Prefetcher")
     core_to_pickle_latency_in_ticks = Param.Int(

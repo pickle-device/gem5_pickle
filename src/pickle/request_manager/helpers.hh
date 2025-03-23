@@ -90,6 +90,12 @@ class RequestBookkeeper: public std::enable_shared_from_this<RequestBookkeeper>
         {
             data_ptr = std::move(_data_ptr);
         }
+        ~RequestBookkeeper()
+        {
+            if (pkt) {
+                delete pkt;
+            }
+        }
         void translationSent() { status = RequestStatus::TRANSLATION_SENT; }
         void requestPending() { status = RequestStatus::REQUEST_PENDING; }
         void requestSent() { status = RequestStatus::REQUEST_SENT; }
@@ -113,6 +119,7 @@ class RequestBookkeeper: public std::enable_shared_from_this<RequestBookkeeper>
             }
         }
         PacketPtr getPkt() { return pkt; }
+        RequestPtr getReq() { return req; }
         Addr getVAddr() const { return req->getVaddr(); }
 };
 

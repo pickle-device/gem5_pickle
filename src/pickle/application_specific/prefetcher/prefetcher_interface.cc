@@ -32,7 +32,11 @@
 #include "pickle/application_specific/prefetcher/prefetcher_interface.hh"
 
 #include "debug/PickleDevicePrefetcherDebug.hh"
+#include "debug/PickleDevicePrefetcherProgressTracker.hh"
+
+#include "pickle/application_specific/prefetcher/backend/cerebellum.hpp"
 #include "pickle/device/pickle_device.hh"
+#include "pickle/request_manager/manager.hh"
 
 namespace gem5
 {
@@ -41,7 +45,11 @@ PrefetcherInterface::PrefetcherInterface(
   const PrefetcherInterfaceParams &params
 )
   : ClockedObject(params),
+    prefetch_distance(params.prefetch_distance),
+    prefetcher(nullptr),
     prefetcher_initialized(false),
+    owner(nullptr),
+    workCount(0),
     prefetcherStats(this)
 {
 }
@@ -56,19 +64,89 @@ PrefetcherInterface::startup()
 }
 
 void
+PrefetcherInterface::setOwner(PickleDevice* pickle_device)
+{
+    this->owner = pickle_device;
+}
+
+void
+PrefetcherInterface::clockTick()
+{
+    if (!prefetcher_initialized)
+        return;
+    prefetcher->operate(curTick());
+    prefetcherStats.histInQueueLength.sample(packet_status.size());
+    prefetcherStats.histOutQueueLength.sample(prefetcher->outQSize());
+    processPrefetcherOutQueue();
+    processPrefetcherInQueue();
+}
+
+void
 PrefetcherInterface::processPrefetcherOutQueue()
 {
+    if (prefetcher->outQSize() > 0)
+    {
+        DPRINTF(
+            PickleDevicePrefetcherDebug,
+            "OutQueue size: %d\n", prefetcher->outQSize()
+        );
+    }
+    while (prefetcher->hasNextPf()) // TODO: do we want to limit how many
+                                    // requests we send out per cycle?
+    {
+        Addr nextPfVAddr = prefetcher->nextPf();
+        bool status = owner->request_manager->enqueueLoadRequest(nextPfVAddr);
+        if (status) {
+            DPRINTF(
+                PickleDevicePrefetcherDebug,
+                "PREFETCH OUT ---> vaddr 0x%llx\n",
+                nextPfVAddr
+            );
+            packet_status[nextPfVAddr] = PacketStatus::SENT;
+            prefetcher->popNextPf(curTick());
+        } else {
+            DPRINTF(
+                PickleDevicePrefetcherDebug, "Warn: outqueue is full\n"
+            );
+            break;
+        }
+    }
 }
 
 void
 PrefetcherInterface::processPrefetcherInQueue()
 {
+    std::vector<Addr> to_be_removed;
+    to_be_removed.reserve(16);
+    for (auto& [vaddr, status] : packet_status)
+    {
+        const bool is_ready = (status == PacketStatus::ARRIVED);
+        if (!is_ready)
+            continue;
+
+        DPRINTF(
+            PickleDevicePrefetcherDebug,
+            "PREFETCH IN <--- vaddr 0x%llx\n", vaddr
+        );
+        std::vector<uint64_t> triggerAddrs = \
+            prefetcher->captureResponse(
+                curTick(), vaddr, std::move(packet_data[vaddr]),
+                64 //block_size
+            );
+        to_be_removed.push_back(vaddr);
+    }
+
+    for (auto const& vaddr: to_be_removed)
+    {
+        packet_data.erase(vaddr);
+        packet_status.erase(vaddr);
+    }
 }
 
-void
-PrefetcherInterface::setOwner(PickleDevice* pickle_device)
+uint64_t
+PrefetcherInterface::getPrefetchDistance() const
 {
-    this->owner = pickle_device;
+    return prefetch_distance;
 }
 
 void
@@ -82,19 +160,60 @@ PrefetcherInterface::switchOff()
 }
 
 void
-PrefetcherInterface::clockTick()
-{
-}
-
-void
 PrefetcherInterface::configure(const PickleJobDescriptor& job)
 {
+    prefetcher = std::unique_ptr<c_cerebellum>(new c_cerebellum(this));
+    // converting to the backend format
+    std::vector<std::tuple<
+        uint64_t, uint64_t, bool, bool, uint64_t, uint64_t, uint64_t
+    >> jobTuples;
+    for (const auto& array : job.arrays)
+    {
+        jobTuples.push_back(
+            std::make_tuple(
+                array.array_id,
+                array.dst_id,
+                array.is_indexed_access,
+                array.is_ranged_access,
+                array.vaddr_start,
+                array.vaddr_end,
+                array.element_size
+            )
+        );
+        DPRINTF(
+            PickleDevicePrefetcherDebug,
+            "Prefetcher configured: array_id %lld, dst_id %lld, is_indexed %d"
+            ", is_ranged %d, vaddr_start 0x%llx, vaddr_end 0x%llx"
+            " element_size %lld\n",
+            array.array_id, array.dst_id,
+            array.is_indexed_access, array.is_ranged_access,
+            array.vaddr_start, array.vaddr_end, array.element_size
+        );
+    }
+    prefetcher->configure(jobTuples);
+    prefetcher_initialized = true;
 }
 
 bool
-PrefetcherInterface::enqueueWork(const uint64_t& node_id)
+PrefetcherInterface::enqueueWork(const uint64_t& workData)
 {
-    return false; // TODO: implement
+    if (!prefetcher_initialized)
+        return false;
+    workCount++;
+    prefetcherStats.numReceivedWork++;
+    if (workCount % 1000 == 0 || workCount == 1) {
+        DPRINTF(
+            PickleDevicePrefetcherProgressTracker,
+            "Work sent: %d\n",
+            workCount
+        );
+    }
+    prefetcher->captureRequest(curTick(), workData);
+    DPRINTF(
+        PickleDevicePrefetcherDebug,
+        "NEW WORK: data = 0x%llx\n", workData
+    );
+    return true;
 }
 
 void
@@ -102,24 +221,26 @@ PrefetcherInterface::receivePrefetch(
   const uint64_t& vaddr, std::unique_ptr<uint8_t[]> p
 )
 {
+    prefetcherStats.numPrefetches++;
+    DPRINTF(
+        PickleDevicePrefetcherDebug,
+        "Receiving Packet: vaddr = 0x%llx\n", vaddr
+    );
+    // Update the packet status
+    packet_status[vaddr] = PacketStatus::ARRIVED;
+    packet_data[vaddr] = std::move(p);
 }
 
 void
 PrefetcherInterface::regStats()
 {
+    ClockedObject::regStats();
+    prefetcherStats.regStats();
 }
 
 PrefetcherInterface::PrefetcherStats::PrefetcherStats(
     statistics::Group *parent
 ) : statistics::Group(parent),
-    ADD_STAT(
-        activatedTick, statistics::units::Tick::get(),
-        "The tick where the prefetcher was activate"
-    ),
-    ADD_STAT(
-        activatedCycle, statistics::units::Tick::get(),
-        "The cycle where the prefetcher was activate"
-    ),
     ADD_STAT(
         numReceivedWork, statistics::units::Count::get(),
         "Number of work sent from software"

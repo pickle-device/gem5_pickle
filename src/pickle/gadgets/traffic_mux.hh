@@ -33,7 +33,9 @@
 #ifndef __TRAFFIC_MUX_HH__
 #define __TRAFFIC_MUX_HH__
 
+#include <queue>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "mem/port.hh"
@@ -43,6 +45,41 @@
 
 namespace gem5
 {
+
+template<typename T>
+class UniqueQueue
+{
+    private:
+        std::queue<T> q;
+        std::unordered_set<T> m;
+    public:
+        void push(T val)
+        {
+            if (m.find(val) == m.end())
+            {
+                q.push(val);
+                m.insert(val);
+            }
+        }
+
+        T pop()
+        {
+            T val = q.front();
+            q.pop();
+            m.erase(val);
+            return val;
+        }
+
+        T front()
+        {
+            return q.front();
+        }
+
+        bool empty()
+        {
+            return q.empty();
+        }
+};
 
 class TrafficMux: public ClockedObject
 {
@@ -135,19 +172,20 @@ class TrafficMux: public ClockedObject
         };
 
     private:
-        TrafficMuxRequestPort                   reqPort;
-        std::vector<TrafficMuxResponsePort>     rspPorts;
-        std::unordered_map<PacketId, std::size_t> pktId2Port;
+        TrafficMuxRequestPort reqPort;
+        std::vector<TrafficMuxResponsePort> rspPorts;
+        std::unordered_map<PacketId, uint64_t> pktId2Port;
+        UniqueQueue<uint64_t> retryQueue;
         bool isActivated;
     private:
-        EventFunctionWrapper event;
+        EventFunctionWrapper retryEvent;
         void processRetry();
 
         // ResponsePort
         AddrRangeList getAddrRanges() const;
         Tick recvAtomic(PacketPtr pkt);
         void recvFunctional(PacketPtr pkt);
-        bool recvTimingReq(PacketPtr pkt, std::size_t port_id);
+        bool recvTimingReq(PacketPtr pkt, uint64_t port_id);
         void recvRespRetry(){}; // don't support retry
 
         // RequestPort

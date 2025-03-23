@@ -50,16 +50,16 @@ class PickleJobArrayDescriptor
         uint64_t vaddr_end;
         uint64_t element_size;
         bool is_ranged_access; // single element or ranged access
-        bool is_index_access; // pointer or index access
+        bool is_indexed_access; // pointer or index access
 
         PickleJobArrayDescriptor(
             uint64_t array_id, uint64_t dst_id, uint64_t vaddr_start,
             uint64_t vaddr_end, uint64_t element_size,
-            bool is_ranged_access, bool is_index_access
+            bool is_ranged_access, bool is_indexed_access
         ) : array_id(array_id), dst_id(dst_id), vaddr_start(vaddr_start),
             vaddr_end(vaddr_end), element_size(element_size),
             is_ranged_access(is_ranged_access),
-            is_index_access(is_index_access) {}
+            is_indexed_access(is_indexed_access) {}
         std::string to_string() const
         {
             std::stringstream ss;
@@ -68,7 +68,7 @@ class PickleJobArrayDescriptor
                << ", vaddr_end: 0x" << std::hex << vaddr_end << std::dec
                << ", element_size: " << element_size
                << ", is_ranged_access: " << is_ranged_access
-               << ", is_index_access: " << is_index_access;
+               << ", is_indexed_access: " << is_indexed_access;
             return ss.str();
         }
 }; // class PickleJobArrayDescriptor
@@ -103,12 +103,12 @@ class PickleJobDescriptor
                 uint64_t is_ranged_access = *(uint64_t *)&job_ptr[job_ptr_i];
                 job_ptr_i += 8;
                 // addressing_mode
-                uint64_t is_pointer_access = *(uint64_t *)&job_ptr[job_ptr_i];
+                uint64_t is_indexed_access = *(uint64_t *)&job_ptr[job_ptr_i];
                 job_ptr_i += 8;
 
                 arrays.emplace_back(array_id, dst_id,
                     vaddr_start, vaddr_end, element_size,
-                    is_ranged_access, is_pointer_access);
+                    is_ranged_access, is_indexed_access);
             }
         }
         std::string to_string() const
