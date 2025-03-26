@@ -99,6 +99,7 @@ class PrefetcherInterface: public ClockedObject
             void regStats() override;
             // See the .cc for the description of each stat
             statistics::Scalar numReceivedWork;
+            statistics::Scalar numPrefetchesSent;
             statistics::Scalar numPrefetches;
             statistics::Histogram histInQueueLength;
             statistics::Histogram histOutQueueLength;

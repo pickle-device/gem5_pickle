@@ -60,6 +60,11 @@ class PickleDevice(ClockedObject):
         "port for uncacheable req bypassing Ruby"
     )
     uncacheable_forwarders = VectorParam.TrafficSnooper("UncacheableForwarder")
+    is_on = Param.Bool(
+        False,
+        "Whether the Pickle device is powered on or off. "
+        "If False, the device will not respond to any requests.",
+    )
 
     # application specifics
     prefetcher = Param.PrefetcherInterface("Prefetcher")

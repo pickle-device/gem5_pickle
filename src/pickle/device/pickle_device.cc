@@ -59,7 +59,7 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
     device_id(params.device_id),
     core_to_pickle_latency_in_ticks(params.core_to_pickle_latency_in_ticks),
     ticks_per_cycle(params.ticks_per_cycle),
-    device_state(PickleDeviceState::SLEEP),
+    //device_state(PickleDeviceState::SLEEP),
     request_port(params.name + ".request_port", this),
     uncacheable_forwarders(params.uncacheable_forwarders),
     request_manager(params.request_manager),
@@ -80,6 +80,11 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
     prefetcher_interface(params.prefetcher),
     device_stats(this)
 {
+    if (params.is_on) {
+        changeToState(PickleDeviceState::IDLE);
+    } else {
+        changeToState(PickleDeviceState::SLEEP);
+    }
     mmu = dynamic_cast<ArmISA::MMU*>(params.mmu);
     isa = dynamic_cast<ArmISA::ISA*>(params.isa);
 

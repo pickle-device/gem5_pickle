@@ -38,7 +38,7 @@ namespace gem5
 
 TrafficSnooper::TrafficSnooper(const TrafficSnooperParams &params)
   : ClockedObject(params),
-    isActivated(false), watch_ranges(params.watch_ranges)
+    isActivated(params.snoop_on), watch_ranges(params.watch_ranges)
 {
     in_port = new TrafficSnooperResponsePort(".in_port", *this, 0);
     out_port = new TrafficSnooperRequestPort(".out_port", *this, 0);

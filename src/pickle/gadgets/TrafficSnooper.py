@@ -54,3 +54,6 @@ class TrafficSnooper(ClockedObject):
     watch_ranges = VectorParam.AddrRange(
         "Address ranges to watch for snooping"
     )
+    snoop_on = Param.Bool(
+        False, "Enable snooping on the specified address ranges"
+    )

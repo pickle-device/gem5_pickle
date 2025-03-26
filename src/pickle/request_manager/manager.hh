@@ -36,6 +36,7 @@
 #include <queue>
 
 #include "arch/generic/mmu.hh"
+#include "base/statistics.hh"
 #include "debug/PickleDeviceRequestManagerDebug.hh"
 #include "params/PickleDeviceRequestManager.hh"
 #include "pickle/request_manager/helpers.hh"
@@ -96,6 +97,21 @@ class PickleDeviceRequestManager : public SimObject
         void addRetryHandleTranslationCompletion(
             std::shared_ptr<RequestBookkeeper> request_bookkeeper
         );
+        void removeOutstandingRequestViaPacketPtr(PacketPtr pkt);
+        void removeOutstandingRequestViaRequestBookkeeper(
+            std::shared_ptr<RequestBookkeeper> request_bookkeeper
+        );
+    public:
+        // stats
+        struct PickleDeviceRequestManagerStats : public statistics::Group
+        {
+            PickleDeviceRequestManagerStats(statistics::Group *parent);
+            statistics::Scalar numRequestsReceivedFromOwner;
+            statistics::Scalar numRequestInitiatedAfterTranslation;
+            statistics::Scalar numRequestsCompleted;
+            statistics::Scalar numTranslationFaults;
+            statistics::Histogram requestQueueLength;
+        } request_manager_stats;
 }; // class PickleDeviceRequestManager
 
 }; // namespace gem5

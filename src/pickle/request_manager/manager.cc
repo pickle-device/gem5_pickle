@@ -44,7 +44,8 @@ PickleDeviceRequestManager::PickleDeviceRequestManager(
     mmu(nullptr),
     retry_handle_translation_completion_event(
         [this]{retryHandleTranslationCompletion();}, name() + ".retry_event"
-    )
+    ),
+    request_manager_stats(this)
 {
 }
 
@@ -85,6 +86,10 @@ PickleDeviceRequestManager::enqueueRequest(
     const Addr vaddr, bool is_load, std::unique_ptr<uint8_t*> data_ptr
 )
 {
+    request_manager_stats.numRequestsReceivedFromOwner++;
+    request_manager_stats.requestQueueLength.sample(
+        outstanding_requests.size()
+    );
     DPRINTF(PickleDeviceRequestManagerDebug,
         "enqueueRequest: vaddr = 0x%llx, isLoad = %d\n", vaddr, is_load
     );
@@ -156,6 +161,7 @@ PickleDeviceRequestManager::handleTranslationCompletion(
     );
     if (success) {
         request_bookkeeper->translationSent();
+        request_manager_stats.numRequestInitiatedAfterTranslation++;;
         DPRINTF(PickleDeviceRequestManagerDebug,
             "Done translation for vaddr 0x%llx\n",
             request_bookkeeper->getReq()->getVaddr()
@@ -216,6 +222,7 @@ PickleDeviceRequestManager::retryHandleTranslationCompletion()
             break;
         }
         need_retry_handle_translation_completion.pop();
+        request_manager_stats.numRequestInitiatedAfterTranslation++;
         request_bookkeeper->requestPending();
         DPRINTF(PickleDeviceRequestManagerDebug,
             "Retrying translation completion for vaddr 0x%llx\n",
@@ -231,6 +238,10 @@ PickleDeviceRequestManager::handleTranslationFault(
 {
     // When the translation fails, we'll notify the requestor.
     // TODO: remove the request from the outstanding requests.
+    request_manager_stats.numTranslationFaults++;
+    request_manager_stats.requestQueueLength.sample(
+        outstanding_requests.size()
+    );
     DPRINTF(PickleDeviceRequestManagerDebug,
         "Translation fault for vaddr 0x%llx\n", request_bookkeeper->getVAddr()
     );
@@ -239,18 +250,7 @@ PickleDeviceRequestManager::handleTranslationFault(
         return;
     }
     // Remove the request from the outstanding requests.
-    outstanding_requests[vaddr].erase(
-        std::remove_if(
-            outstanding_requests[vaddr].begin(),
-            outstanding_requests[vaddr].end(),
-            [request_bookkeeper](
-                const std::shared_ptr<RequestBookkeeper>& rbk
-            ) {
-                return rbk == request_bookkeeper;
-            }
-        ),
-        outstanding_requests[vaddr].end()
-    );
+    removeOutstandingRequestViaRequestBookkeeper(request_bookkeeper);
     owner->device_stats.numTranslationFaults++;
 }
 
@@ -284,14 +284,29 @@ PickleDeviceRequestManager::setRequestorID(const RequestorID requestor_id)
 void
 PickleDeviceRequestManager::handleRequestCompletion(PacketPtr pkt)
 {
+    request_manager_stats.numRequestsCompleted++;
+    request_manager_stats.requestQueueLength.sample(
+        outstanding_requests.size()
+    );
+    Addr vaddr = pkt->req->getVaddr();
+    Addr block_aligned_vaddr = (vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+    removeOutstandingRequestViaPacketPtr(pkt);
+
+    // When the request is done, we'll notify the requestor.
+    DPRINTF(PickleDeviceRequestManagerDebug,
+        "Request done for vaddr 0x%llx\n", block_aligned_vaddr
+    );
+}
+
+void
+PickleDeviceRequestManager::removeOutstandingRequestViaPacketPtr(PacketPtr pkt)
+{
     Addr vaddr = pkt->req->getVaddr();
     Addr block_aligned_vaddr = (vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
     if (outstanding_requests.find(block_aligned_vaddr) == \
             outstanding_requests.end()) {
         return;
     }
-
-
     outstanding_requests[block_aligned_vaddr].erase(
         std::remove_if(
             outstanding_requests[block_aligned_vaddr].begin(),
@@ -299,16 +314,69 @@ PickleDeviceRequestManager::handleRequestCompletion(PacketPtr pkt)
             [pkt](
                 const std::shared_ptr<RequestBookkeeper>& rbk
             ) {
+                if (rbk == nullptr || rbk->getPkt() == nullptr) {
+                    return false;
+                }
                 return rbk->getPkt() == pkt;
             }
         ),
         outstanding_requests[block_aligned_vaddr].end()
     );
+    if (outstanding_requests[block_aligned_vaddr].empty()) {
+        outstanding_requests.erase(block_aligned_vaddr);
+    }
+}
 
-    // When the request is done, we'll notify the requestor.
-    DPRINTF(PickleDeviceRequestManagerDebug,
-        "Request done for vaddr 0x%llx\n", block_aligned_vaddr
+void
+PickleDeviceRequestManager::removeOutstandingRequestViaRequestBookkeeper(
+    std::shared_ptr<RequestBookkeeper> request_bookkeeper
+)
+{
+    Addr vaddr = request_bookkeeper->getReq()->getVaddr();
+    Addr block_aligned_vaddr = (vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+    if (outstanding_requests.find(block_aligned_vaddr) == \
+            outstanding_requests.end()) {
+        return;
+    }
+    outstanding_requests[block_aligned_vaddr].erase(
+        std::remove_if(
+            outstanding_requests[block_aligned_vaddr].begin(),
+            outstanding_requests[block_aligned_vaddr].end(),
+            [request_bookkeeper](
+                const std::shared_ptr<RequestBookkeeper>& rbk
+            ) {
+                if (rbk == nullptr) {
+                    return false;
+                }
+                return rbk == request_bookkeeper;
+            }
+        ),
+        outstanding_requests[block_aligned_vaddr].end()
     );
+    if (outstanding_requests[block_aligned_vaddr].empty()) {
+        outstanding_requests.erase(block_aligned_vaddr);
+    }
+}
+
+PickleDeviceRequestManager::
+PickleDeviceRequestManagerStats::PickleDeviceRequestManagerStats(
+    statistics::Group *parent
+) : statistics::Group(parent),
+    ADD_STAT(numRequestsReceivedFromOwner, statistics::units::Count::get(),
+             "Number of requests received from the owner"),
+    ADD_STAT(numRequestInitiatedAfterTranslation,
+             statistics::units::Count::get(),
+             "Number of requests initiated"),
+    ADD_STAT(numRequestsCompleted, statistics::units::Count::get(),
+             "Number of requests completed"),
+    ADD_STAT(numTranslationFaults, statistics::units::Count::get(),
+             "Number of translation faults"),
+    ADD_STAT(requestQueueLength, statistics::units::Count::get(),
+             "Histogram of the request queue length over time")
+{
+    requestQueueLength
+      .init(16)
+      .flags(statistics::pdf);
 }
 
 }; // namespace gem5
