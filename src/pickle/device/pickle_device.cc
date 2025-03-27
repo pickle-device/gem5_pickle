@@ -256,10 +256,10 @@ PickleDevice::PickleDeviceRequestPort::recvTimingResp(PacketPtr pkt)
     const uint8_t* pkt_data = pkt->getConstPtr<uint8_t>();
     uint8_t* data = new uint8_t[req->getSize()];
     std::memcpy(data, pkt_data, req->getSize());
-    owner->request_manager->handleRequestCompletion(pkt);
     owner->prefetcher_interface->receivePrefetch(
         req->getVaddr(), std::unique_ptr<uint8_t[]>(data)
     );
+    owner->request_manager->handleRequestCompletion(pkt);
     return true;
 }
 

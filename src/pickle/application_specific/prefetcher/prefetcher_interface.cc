@@ -204,8 +204,9 @@ PrefetcherInterface::enqueueWork(const uint64_t& workData)
     if (workCount % 1000 == 0 || workCount == 1) {
         DPRINTF(
             PickleDevicePrefetcherProgressTracker,
-            "Work sent: %lld, numPrefetches: %lld\n",
-            workCount, prefetcherStats.numPrefetches.value()
+            "Work sent: %lld, numPrefetches: %lld, inQ size: %lld\n",
+            workCount, prefetcherStats.numPrefetches.value(),
+            packet_status.size()
         );
     }
     prefetcher->captureRequest(curTick(), workData);
