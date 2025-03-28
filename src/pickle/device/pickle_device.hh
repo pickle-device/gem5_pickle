@@ -93,11 +93,12 @@ class PickleDevice: public ClockedObject
         void switchOff();
         void wakeup();
         void operate();
-        void operateResponseQueue();
+        void operateUncacheableResponseQueue();
         void processEvent(); // what to do per event
     private:
         PARAMS(PickleDevice);
         EventFunctionWrapper event;
+        EventFunctionWrapper operate_uncacheable_response_queue_event;
         System * system;
         //BaseMMU * mmu;
         ArmISA::MMU * mmu;
@@ -170,6 +171,7 @@ class PickleDevice: public ClockedObject
         void changeToState(const PickleDeviceState new_state);
         Port& getPort(const std::string &if_name, PortID idx) override;
         void addWatchRange(AddrRange r);
+        void scheduleOperateUncacheableResponseQueueEvent();
     private:
         uint64_t remaining_control_message_length;
         uint64_t remaining_control_data_length;

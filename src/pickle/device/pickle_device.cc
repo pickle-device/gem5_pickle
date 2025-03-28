@@ -50,6 +50,10 @@ namespace gem5
 PickleDevice::PickleDevice(const PickleDeviceParams& params)
   : ClockedObject(params),
     event([this]{processEvent();}, name() + ".event"),
+    operate_uncacheable_response_queue_event(
+        [this]{operateUncacheableResponseQueue();},
+        name() + ".operate_uncacheable_response_queue_event"
+    ),
     system(params.system),
     //mmu(params.mmu),
     //isa(params.isa),
@@ -155,7 +159,7 @@ void
 PickleDevice::operate()
 {
     schedule(event, curTick() + ticks_per_cycle);
-    operateResponseQueue();
+    //operateUncacheableResponseQueue();
     if (prefetcher_interface) {
         prefetcher_interface->clockTick();
     }
@@ -166,8 +170,9 @@ PickleDevice::operate()
 }
 
 void
-PickleDevice::operateResponseQueue()
+PickleDevice::operateUncacheableResponseQueue()
 {
+    bool has_remaining_packets = false;
     for (
         uint8_t port_id = 0;
         port_id < uncacheable_response_queues.size();
@@ -191,6 +196,13 @@ PickleDevice::operateResponseQueue()
                 break;
             }
         }
+        if (uncacheable_response_queues[port_id].size() > 0) {
+            has_remaining_packets = true;
+        }
+    }
+    // schedule the next event if there are still packets in the queues
+    if (has_remaining_packets) {
+        scheduleOperateUncacheableResponseQueueEvent();
     }
 }
 
@@ -290,7 +302,8 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
             );
             if (pkt->needsResponse()) {
                 pkt->makeResponse();
-                owner->enqueueResponse(pkt, internal_id);
+                bool success = owner->enqueueResponse(pkt, internal_id);
+                assert(success);
             }
         }
         // 0x10110008 sends data accordingly to command type and length
@@ -305,7 +318,8 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
             );
             if (pkt->needsResponse()) {
                 pkt->makeResponse();
-                owner->enqueueResponse(pkt, internal_id);
+                bool success = owner->enqueueResponse(pkt, internal_id);
+                assert(success);
             }
         } // device specs
         else if (
@@ -331,7 +345,8 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
                 "Sent to paddr: 0x%llx, size: %ld, data: 0x%ld\n",
                 paddr, pkt->req->getSize(), data
             );
-            owner->enqueueResponse(pkt, internal_id);
+            bool success = owner->enqueueResponse(pkt, internal_id);
+            assert(success);
         } else {
             owner->trySetThreadContextFromCore(internal_id);
             bool isLoad = pkt->isRead();
@@ -353,7 +368,8 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
             }
             if (pkt->needsResponse()) {
                 pkt->makeResponse();
-                owner->enqueueResponse(pkt, internal_id);
+                bool success = owner->enqueueResponse(pkt, internal_id);
+                assert(success);
             }
         }
     }
@@ -579,6 +595,7 @@ PickleDevice::enqueueResponse(PacketPtr pkt, uint8_t internal_port_id)
         return false;
     }
     uncacheable_response_queues[internal_port_id].push(pkt);
+    scheduleOperateUncacheableResponseQueueEvent();
     return true;
 }
 
@@ -598,6 +615,17 @@ PickleDevice::addWatchRange(AddrRange r)
             forwarder->name()
         );
         forwarder->addWatchRange(r);
+    }
+}
+
+void
+PickleDevice::scheduleOperateUncacheableResponseQueueEvent()
+{
+    if (!operate_uncacheable_response_queue_event.scheduled()) {
+        schedule(
+            operate_uncacheable_response_queue_event,
+            curTick() + ticks_per_cycle
+        );
     }
 }
 
