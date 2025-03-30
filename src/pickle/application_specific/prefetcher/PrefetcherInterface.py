@@ -45,3 +45,7 @@ class PrefetcherInterface(ClockedObject):
     cxx_exports = [PyBindMethod("switchOn"), PyBindMethod("switchOff")]
 
     prefetch_distance = Param.Int(1, "Prefetch distance")
+    prefetch_distance_offset_from_software_hint = Param.Int(
+        16,
+        "Prefetch distance offset from software hint",
+    )

@@ -46,12 +46,20 @@ PrefetcherInterface::PrefetcherInterface(
 )
   : ClockedObject(params),
     prefetch_distance(params.prefetch_distance),
+    prefetch_distance_offset_from_software_hint(
+      params.prefetch_distance_offset_from_software_hint
+    ),
     prefetcher(nullptr),
     prefetcher_initialized(false),
     owner(nullptr),
     workCount(0),
     prefetcherStats(this)
 {
+    panic_if(
+        prefetch_distance <= prefetch_distance_offset_from_software_hint,
+        "Prefetch distance offset from software hint must be smaller than "
+        "the prefetch distance\n"
+    );
 }
 
 PrefetcherInterface::~PrefetcherInterface()
@@ -200,6 +208,8 @@ PrefetcherInterface::enqueueWork(const uint64_t& workData)
     if (!prefetcher_initialized)
         return false;
     workCount++;
+    Addr prefetchAddr = \
+        workData - prefetch_distance_offset_from_software_hint * 4;
     prefetcherStats.numReceivedWork++;
     if (workCount % 1000 == 0 || workCount == 1) {
         DPRINTF(
@@ -209,10 +219,10 @@ PrefetcherInterface::enqueueWork(const uint64_t& workData)
             packet_status.size()
         );
     }
-    prefetcher->captureRequest(curTick(), workData);
+    prefetcher->captureRequest(curTick(), prefetchAddr);
     DPRINTF(
         PickleDevicePrefetcherDebug,
-        "NEW WORK: data = 0x%llx\n", workData
+        "NEW WORK: data = 0x%llx\n", prefetchAddr
     );
     return true;
 }

@@ -60,7 +60,8 @@ class PickleDevice;
 class PrefetcherInterface: public ClockedObject
 {
     private:
-        uint64_t prefetch_distance;
+        int64_t prefetch_distance;
+        int64_t prefetch_distance_offset_from_software_hint;
         PARAMS(PrefetcherInterface);
     private:
         std::unique_ptr<c_cerebellum> prefetcher;
