@@ -56,9 +56,9 @@ PrefetcherInterface::PrefetcherInterface(
     prefetcherStats(this)
 {
     panic_if(
-        prefetch_distance <= prefetch_distance_offset_from_software_hint,
-        "Prefetch distance offset from software hint must be smaller than "
-        "the prefetch distance\n"
+        prefetch_distance < prefetch_distance_offset_from_software_hint,
+        "Prefetch distance offset from software hint must not be greater "
+        "than the prefetch distance\n"
     );
 }
 
