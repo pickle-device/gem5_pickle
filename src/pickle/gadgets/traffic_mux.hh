@@ -90,15 +90,18 @@ class TrafficMux: public ClockedObject
 
                 /** A reference to the crossbar to which this port belongs. */
                 TrafficMux &mux;
+                uint64_t internal_id;
 
             public:
 
                 TrafficMuxResponsePort(
                     const std::string &_name,
                     PortID _id,
-                    TrafficMux &_mux
+                    TrafficMux &_mux,
+                    uint64_t _internal_id
                 )
-                    : ResponsePort(_name, _id), mux(_mux)
+                    : ResponsePort(_name, _id), mux(_mux),
+                      internal_id(_internal_id)
                 { }
 
             protected:
@@ -124,13 +127,12 @@ class TrafficMux: public ClockedObject
                 bool
                 recvTimingReq(PacketPtr pkt) override
                 {
-                    // TODO: id is provided ?
-                    return mux.recvTimingReq(pkt, id);
+                    return mux.recvTimingReq(pkt, internal_id);
                 }
 
                 void recvRespRetry() override
                 {
-                    mux.recvRespRetry();
+                    mux.recvRespRetry(id);
                 }
 
         };
@@ -172,26 +174,23 @@ class TrafficMux: public ClockedObject
         };
 
     private:
-        TrafficMuxRequestPort reqPort;
-        std::vector<TrafficMuxResponsePort> rspPorts;
-        std::unordered_map<PacketId, uint64_t> pktId2Port;
-        UniqueQueue<uint64_t> retryQueue;
-        bool isActivated;
+        TrafficMuxRequestPort mem_side_port;
+        std::vector<TrafficMuxResponsePort> cpu_side_ports;
+        std::unordered_map<PacketId, uint64_t> where_is_the_port;
+        UniqueQueue<uint64_t> retry_queue;
     private:
-        EventFunctionWrapper retryEvent;
-        void processRetry();
 
         // ResponsePort
         AddrRangeList getAddrRanges() const;
         Tick recvAtomic(PacketPtr pkt);
         void recvFunctional(PacketPtr pkt);
         bool recvTimingReq(PacketPtr pkt, uint64_t port_id);
-        void recvRespRetry(){}; // don't support retry
+        void recvRespRetry(const PortID id);
 
         // RequestPort
         bool recvTimingResp(PacketPtr pkt);
-        void recvReqRetry() {};
-        void recvRangeChange(); // don't support retry
+        void recvReqRetry();
+        void recvRangeChange();
     public:
         TrafficMux(const TrafficMuxParams &params);
         void startup() {};

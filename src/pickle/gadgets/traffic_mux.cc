@@ -39,13 +39,12 @@ namespace gem5
 
 TrafficMux::TrafficMux(const TrafficMuxParams &params)
   : ClockedObject(params),
-    reqPort(params.name + ".reqPort", *this),
-    isActivated(false),
-    retryEvent([this]{processRetry();}, name() + ".retryEvent")
+    mem_side_port(params.name + ".mem_side_port", *this)
 {
-                                     // python port name here
      for (int i = 0; i < params.port_rsp_ports_connection_count; ++i) {
-        rspPorts.emplace_back(name() + csprintf(".rspPorts[%d]", i), i, *this);
+        cpu_side_ports.emplace_back(
+            name() + csprintf(".cpu_side_ports[%d]", i), i, *this, i
+        );
     }
 }
 
@@ -54,77 +53,49 @@ TrafficMux::TrafficMux(const TrafficMuxParams &params)
 AddrRangeList
 TrafficMux::getAddrRanges() const
 {
-    return reqPort.getAddrRanges();
+    return mem_side_port.getAddrRanges();
 }
 
 Tick
 TrafficMux::recvAtomic(PacketPtr pkt)
 {
-    return reqPort.sendAtomic(pkt);
+    return mem_side_port.sendAtomic(pkt);
 }
 
 void
 TrafficMux::recvFunctional(PacketPtr pkt)
 {
-    reqPort.sendFunctional(pkt);
+    mem_side_port.sendFunctional(pkt);
 }
 
 bool
-TrafficMux::recvTimingReq(PacketPtr pkt, uint64_t port_id)
+TrafficMux::recvTimingReq(PacketPtr pkt, uint64_t internal_id)
 {
-    if (reqPort.sendTimingReq(pkt)) {
-        pktId2Port[pkt->id] = port_id;
+    if (mem_side_port.sendTimingReq(pkt)) {
+        where_is_the_port[pkt->id] = internal_id;
         return true;
     }
 
-    // Have to retry
-    if (!retryEvent.scheduled()) {
-        DPRINTF(
-            TrafficMuxDebug,
-            "schedule retry at %lld\n", curTick() + 250
-        );
-        schedule(retryEvent, curTick() + 250);
-        retryQueue.push(port_id);
-    }
-
+    DPRINTF(
+        TrafficMuxDebug,
+        "Failed to send timing request on port %lu\n",
+        internal_id
+    );
+    retry_queue.push(internal_id);
     return false;
 }
-
-void
-TrafficMux::processRetry()
-{
-    DPRINTF(TrafficMuxDebug, "process retry\n");
-    if (!retryQueue.empty()) {
-        rspPorts[retryQueue.pop()].sendRetryReq();
-    }
-    if (!retryQueue.empty()) {
-        if (!retryEvent.scheduled()) {
-            DPRINTF(
-                TrafficMuxDebug,
-                "schedule retry at %lld\n", curTick() + 250
-            );
-            schedule(retryEvent, curTick() + 250);
-        }
-    }
-}
-
-// RequestPort
 
 bool
 TrafficMux::recvTimingResp(PacketPtr pkt)
 {
-    PacketId id = pkt->id;
-    auto itr = pktId2Port.find(id);
-
-    panic_if(itr == pktId2Port.end(), "response to an unknown pkt");
-
-    return rspPorts[itr->second].sendTimingResp(pkt);
+    PacketId pkt_id = pkt->id;
+    return cpu_side_ports[where_is_the_port[pkt_id]].sendTimingResp(pkt);
 }
 
 void
 TrafficMux::recvRangeChange()
 {
-    for (auto p : rspPorts)
+    for (auto p : cpu_side_ports)
         p.sendRangeChange();
 }
 
@@ -132,24 +103,30 @@ Port &
 TrafficMux::getPort(const std::string &if_name, PortID idx)
 {
     if (if_name == "req_port") {
-      return reqPort;
-    } else if (if_name == "rsp_ports" && idx < rspPorts.size()) {
+      return mem_side_port;
+    } else if (if_name == "rsp_ports" && idx < cpu_side_ports.size()) {
         // We should have already created all of the ports in the constructor
-        return rspPorts[idx];
+        return cpu_side_ports[idx];
     }
     return ClockedObject::getPort(if_name, idx);
 }
 
 void
-TrafficMux::switchOn()
+TrafficMux::recvRespRetry(const PortID id)
 {
-    isActivated = true;
-}
+    mem_side_port.sendRetryResp();
+    DPRINTF(TrafficMuxDebug, "Received response retry: id=%ld\n", id);
+};
 
 void
-TrafficMux::switchOff()
+TrafficMux::recvReqRetry()
 {
-    isActivated = false;
-}
+    while (!retry_queue.empty()) {
+        uint64_t id = retry_queue.front();
+        cpu_side_ports[id].sendRetryReq();
+        retry_queue.pop();
+        DPRINTF(TrafficMuxDebug, "Retrying request on port: %lu\n", id);
+    }
+};
 
 }; // namespace gem5

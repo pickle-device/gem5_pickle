@@ -40,7 +40,6 @@ class TrafficMux(ClockedObject):
     type = "TrafficMux"
     cxx_header = "pickle/gadgets/traffic_mux.hh"
     cxx_class = "gem5::TrafficMux"
-    cxx_exports = [PyBindMethod("switchOn"), PyBindMethod("switchOff")]
 
     # Input
     rsp_ports = VectorResponsePort("reponse ports with no arbitation")
