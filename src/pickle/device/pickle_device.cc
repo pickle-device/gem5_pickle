@@ -600,6 +600,12 @@ PickleDevice::enqueueResponse(PacketPtr pkt, uint8_t internal_port_id)
 }
 
 void
+PickleDevice::handleRequestTranslationFault(const Addr vaddr)
+{
+    prefetcher_interface->receivePrefetch(vaddr, nullptr);
+}
+
+void
 PickleDevice::addWatchRange(AddrRange r)
 {
     DPRINTF(

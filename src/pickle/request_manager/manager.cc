@@ -113,12 +113,12 @@ PickleDeviceRequestManager::enqueueRequest(
         block_aligned_vaddr, BLOCK_SIZE, flags, requestor_id, 0, 0
     );
 
-    AddressTranslationDoneCallbackType done_callback = std::bind(
+    static AddressTranslationDoneCallbackType done_callback = std::bind(
         &PickleDeviceRequestManager::handleTranslationCompletion,
         this, std::placeholders::_1
     );
 
-    AddressTranslationFaultCallbackType fault_callback = std::bind(
+    static AddressTranslationFaultCallbackType fault_callback = std::bind(
         &PickleDeviceRequestManager::handleTranslationFault,
         this, std::placeholders::_1, std::placeholders::_2
     );
@@ -246,6 +246,7 @@ PickleDeviceRequestManager::handleTranslationFault(
         "Translation fault for vaddr 0x%llx\n", request_bookkeeper->getVAddr()
     );
     Addr vaddr = request_bookkeeper->getVAddr();
+    owner->handleRequestTranslationFault(vaddr);
     if (outstanding_requests.find(vaddr) == outstanding_requests.end()) {
         return;
     }
