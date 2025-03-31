@@ -274,3 +274,11 @@ structure(RubyPrefetcherProxy, external = "yes") {
     // this for every RubyPrefetcherProxy object present
     void regProbePoints();
 }
+
+structure (RubyDataMovementTrackerProxy, external = "yes") {
+    void notifyWriteback(
+        RequestPtr, MachineID, MachineID, bool, Tick, DataBlock);
+    void notifyHit(RequestPtr, MachineID, Addr);
+    void notifyAccess(RequestPtr, MachineID, Addr);
+    void regProbePoints();
+}

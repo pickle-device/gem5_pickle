@@ -112,6 +112,8 @@ MakeInclude('structures/PerfectCacheMemory.hh')
 MakeInclude('structures/PersistentTable.hh')
 MakeInclude('structures/RubyPrefetcher.hh')
 MakeInclude('structures/RubyPrefetcherProxy.hh')
+MakeInclude('structures/RubyDataMovementTracker.hh')
+MakeInclude('structures/RubyDataMovementTrackerProxy.hh')
 MakeInclude('structures/TBEStorage.hh')
 if env['CONF']['RUBY_PROTOCOL_CHI']:
     MakeInclude('structures/MN_TBEStorage.hh')

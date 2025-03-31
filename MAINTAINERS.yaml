@@ -207,6 +207,12 @@ misc:
     experts:
         - Jason Lowe-Power <jason@lowepower.com>
 
+perf:
+    desc: >-
+        Tools for measuring useful performance-related metrics
+    status: maintained
+    maintainers:
+        - Hoa Nguyen <hn@hnpl.org>
 pickle:
     desc: >-
         The Pickle Device

@@ -169,6 +169,8 @@ class RubySystem : public ClockedObject
   public:
     Profiler* m_profiler;
     CacheRecorder* m_cache_recorder;
+    std::unordered_map<MachineID, AbstractController*> \
+      machineIDToControllerMap;
     std::vector<std::map<uint32_t, AbstractController *> > m_abstract_controls;
     std::map<MachineType, uint32_t> m_num_controllers;
 

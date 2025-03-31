@@ -280,6 +280,8 @@ action(Initiate_Request, desc="") {
   // model the initial tag array read
   tbe.actions.pushNB(Event:TagArrayRead);
 
+  tbe.requestInitiationTick := curTick();
+
   incomingTransactionStart(address, curTransitionEvent(), initial, was_retried);
 }
 
@@ -477,6 +479,17 @@ action(Initiate_ReadShared_Miss, desc="") {
   }
   tbe.actions.push(Event:CheckCacheFill);
   tbe.actions.push(Event:TagArrayWrite);
+}
+
+action(Update_PreviousBlockOwner, desc="") {
+  assert(is_valid(tbe));
+  assert(is_valid(cache_entry));
+  assert(tbe.dataValid);
+  bool is_demand := (tbe.is_local_pf || tbe.is_remote_pf) == false;
+  if (is_demand) {
+    tbe.previousBlockOwner := machineID;
+    tbe.previousBlockOwnerValid := true;
+  }
 }
 
 action(Initiate_ReadShared_Hit, desc="") {
@@ -2148,6 +2161,8 @@ action(Receive_ReqDataResp, desc="") {
       tbe.oldDataBlk.copyPartial(in_msg.dataBlk, in_msg.bitMask);
       assert(tbe.dataBlkValid.isOverlap(in_msg.bitMask) == false);
       tbe.dataBlkValid.orMask(in_msg.bitMask);
+      tbe.previousBlockOwner := in_msg.originalResponder;
+      tbe.previousBlockOwnerValid := in_msg.originalResponderValid;
       DPRINTF(RubySlicc, "Received %s\n", tbe.oldDataBlk);
       DPRINTF(RubySlicc, "dataBlkValid = %s\n", tbe.dataBlkValid);
     } else if ((tbe.dataBlkValid.isFull() == false) ||
@@ -2163,6 +2178,8 @@ action(Receive_ReqDataResp, desc="") {
       tbe.dataBlk.copyPartial(in_msg.dataBlk, in_msg.bitMask);
       assert(tbe.dataBlkValid.isOverlap(in_msg.bitMask) == false);
       tbe.dataBlkValid.orMask(in_msg.bitMask);
+      tbe.previousBlockOwner := in_msg.originalResponder;
+      tbe.previousBlockOwnerValid := in_msg.originalResponderValid;
     }
   }
 }
@@ -2227,6 +2244,8 @@ action(Receive_SnpDataResp, desc="") {
       tbe.dataBlk.copyPartial(in_msg.dataBlk, in_msg.bitMask);
       assert(tbe.dataBlkValid.isOverlap(in_msg.bitMask) == false);
       tbe.dataBlkValid.orMask(in_msg.bitMask);
+      tbe.previousBlockOwner := in_msg.originalResponder;
+      tbe.previousBlockOwnerValid := in_msg.originalResponderValid;
     }
   }
 }
@@ -3090,6 +3109,9 @@ action(Send_Data, desc="") {
     out_msg.type := tbe.snd_msgType;
     out_msg.txnId := tbe.txnId;
 
+    out_msg.originalResponder := tbe.previousBlockOwner;
+    out_msg.originalResponderValid := tbe.previousBlockOwnerValid;
+
     int offset := tbe.snd_pendBytes.firstBitSet(true);
     assert(offset < blockSize);
     int range := tbe.snd_pendBytes.firstBitSet(false, offset) - offset;
@@ -3778,6 +3800,7 @@ action(Profile_Hit, desc="") {
   bool is_remote_can_notify := tbe.is_remote_pf && upstream_prefetch_trains_prefetcher;
   if (is_demand) {
     cache.profileDemandHit();
+    dmvProxy.notifyHit(tbe.seqReq, machineID, tbe.addr);
   } else {
     assert(use_prefetcher || tbe.is_remote_pf);
     cache.profilePrefetchHit();
@@ -3809,6 +3832,13 @@ action(Profile_Fill, desc="") {
     // Prefetchers that use this info require notifications from both
     // demand and pf fills (unlike notifyPfHit/notifyPfMiss)
     pfProxy.notifyPfFill(tbe.seqReq, tbe.dataBlk, tbe.is_local_pf);
+  }
+  if (tbe.isSeqReqValid) {
+    dmvProxy.notifyWriteback(
+        tbe.seqReq, tbe.requestor, tbe.previousBlockOwner,
+        tbe.previousBlockOwnerValid, curTick() - tbe.requestInitiationTick,
+        tbe.dataBlk
+    );
   }
 }
 

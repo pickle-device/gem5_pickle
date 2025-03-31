@@ -104,6 +104,7 @@ RubySystem::registerAbstractController(
 
     MachineID id = cntrl->getMachineID();
     m_abstract_controls[id.getType()][id.getNum()] = cntrl;
+    machineIDToControllerMap[id] = cntrl;
 
     if (!protocolInfo) {
         protocolInfo = std::move(cntl_protocol);

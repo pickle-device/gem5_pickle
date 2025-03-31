@@ -188,6 +188,8 @@ class AbstractController : public ClockedObject, public Consumer
 
     const AddrRangeList &getAddrRanges() const { return addrRanges; }
 
+    RubySystem* getRubySystem() { return m_ruby_system; }
+
   public:
     MachineID getMachineID() const { return m_machineID; }
     RequestorID getRequestorId() const { return m_id; }
@@ -402,6 +404,7 @@ class AbstractController : public ClockedObject, public Consumer
     { fatal("coalesce: prefetching not supported"); return false; }
 
     friend class RubyPrefetcherProxy;
+    friend class RubyDataMovementTrackerProxy;
 
   protected:
     const NodeID m_version;

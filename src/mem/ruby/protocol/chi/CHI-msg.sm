@@ -216,6 +216,8 @@ structure(CHIDataMsg, desc="", interface="Message") {
   Addr addr,            desc="Line address";
   CHIDataType type,     desc="Response type";
   MachineID responder,  desc="Responder ID";
+  MachineID originalResponder, desc="Which controller has sent data block";
+  bool originalResponderValid, desc="True if the var is set", default="false";
   NetDest Destination,  desc="Response destination";
   DataBlock dataBlk,    desc="Line data";
   WriteMask bitMask,    desc="Which bytes in the data block are valid";

@@ -156,6 +156,9 @@ machine(MachineType:Memory, "Memory controller interface") :
   // Data structures
   ////////////////////////////////////////////////////////////////////////////
 
+  // Optional Data Movement Tracker
+  RubyDataMovementTrackerProxy dmvProxy, constructor="this";
+
   // Cache block size
   int blockSize, default="m_ruby_system->getBlockSizeBytes()";
 
@@ -173,6 +176,7 @@ machine(MachineType:Memory, "Memory controller interface") :
     MachineID requestor, desc="Requestor that originated this request";
     MachineID destination, desc="Where we are sending data";
     bool useDataSepResp, desc="Replies with DataSepResp instead of CompData";
+    RequestPtr reqPtr, default="nullptr";
   }
 
   structure(TBETable, external ="yes") {
@@ -321,6 +325,9 @@ machine(MachineType:Memory, "Memory controller interface") :
     }
   }
 
+  void regProbePoints() {
+    dmvProxy.regProbePoints();
+  }
 
   ////////////////////////////////////////////////////////////////////////////
   // Helper functions
@@ -498,6 +505,7 @@ machine(MachineType:Memory, "Memory controller interface") :
   action(initializeFromReqTBE, "itbe", desc="Initialize TBE fields") {
     peek(reqRdyInPort, CHIRequestMsg) {
       tbe.requestor := in_msg.requestor;
+      tbe.reqPtr := in_msg.seqReq;
       if (in_msg.dataToFwdRequestor) {
         tbe.destination := in_msg.fwdRequestor;
       } else {
@@ -611,6 +619,8 @@ machine(MachineType:Memory, "Memory controller interface") :
     assert(tbe.rxtxBytes < blockSize);
     enqueue(datOutPort, CHIDataMsg, data_latency) {
       out_msg.addr := tbe.addr;
+      out_msg.originalResponder := machineID;
+      out_msg.originalResponderValid := true;
       out_msg.txnId := tbe.txnId;
       if (tbe.useDataSepResp) {
         out_msg.type := CHIDataType:DataSepResp_UC;
@@ -704,6 +714,10 @@ machine(MachineType:Memory, "Memory controller interface") :
     }
   }
 
+  action(Profile_Mem, desc="") {
+    dmvProxy.notifyHit(tbe.reqPtr, machineID, tbe.addr);
+  }
+
   ////////////////////////////////////////////////////////////////////////////
   // Transitions
   ////////////////////////////////////////////////////////////////////////////
@@ -731,6 +745,7 @@ machine(MachineType:Memory, "Memory controller interface") :
   transition(READING_MEM, MemoryData, SENDING_NET_DATA) {
     prepareSend;
     sendDataAndCheck;
+    Profile_Mem;
     popMemoryQueue;
   }
 

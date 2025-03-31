@@ -200,6 +200,7 @@ transition({RSC,RUSC}, {ReadShared,ReadNotSharedDirty}, BUSY_BLKD) {
 
 transition({UD,SD,UC,SC}, {ReadShared,ReadNotSharedDirty}, BUSY_BLKD) {
   Initiate_Request;
+  Update_PreviousBlockOwner;
   Initiate_ReadShared_Hit;
   Allocate_DirEntry;
   Profile_Hit;
@@ -209,6 +210,7 @@ transition({UD,SD,UC,SC}, {ReadShared,ReadNotSharedDirty}, BUSY_BLKD) {
 
 transition({UD_RSC,SD_RSC,UC_RSC,SC_RSC,UD_RSD,SD_RSD}, {ReadShared,ReadNotSharedDirty}, BUSY_BLKD) {
   Initiate_Request;
+  Update_PreviousBlockOwner;
   Initiate_ReadShared_Hit;
   Profile_Hit;
   Pop_ReqRdyQueue;
@@ -235,6 +237,7 @@ transition(I, ReadOnce, BUSY_BLKD) {
 
 transition({UD,SD,UC,SC,UD_RSC,SD_RSC,UC_RSC,SC_RSC,UD_RSD,SD_RSD}, ReadOnce, BUSY_BLKD) {
   Initiate_Request;
+  Update_PreviousBlockOwner;
   Initiate_ReadOnce_Hit;
   Profile_Hit;
   Pop_ReqRdyQueue;
@@ -263,6 +266,7 @@ transition(I, {ReadUnique,ReadUnique_PoC}, BUSY_BLKD) {
 
 transition({UD,UC}, {ReadUnique,ReadUnique_PoC}, BUSY_BLKD) {
   Initiate_Request;
+  Update_PreviousBlockOwner;
   Initiate_ReadUnique_Hit;
   Allocate_DirEntry;
   Profile_Hit;
@@ -272,6 +276,7 @@ transition({UD,UC}, {ReadUnique,ReadUnique_PoC}, BUSY_BLKD) {
 
 transition({UD_RSC,UC_RSC,UD_RSD}, {ReadUnique,ReadUnique_PoC}, BUSY_BLKD) {
   Initiate_Request;
+  Update_PreviousBlockOwner;
   Initiate_ReadUnique_Hit_InvUpstream;
   Profile_Hit;
   Pop_ReqRdyQueue;
@@ -288,6 +293,7 @@ transition({UD_RU,UC_RU,RU,RUSD,RUSC}, {ReadUnique,ReadUnique_PoC}, BUSY_BLKD) {
 
 transition({SC,SD}, ReadUnique_PoC, BUSY_BLKD) {
   Initiate_Request;
+  Update_PreviousBlockOwner;
   Initiate_ReadUnique_AutoUpgrade;
   Initiate_ReadUnique_Hit;
   Allocate_DirEntry;
@@ -298,6 +304,7 @@ transition({SC,SD}, ReadUnique_PoC, BUSY_BLKD) {
 
 transition({SC_RSC, SD_RSC, SD_RSD}, ReadUnique_PoC, BUSY_BLKD) {
   Initiate_Request;
+  Update_PreviousBlockOwner;
   Initiate_ReadUnique_AutoUpgrade;
   Initiate_ReadUnique_Hit_InvUpstream;
   Profile_Hit;
@@ -335,6 +342,7 @@ transition({SC_RSC, SD_RSC, RSC, SD_RSD, RSD}, ReadUnique, BUSY_BLKD) {
 // MakeReadUnique
 transition({UD_RSC,UC_RSC,UD_RSD}, MakeReadUnique, BUSY_BLKD) {
   Initiate_Request;
+  Update_PreviousBlockOwner;
   Initiate_MakeReadUnique_Hit_InvUpstream;
   Profile_Hit;
   Pop_ReqRdyQueue;
@@ -390,6 +398,7 @@ transition({SC,UC,SD,UD,SC_RSC,UC_RSC,SD_RSC,UD_RSC,UC_RU,UD_RU,UD_RSD,SD_RSD},
            WriteUniqueZero,
            BUSY_BLKD) {
   Initiate_Request;
+  Update_PreviousBlockOwner;
   Initiate_WriteUnique_Zero;
   Profile_Hit;
   Pop_ReqRdyQueue;
@@ -402,6 +411,7 @@ transition({UD,UD_RSD,UD_RSC,UC,UC_RSC},
            {WriteUnique, WriteUniquePtl_PoC, WriteUniqueFull_PoC, WriteUniqueFull_PoC_Alloc},
            BUSY_BLKD) {
   Initiate_Request;
+  Update_PreviousBlockOwner;
   Initiate_WriteUnique_LocalWrite;
   Profile_Hit;
   Pop_ReqRdyQueue;
@@ -492,6 +502,7 @@ transition({I,SC,SC_RSC,SD,SD_RSD,SD_RSC,RSD,RUSD,RUSC,
 transition({UD,UD_RU,UD_RSD,UD_RSC,UC,UC_RU,UC_RSC},
            {AtomicReturn_PoC_Alloc, AtomicReturn_PoC}, BUSY_BLKD) {
   Initiate_Request;
+  Update_PreviousBlockOwner;
   Initiate_AtomicReturn_LocalWrite;
   Profile_Hit;
   Pop_ReqRdyQueue;
@@ -501,6 +512,7 @@ transition({UD,UD_RU,UD_RSD,UD_RSC,UC,UC_RU,UC_RSC},
 transition({UD,UD_RU,UD_RSD,UD_RSC,UC,UC_RU,UC_RSC},
            {AtomicNoReturn_PoC_Alloc, AtomicNoReturn_PoC}, BUSY_BLKD) {
   Initiate_Request;
+  Update_PreviousBlockOwner;
   Initiate_AtomicNoReturn_LocalWrite;
   Profile_Hit;
   Pop_ReqRdyQueue;
@@ -602,6 +614,7 @@ transition(I, AtomicNoReturn_PoC, BUSY_BLKD) {
 
 transition({UD,UD_T,SD,UC,SC}, Load, BUSY_BLKD) {
   Initiate_Request;
+  Update_PreviousBlockOwner;
   Initiate_LoadHit;
   Profile_Hit;
   Pop_ReqRdyQueue;
@@ -627,6 +640,7 @@ transition(BUSY_BLKD, LoadHit) {
 
 transition({UD,UD_T,UC}, Store, BUSY_BLKD) {
   Initiate_Request;
+  Update_PreviousBlockOwner;
   Initiate_StoreHit;
   Profile_Hit;
   Pop_ReqRdyQueue;
@@ -641,6 +655,7 @@ transition(BUSY_BLKD, StoreHit) {
 
 transition(UC, {AtomicLoad,AtomicStore}, BUSY_BLKD) {
   Initiate_Request;
+  Update_PreviousBlockOwner;
   Initiate_Atomic_UC;
   Profile_Hit;
   Pop_ReqRdyQueue;
@@ -649,6 +664,7 @@ transition(UC, {AtomicLoad,AtomicStore}, BUSY_BLKD) {
 
 transition({UD,UD_T}, {AtomicLoad,AtomicStore}, BUSY_BLKD) {
   Initiate_Request;
+  Update_PreviousBlockOwner;
   Initiate_Atomic_UD;
   Profile_Hit;
   Pop_ReqRdyQueue;
@@ -876,7 +892,7 @@ transition(I, Global_Eviction) {
 // Snoops
 
 // SnpCleanInvalid/SnpUnique/SnpUniqueFwd
-// All invalidating snoops have a simular behavior
+// All invalidating snoops have a similar behavior
 
 transition({UD,SD,UC,SC,UD_RSC,SD_RSC,UC_RSC,UD_RU,UC_RU,RU,RUSD,RUSC,RSD,UD_RSD,SD_RSD,SC_RSC,RSC},
            {SnpUnique,SnpUniqueFwd,SnpCleanInvalid}, BUSY_BLKD) {
@@ -900,6 +916,7 @@ transition(BUSY_INTR, {SnpUnique,SnpUniqueFwd,SnpCleanInvalid}, BUSY_BLKD) {
 transition({UD,UD_RSC,SD,SD_RSC,UC,UC_RSC,UD_RU,UC_RU,RU,UD_RSD,SD_RSD,RSD,RUSD,RUSC},
            {SnpShared,SnpSharedFwd,SnpNotSharedDirtyFwd}, BUSY_BLKD) {
   Initiate_Snoop;
+  Update_PreviousBlockOwner;
   Initiate_SnpShared;
   Pop_SnoopRdyQueue;
   ProcessNextState;
@@ -907,6 +924,7 @@ transition({UD,UD_RSC,SD,SD_RSC,UC,UC_RSC,UD_RU,UC_RU,RU,UD_RSD,SD_RSD,RSD,RUSD,
 
 transition({SC, SC_RSC, RSC}, {SnpSharedFwd, SnpNotSharedDirtyFwd}, BUSY_BLKD) {
   Initiate_Snoop;
+  Update_PreviousBlockOwner;
   Initiate_SnpShared;
   Pop_SnoopRdyQueue;
   ProcessNextState;
@@ -914,6 +932,7 @@ transition({SC, SC_RSC, RSC}, {SnpSharedFwd, SnpNotSharedDirtyFwd}, BUSY_BLKD) {
 
 transition(BUSY_INTR, {SnpShared,SnpSharedFwd,SnpNotSharedDirtyFwd}, BUSY_BLKD) {
   Initiate_Snoop_Hazard;
+  Update_PreviousBlockOwner;
   Initiate_SnpShared;
   Pop_SnoopRdyQueue;
   ProcessNextState;
@@ -923,6 +942,7 @@ transition(BUSY_INTR, {SnpShared,SnpSharedFwd,SnpNotSharedDirtyFwd}, BUSY_BLKD) 
 transition({UD,UD_T,UD_RSC,UD_RU,UD_RSD,SD,SD_RSC,SD_RSD,UC,UC_RSC,UC_RU,SC,SC_RSC,RU,RSC,RSD,RUSD,RUSC},
            {SnpOnce,SnpOnceFwd}, BUSY_BLKD) {
   Initiate_Snoop;
+  Update_PreviousBlockOwner;
   Initiate_SnpOnce;
   Pop_SnoopRdyQueue;
   ProcessNextState;
@@ -930,6 +950,7 @@ transition({UD,UD_T,UD_RSC,UD_RU,UD_RSD,SD,SD_RSC,SD_RSD,UC,UC_RSC,UC_RU,SC,SC_R
 
 transition(BUSY_INTR, {SnpOnce,SnpOnceFwd}, BUSY_BLKD) {
   Initiate_Snoop_Hazard;
+  Update_PreviousBlockOwner;
   Initiate_SnpOnce;
   Pop_SnoopRdyQueue;
   ProcessNextState;

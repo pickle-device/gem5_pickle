@@ -305,6 +305,7 @@ bool fromSequencer(CHIRequestType reqType) {
 
 void regProbePoints() {
   pfProxy.regProbePoints();
+  dmvProxy.regProbePoints();
 }
 
 bool inCache(Addr addr, bool is_secure) {

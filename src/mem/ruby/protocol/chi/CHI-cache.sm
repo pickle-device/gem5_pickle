@@ -699,6 +699,8 @@ machine(MachineType:Cache, "Cache coherency protocol") :
     bool dataToBeSharedClean,     desc="Local copy will become SC at the end of transaction";
     NetDest dir_sharers,          desc="Upstream controllers that have the line (includes owner)";
     MachineID dir_owner,          desc="Owner ID";
+    MachineID previousBlockOwner, desc="Previous block owner";
+    bool previousBlockOwnerValid, desc="", default="false";
     bool dir_ownerExists,         desc="Owner ID is valid";
     bool dir_ownerIsExcl,         desc="Owner is UD or UC; SD otherwise";
     bool doCacheFill,             desc="Write valid data to the cache when completing transaction";
@@ -764,6 +766,8 @@ machine(MachineType:Cache, "Cache coherency protocol") :
     bool wakeup_pending_req;
     bool wakeup_pending_snp;
     bool wakeup_pending_tgr;
+
+    Tick requestInitiationTick, default="0";
   }
 
   // TBE table definition
@@ -832,6 +836,8 @@ machine(MachineType:Cache, "Cache coherency protocol") :
   // Interface to prefetchers
   RubyPrefetcherProxy pfProxy, constructor="this, m_prefetcher_ptr, m_prefetchQueue_ptr";
 
+  // Interface to the data movement tracker
+  RubyDataMovementTrackerProxy dmvProxy, constructor="this";
 
   // DVM data
   // Queue of non-sync operations that haven't been Comp-d yet.

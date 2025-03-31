@@ -1,0 +1,14 @@
+# Copyright (c) 2024 The Regents of the University of California
+# All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
+Import('*')
+
+SimObject(
+    'RubyDataMovementTracker.py', sim_objects=['RubyDataMovementTracker']
+)
+
+Source('RubyDataMovementTracker.cc')
+
+DebugFlag('RubyDataMovementTrackerDebug', tags='perf')
+DebugFlag('RubyDataMovementTrackerStatsDebug', tags='perf')
