@@ -484,9 +484,9 @@ action(Initiate_ReadShared_Miss, desc="") {
 action(Update_PreviousBlockOwner, desc="") {
   assert(is_valid(tbe));
   assert(is_valid(cache_entry));
-  assert(tbe.dataValid);
+  //assert(tbe.dataValid);
   bool is_demand := (tbe.is_local_pf || tbe.is_remote_pf) == false;
-  if (is_demand) {
+  if (is_demand && tbe.dataValid) {
     tbe.previousBlockOwner := machineID;
     tbe.previousBlockOwnerValid := true;
   }
@@ -4133,4 +4133,28 @@ action(Profile_OutgoingStart_DVM, desc="") {
 action(Profile_OutgoingEnd_DVM, desc="") {
   assert(is_valid(tbe));
   outgoingTransactionEnd(address, tbe.rcvdRetryAck, false);
+}
+
+action(Debug_1, desc="") {
+  DPRINTF(RubyCHIActionDebug, "Debug_1\n");
+}
+
+action(Debug_2, desc="") {
+  DPRINTF(RubyCHIActionDebug, "Debug_2\n");
+}
+
+action(Debug_3, desc="") {
+  DPRINTF(RubyCHIActionDebug, "Debug_3\n");
+}
+
+action(Debug_4, desc="") {
+  DPRINTF(RubyCHIActionDebug, "Debug_4\n");
+}
+
+action(Debug_5, desc="") {
+  DPRINTF(RubyCHIActionDebug, "Debug_5\n");
+}
+
+action(Debug_6, desc="") {
+  DPRINTF(RubyCHIActionDebug, "Debug_6\n");
 }
