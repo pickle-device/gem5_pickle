@@ -101,6 +101,8 @@ class PickleDeviceRequestManager : public SimObject
         void removeOutstandingRequestViaRequestBookkeeper(
             std::shared_ptr<RequestBookkeeper> request_bookkeeper
         );
+        void profileRequest(const Addr vaddr);
+        void profileRequestCoalescing(const Addr vaddr);
     public:
         // stats
         struct PickleDeviceRequestManagerStats : public statistics::Group
@@ -111,6 +113,8 @@ class PickleDeviceRequestManager : public SimObject
             statistics::Scalar numRequestsCompleted;
             statistics::Scalar numTranslationFaults;
             statistics::Histogram requestQueueLength;
+            statistics::Vector requestsCountPerArray;
+            statistics::Vector requestsCountAfterCoalescingPerArray;
         } request_manager_stats;
 }; // class PickleDeviceRequestManager
 

@@ -94,6 +94,7 @@ PickleDeviceRequestManager::enqueueRequest(
         "enqueueRequest: vaddr = 0x%llx, isLoad = %d\n", vaddr, is_load
     );
     Addr block_aligned_vaddr = (vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+    profileRequest(block_aligned_vaddr);
     bool already_requested = false;
     if (outstanding_requests.find(block_aligned_vaddr) != \
             outstanding_requests.end()) {
@@ -103,8 +104,9 @@ PickleDeviceRequestManager::enqueueRequest(
         std::vector<std::shared_ptr<RequestBookkeeper>>();
 
     // If the request is a load and the block has already been requested,
-    // we ignore the request.
+    // we ignore the request, aka coalescing.
     if (is_load && already_requested) {
+        profileRequestCoalescing(block_aligned_vaddr);
         return true;
     }
 
@@ -373,11 +375,46 @@ PickleDeviceRequestManagerStats::PickleDeviceRequestManagerStats(
     ADD_STAT(numTranslationFaults, statistics::units::Count::get(),
              "Number of translation faults"),
     ADD_STAT(requestQueueLength, statistics::units::Count::get(),
-             "Histogram of the request queue length over time")
+             "Histogram of the request queue length over time"),
+    ADD_STAT(requestsCountPerArray, statistics::units::Count::get(),
+             "Number of requests per array"),
+    ADD_STAT(requestsCountAfterCoalescingPerArray,
+             statistics::units::Count::get(),
+             "Number of requests per array after coalescing")
 {
     requestQueueLength
       .init(16)
       .flags(statistics::pdf);
+    requestsCountPerArray
+      .init(16)
+      .flags(statistics::nozero | statistics::total);
+    requestsCountAfterCoalescingPerArray
+      .init(16)
+      .flags(statistics::nozero | statistics::total);
+}
+
+void
+PickleDeviceRequestManager::profileRequest(const Addr vaddr)
+{
+    uint64_t array_id = owner->getJobDescriptor()->get_array_id(vaddr);
+    if (array_id == -1ULL) {
+        return;
+    }
+    request_manager_stats.requestsCountPerArray[array_id]++;
+}
+
+void
+PickleDeviceRequestManager::profileRequestCoalescing(const Addr vaddr)
+{
+    uint64_t array_id = owner->getJobDescriptor()->get_array_id(vaddr);
+    if (array_id == -1ULL) {
+        return;
+    }
+    request_manager_stats.requestsCountAfterCoalescingPerArray[array_id]++;
+    DPRINTF(PickleDeviceRequestManagerDebug,
+        "Request coalescing for vaddr 0x%llx, array_id: %lld\n",
+        vaddr, array_id
+    );
 }
 
 }; // namespace gem5
