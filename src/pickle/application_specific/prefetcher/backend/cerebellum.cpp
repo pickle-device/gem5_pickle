@@ -89,22 +89,18 @@ bool c_cerebellum::squashOldEntry(requestEntry entry)
 }
 
 
-std::vector<uint64_t> c_cerebellum::captureResponse(
-    uint64_t clk, const gem5::Addr& vaddr, std::unique_ptr<uint8_t[]> p, size_t size)
+void c_cerebellum::captureResponse(
+    uint64_t clk, const gem5::Addr& vaddr, std::unique_ptr<uint8_t[]> p,
+    size_t size
+)
 {
-    std::vector<uint64_t> triggerAddrs;
-    if (p) {
-        //std::cout << "CaptureResponse: vaddr: 0x" << std::hex << vaddr << std::dec << std::endl;
+    if (p != nullptr) {
         m_descPf->setData(vaddr, std::move(p), size);
         m_rspQ.pushBack(vaddr, clk);
-        for (auto const& entry: m_outstandingEntries[vaddr]) {
-            triggerAddrs.push_back(entry.triggerAddr);
-        }
     } else {
         // load response contain no data indicating that it faces a problem such as pagefault.
         removeOutstandingEntry(vaddr);
     }
-    return triggerAddrs;
 }
 
 void c_cerebellum::operate(uint64_t clk)
@@ -329,4 +325,3 @@ void c_cerebellum::configure(const std::vector<std::tuple<uint64_t, uint64_t, bo
     m_nChildren        = 32;
     m_descPf = new descriptiveDataPf(jobTuples);
 }
-

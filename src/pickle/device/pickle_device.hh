@@ -51,6 +51,7 @@
 #include "mem/ruby/protocol/CHI/Cache_Controller.hh"
 #include "params/PickleDevice.hh"
 #include "pickle/application_specific/prefetcher/prefetcher_interface.hh"
+#include "pickle/application_specific/prefetcher/prefetcher_work_tracker.hh"
 #include "pickle/device/device_thread_context.hh"
 #include "pickle/gadgets/traffic_snooper.hh"
 #include "sim/clocked_object.hh"
@@ -111,7 +112,6 @@ class PickleDevice: public ClockedObject
         uint64_t core_to_pickle_latency_in_ticks;
         uint64_t ticks_per_cycle;
         PickleDeviceState device_state;
-        MemMode mem_mode;
     public:
         // this is a request port from the engine to its controller
         // this port allows the engine to make requests to controller as if
@@ -203,11 +203,13 @@ class PickleDevice: public ClockedObject
         ThreadContext *getThreadContextPtr();
         PickleDeviceState getDeviceState() const;
         PrefetcherInterface *getPrefetcher();
-        MemMode getMemMode() const { return mem_mode; }
         PacketPtr zeroCycleLoad(const Addr& addr, bool& success);
         Addr getCommandAddr() const;
     public: // application speicific
         PrefetcherInterface* prefetcher_interface;
+        std::shared_ptr<PickleJobDescriptor> job_descriptor;
+        std::shared_ptr<PickleJobDescriptor> getJobDescriptor() const;
+        std::vector<PrefetcherWorkTracker> prefetcher_work_trackers;
     public:
         struct PickleDeviceStats : public statistics::Group
         {

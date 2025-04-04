@@ -119,6 +119,24 @@ class PickleJobDescriptor
             }
             return ss.str();
         }
+        PickleJobArrayDescriptor get_array(const uint64_t array_id) const
+        {
+            for (const auto &array : arrays) {
+                if (array.array_id == array_id) {
+                    return array;
+                }
+            }
+            return PickleJobArrayDescriptor(0, 0, 0, 0, 0, false, false);
+        }
+        uint64_t get_array_id(const Addr vaddr) const
+        {
+            for (const auto &array : arrays) {
+                if (vaddr >= array.vaddr_start && vaddr < array.vaddr_end) {
+                    return array.array_id;
+                }
+            }
+            return -1ULL;
+        }
 }; // class PickleJobDescriptor
 
 }; // namespace gem5

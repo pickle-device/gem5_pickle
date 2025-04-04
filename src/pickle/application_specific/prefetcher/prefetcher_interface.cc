@@ -33,6 +33,7 @@
 
 #include "debug/PickleDevicePrefetcherDebug.hh"
 #include "debug/PickleDevicePrefetcherProgressTracker.hh"
+#include "debug/PickleDevicePrefetcherTrace.hh"
 
 #include "pickle/application_specific/prefetcher/backend/cerebellum.hpp"
 #include "pickle/device/pickle_device.hh"
@@ -136,11 +137,14 @@ PrefetcherInterface::processPrefetcherInQueue()
             PickleDevicePrefetcherDebug,
             "PREFETCH IN <--- vaddr 0x%llx\n", vaddr
         );
-        std::vector<uint64_t> triggerAddrs = \
-            prefetcher->captureResponse(
-                curTick(), vaddr, std::move(packet_data[vaddr]),
-                64 //block_size
-            );
+        prefetcher->captureResponse(
+            curTick(), vaddr, std::move(packet_data[vaddr]),
+            64 //block_size
+        );
+        for (auto tracker : owner->prefetcher_work_trackers)
+        {
+            tracker.trackIncomingPrefetch(vaddr);
+        }
         to_be_removed.push_back(vaddr);
     }
 
@@ -157,6 +161,12 @@ PrefetcherInterface::getPrefetchDistance() const
     return prefetch_distance;
 }
 
+uint64_t
+PrefetcherInterface::getPrefetchDistanceOffsetFromSoftwareHint() const
+{
+    return prefetch_distance_offset_from_software_hint;
+}
+
 void
 PrefetcherInterface::switchOn()
 {
@@ -168,14 +178,14 @@ PrefetcherInterface::switchOff()
 }
 
 void
-PrefetcherInterface::configure(const PickleJobDescriptor& job)
+PrefetcherInterface::configure(std::shared_ptr<PickleJobDescriptor> job)
 {
     prefetcher = std::unique_ptr<c_cerebellum>(new c_cerebellum(this));
     // converting to the backend format
     std::vector<std::tuple<
         uint64_t, uint64_t, bool, bool, uint64_t, uint64_t, uint64_t
     >> jobTuples;
-    for (const auto& array : job.arrays)
+    for (const auto& array : job->arrays)
     {
         jobTuples.push_back(
             std::make_tuple(
@@ -203,7 +213,9 @@ PrefetcherInterface::configure(const PickleJobDescriptor& job)
 }
 
 bool
-PrefetcherInterface::enqueueWork(const uint64_t& workData)
+PrefetcherInterface::enqueueWork(
+    const uint64_t workData, const uint64_t cpuId
+)
 {
     if (!prefetcher_initialized)
         return false;
@@ -220,6 +232,9 @@ PrefetcherInterface::enqueueWork(const uint64_t& workData)
         );
     }
     prefetcher->captureRequest(curTick(), prefetchAddr);
+    owner->prefetcher_work_trackers[cpuId].addWorkItem(
+        workData
+    );
     DPRINTF(
         PickleDevicePrefetcherDebug,
         "NEW WORK: data = 0x%llx\n", prefetchAddr
@@ -229,7 +244,7 @@ PrefetcherInterface::enqueueWork(const uint64_t& workData)
 
 void
 PrefetcherInterface::receivePrefetch(
-  const uint64_t& vaddr, std::unique_ptr<uint8_t[]> p
+  const uint64_t vaddr, std::unique_ptr<uint8_t[]> p
 )
 {
     prefetcherStats.numPrefetches++;

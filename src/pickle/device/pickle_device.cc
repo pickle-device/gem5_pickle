@@ -99,6 +99,10 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
             new PickleDeviceUncacheableSnoopPort(
                 csprintf("%s%d", "uncacheable_snoop_port", i), this, i, i));
     }
+
+    for (int i = 0; i < num_cores; ++i) {
+        prefetcher_work_trackers.emplace_back(this);
+    }
 }
 
 PickleDevice::~PickleDevice()
@@ -359,7 +363,7 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
             } else {
                 const uint64_t* ptr = pkt->getConstPtr<uint64_t>();
                 uint64_t data = ptr[0];
-                owner->prefetcher_interface->enqueueWork(data);
+                owner->prefetcher_interface->enqueueWork(data, internal_id);
                 DPRINTF(
                     PickleDeviceUncacheableForwarding,
                     "Received store request: addr = 0x%llx, data = 0x%llx\n",
@@ -638,12 +642,17 @@ PickleDevice::scheduleOperateUncacheableResponseQueueEvent()
 void
 PickleDevice::processJobDescriptor(std::vector<uint8_t>& _job_descriptor)
 {
-    PickleJobDescriptor job_descriptor(_job_descriptor);
+    job_descriptor = std::shared_ptr<PickleJobDescriptor>(
+        new PickleJobDescriptor(_job_descriptor)
+    );
     prefetcher_interface->configure(job_descriptor);
+    for (auto tracker: prefetcher_work_trackers) {
+        tracker.setJobDescriptor(job_descriptor);
+    }
     DPRINTF(
         PickleDeviceControl,
         "Received job descriptor: %s\n",
-        job_descriptor.to_string()
+        job_descriptor->to_string()
     );
 }
 
@@ -751,6 +760,12 @@ Addr
 PickleDevice::getCommandAddr() const
 {
     return device_command_address;
+}
+
+std::shared_ptr<PickleJobDescriptor>
+PickleDevice::getJobDescriptor() const
+{
+    return job_descriptor;
 }
 
 PacketPtr

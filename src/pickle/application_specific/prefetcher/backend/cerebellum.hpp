@@ -359,7 +359,10 @@ public:
     // Response queue. TODO: right now only one queue. How can we serve multiple kernels?
     // May need multiple queues because they will be more response than request! Can be mimic by taking multiple entry from the queue.
     //void captureResponse(c_K12MemifRequest* x_rsp, uint64_t clk);
-    std::vector<uint64_t> captureResponse(uint64_t clk, const gem5::Addr& vaddr, std::unique_ptr<uint8_t[]> p, size_t size);
+    void captureResponse(
+        uint64_t clk, const gem5::Addr& vaddr, std::unique_ptr<uint8_t[]> p,
+        size_t size
+    );
 
     void config();
     void configure(const std::vector<std::tuple<uint64_t, uint64_t, bool, bool, uint64_t, uint64_t, uint64_t>>& jobTuples);

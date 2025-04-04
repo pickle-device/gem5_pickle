@@ -81,15 +81,16 @@ class PrefetcherInterface: public ClockedObject
     public:
         void setOwner(PickleDevice* engine);
         void clockTick(); // what to do every cycle
-        void configure(const PickleJobDescriptor& job);
+        void configure(std::shared_ptr<PickleJobDescriptor> job);
         void switchOn();
         void switchOff();
         bool isActivated() const { return prefetcher_initialized; }
         uint64_t getPrefetchDistance() const;
+        uint64_t getPrefetchDistanceOffsetFromSoftwareHint() const;
     public: // the interface
-        bool enqueueWork(const uint64_t& node_id);
+        bool enqueueWork(const uint64_t workData, const uint64_t cpuId);
         void receivePrefetch(
-            const uint64_t& vaddr, std::unique_ptr<uint8_t[]> p
+            const uint64_t vaddr, std::unique_ptr<uint8_t[]> p
         );
     public:
         uint64_t workCount;
