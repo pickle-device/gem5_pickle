@@ -646,7 +646,7 @@ PickleDevice::processJobDescriptor(std::vector<uint8_t>& _job_descriptor)
         new PickleJobDescriptor(_job_descriptor)
     );
     prefetcher_interface->configure(job_descriptor);
-    for (auto tracker: prefetcher_work_trackers) {
+    for (auto &tracker: prefetcher_work_trackers) {
         tracker.setJobDescriptor(job_descriptor);
     }
     DPRINTF(
@@ -769,13 +769,36 @@ PickleDevice::getJobDescriptor() const
 }
 
 PacketPtr
-PickleDevice::zeroCycleLoad(const Addr& addr, bool& success)
+PickleDevice::zeroCycleLoadWithPAddr(const Addr& paddr, bool& success)
 {
     const Addr BLOCK_SIZE = 64;
     Request::Flags flags = 0;
     MemCmd cmd = MemCmd::ReadReq;
     RequestPtr req = std::make_shared<Request>(
-        (addr >> 6) << 6, BLOCK_SIZE, flags, requestor_id);
+        (paddr >> 6) << 6, BLOCK_SIZE, flags, requestor_id);
+    uint8_t* data = new uint8_t[BLOCK_SIZE];
+    PacketPtr pkt = new Packet(req, cmd, BLOCK_SIZE);
+    pkt->dataDynamic<uint8_t>(data);
+    request_port.sendFunctional(pkt);
+    success = true;
+    return pkt;
+}
+
+PacketPtr
+PickleDevice::zeroCycleLoadWithVAddr(const Addr& vaddr, bool& success)
+{
+    const Addr BLOCK_SIZE = 64;
+    Request::Flags flags = 0;
+    MemCmd cmd = MemCmd::ReadReq;
+    RequestPtr req1 = std::shared_ptr<Request>(
+        new Request(vaddr, 64, Request::Flags(0), this->requestor_id, -1, 0)
+    );
+    Fault f = mmu->translateFunctional(
+        req1, device_thread_context.get(), BaseMMU::Mode::Read
+    );
+    Addr paddr = req1->getPaddr();
+    RequestPtr req = std::make_shared<Request>(
+        (paddr >> 6) << 6, BLOCK_SIZE, flags, requestor_id);
     uint8_t* data = new uint8_t[BLOCK_SIZE];
     PacketPtr pkt = new Packet(req, cmd, BLOCK_SIZE);
     pkt->dataDynamic<uint8_t>(data);

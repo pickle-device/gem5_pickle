@@ -203,7 +203,8 @@ class PickleDevice: public ClockedObject
         ThreadContext *getThreadContextPtr();
         PickleDeviceState getDeviceState() const;
         PrefetcherInterface *getPrefetcher();
-        PacketPtr zeroCycleLoad(const Addr& addr, bool& success);
+        PacketPtr zeroCycleLoadWithVAddr(const Addr& vaddr, bool& success);
+        PacketPtr zeroCycleLoadWithPAddr(const Addr& paddr, bool& success);
         Addr getCommandAddr() const;
     public: // application speicific
         PrefetcherInterface* prefetcher_interface;
