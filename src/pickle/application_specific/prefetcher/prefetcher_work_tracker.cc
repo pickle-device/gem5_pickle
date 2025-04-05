@@ -38,7 +38,8 @@ namespace gem5
 {
 
 PrefetcherWorkTracker::PrefetcherWorkTracker()
-  : owner(nullptr),
+  : is_activated(false),
+    owner(nullptr),
     job_descriptor(nullptr),
     software_hint_distance(0),
     hardware_prefetch_distance(0),
@@ -47,7 +48,8 @@ PrefetcherWorkTracker::PrefetcherWorkTracker()
 }
 
 PrefetcherWorkTracker::PrefetcherWorkTracker(PickleDevice* owner)
-  : owner(owner),
+  : is_activated(false),
+    owner(owner),
     job_descriptor(nullptr),
     current_core_work_item(-1ULL)
 {
@@ -59,15 +61,20 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(PickleDevice* owner)
 
 void
 PrefetcherWorkTracker::setJobDescriptor(
-    std::shared_ptr<PickleJobDescriptor> job_descriptor
+    std::shared_ptr<PickleJobDescriptor> _job_descriptor
 )
 {
-    this->job_descriptor = job_descriptor;
+    is_activated = true;
+    this->job_descriptor = _job_descriptor;
 }
 
 void
 PrefetcherWorkTracker::addWorkItem(Addr vaddr)
 {
+    if (!is_activated) {
+        return;
+    }
+
     vaddr += 4; // the backend prefetches the next iter
 
     WorkItem workItem(vaddr);
@@ -85,7 +92,8 @@ PrefetcherWorkTracker::addWorkItem(Addr vaddr)
         bool success = false;
         Addr block_aligned_vaddr = (vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
         constexpr Addr item_size = 4;
-        PacketPtr pkt = owner->zeroCycleLoad(block_aligned_vaddr, success);
+        PacketPtr pkt = \
+            owner->zeroCycleLoadWithVAddr(block_aligned_vaddr, success);
         if (!success) {
             DPRINTF(
                 PickleDevicePrefetcherTrace,
@@ -115,7 +123,9 @@ PrefetcherWorkTracker::addWorkItem(Addr vaddr)
         Addr first_item_vaddr_block_aligned = \
             (first_item_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
         PacketPtr pkt = \
-            owner->zeroCycleLoad(first_item_vaddr_block_aligned, success);
+            owner->zeroCycleLoadWithVAddr(
+                first_item_vaddr_block_aligned, success
+            );
         if (!success) {
             DPRINTF(
                 PickleDevicePrefetcherTrace,
@@ -127,7 +137,7 @@ PrefetcherWorkTracker::addWorkItem(Addr vaddr)
         constexpr Addr item_size = 8;
         Addr start_index = \
             (first_item_vaddr - first_item_vaddr_block_aligned) / item_size;
-        lv2_start_edge_vaddr = (pkt->getConstPtr<uint32_t>()[start_index]);
+        lv2_start_edge_vaddr = (pkt->getConstPtr<uint64_t>()[start_index]);
         // We add expected prefetches
         workItem.addExpectedPrefetch(first_item_vaddr_block_aligned);
         DPRINTF(
@@ -145,7 +155,9 @@ PrefetcherWorkTracker::addWorkItem(Addr vaddr)
         Addr second_item_vaddr_block_aligned = \
             (second_item_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
         PacketPtr pkt = \
-            owner->zeroCycleLoad(second_item_vaddr_block_aligned, success);
+            owner->zeroCycleLoadWithVAddr(
+                second_item_vaddr_block_aligned, success
+            );
         if (!success) {
             DPRINTF(
                 PickleDevicePrefetcherTrace,
@@ -157,12 +169,12 @@ PrefetcherWorkTracker::addWorkItem(Addr vaddr)
         constexpr Addr item_size = 8;
         Addr end_index = \
             (second_item_vaddr - second_item_vaddr_block_aligned) / item_size;
-        lv2_end_edge_vaddr = (pkt->getConstPtr<uint32_t>()[end_index]);
+        lv2_end_edge_vaddr = (pkt->getConstPtr<uint64_t>()[end_index]);
         // We add expected prefetches
         workItem.addExpectedPrefetch(second_item_vaddr_block_aligned);
         DPRINTF(
             PickleDevicePrefetcherTrace,
-            "Work Item = 0x%llx, edge_end_ptr = %lld\n",
+            "Work Item = 0x%llx, edge_end_ptr = 0x%llx\n",
             vaddr, lv2_end_edge_vaddr
         );
     }
@@ -171,20 +183,23 @@ PrefetcherWorkTracker::addWorkItem(Addr vaddr)
         Addr curr_block_vaddr = 1;
         PacketPtr pkt = nullptr;
         uint32_t* data_ptr = nullptr;
+        Addr array_vaddr = job_descriptor->get_array(1).vaddr_start;
         lv3_edge_indices.reserve(
-            (lv2_end_edge_vaddr - lv2_start_edge_vaddr)/4
+            (lv2_end_edge_vaddr - lv2_start_edge_vaddr) / 4
         );
         for (
             Addr edge_vaddr = lv2_start_edge_vaddr;
             edge_vaddr < lv2_end_edge_vaddr;
-            edge_vaddr += 8
+            edge_vaddr += 4
         )
         {
             Addr edge_vaddr_block_aligned = \
                 (edge_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
             if (edge_vaddr_block_aligned != curr_block_vaddr) {
                 bool success = false;
-                pkt = owner->zeroCycleLoad(edge_vaddr_block_aligned, success);
+                pkt = owner->zeroCycleLoadWithVAddr(
+                    edge_vaddr_block_aligned, success
+                );
                 if (!success) {
                     DPRINTF(
                         PickleDevicePrefetcherTrace,
@@ -231,17 +246,7 @@ PrefetcherWorkTracker::addWorkItem(Addr vaddr)
 }
 
 void
-PrefetcherWorkTracker::removeWorkItem(Addr vaddr)
-{
-    vaddr += 4; // the backend prefetches the next iter
-    auto it = work_items.find(vaddr);
-    if (it != work_items.end()) {
-        work_items.erase(it);
-    }
-}
-
-void
-PrefetcherWorkTracker::trackIncomingPrefetch(const Addr pf_vaddr)
+PrefetcherWorkTracker::processIncomingPrefetch(const Addr pf_vaddr)
 {
     // TODO: check if the prefetch is expected
 }

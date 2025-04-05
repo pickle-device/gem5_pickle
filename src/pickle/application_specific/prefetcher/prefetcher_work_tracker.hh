@@ -32,6 +32,7 @@
 #ifndef __PREFETCHER_WORK_TRACKER_HH__
 #define __PREFETCHER_WORK_TRACKER_HH__
 
+#include <array>
 #include <unordered_set>
 
 #include "mem/packet.hh"
@@ -46,41 +47,39 @@ class WorkItem
 {
     private:
         Addr vaddr;
-        std::unordered_set<Addr> expected_prefetches;
+        std::array<std::unordered_set<Addr>, 4> expected_prefetches;
+        uint64_t step;
     public:
-        WorkItem() {}
-        WorkItem(Addr vaddr) : vaddr(vaddr) {}
+        WorkItem() : step(0) {}
+        WorkItem(Addr vaddr) : vaddr(vaddr), step(0) {}
         Addr getVAddr() const
         {
             return vaddr;
         }
-        void addExpectedPrefetch(Addr addr)
+        void addExpectedPrefetch(Addr addr, const uint64_t step)
         {
-            expected_prefetches.insert(addr);
+            expected_prefetches[step].insert(addr);
         }
-        const std::unordered_set<Addr>& getExpectedPrefetches() const
+        const std::unordered_set<Addr>& getExpectedPrefetches(
+            const uint64_t step
+        ) const
         {
-            return expected_prefetches;
+            return expected_prefetches[step];
         }
-        void clearExpectedPrefetches()
+        void moveToNextStep()
         {
-            expected_prefetches.clear();
+            step += 1;
         }
-        bool hasExpectedPrefetches() const
+        bool isDone() const
         {
-            return !expected_prefetches.empty();
+            return step == 5;
         }
-        void removeExpectedPrefetch(Addr addr)
-        {
-            expected_prefetches.erase(addr);
-        }
-        bool isDone() const { return expected_prefetches.empty(); }
-        void clear() { expected_prefetches.clear(); }
 }; // class WorkItem
 
 class PrefetcherWorkTracker
 {
     private:
+        bool is_activated;
         PickleDevice* owner;
         std::shared_ptr<PickleJobDescriptor> job_descriptor;
         std::unordered_map<Addr, WorkItem> work_items;
@@ -94,8 +93,7 @@ class PrefetcherWorkTracker
             std::shared_ptr<PickleJobDescriptor> job_descriptor
         );
         void addWorkItem(Addr vaddr);
-        void removeWorkItem(Addr vaddr);
-        void trackIncomingPrefetch(const Addr pf_vaddr);
+        void processIncomingPrefetch(const Addr pf_vaddr);
 };  // class PrefetcherWorkTracker
 
 };  // namespace gem5
