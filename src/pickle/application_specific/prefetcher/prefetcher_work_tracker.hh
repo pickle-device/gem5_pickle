@@ -49,25 +49,25 @@ class PickleDevice;
 class WorkItem
 {
     private:
-        Addr vaddr;
+        Addr work_vaddr;
         std::array<std::unordered_set<Addr>, 4> expected_prefetches;
         uint64_t curr_step;
     public:
         WorkItem() : curr_step(0) {}
-        WorkItem(Addr vaddr) : vaddr(vaddr), curr_step(0) {}
-        Addr getVAddr() const
+        WorkItem(Addr _work_vaddr) : work_vaddr(_work_vaddr), curr_step(0) {}
+        Addr getWorkVAddr() const
         {
-            return vaddr;
+            return work_vaddr;
         }
-        void addExpectedPrefetch(Addr addr, const uint64_t step)
+        void addExpectedPrefetch(Addr pf_vaddr, const uint64_t step)
         {
-            expected_prefetches[step].insert(addr);
+            expected_prefetches[step].insert(pf_vaddr);
         }
-        void removeExpectedPrefetch(Addr addr)
+        void removeExpectedPrefetch(Addr pf_vaddr)
         {
             std::unordered_set<Addr>& curr_set = \
                 expected_prefetches[curr_step];
-            auto it = curr_set.find(addr);
+            auto it = curr_set.find(pf_vaddr);
             if (it != curr_set.end()) {
                 curr_set.erase(it);
             }
@@ -109,10 +109,13 @@ class PrefetcherWorkTracker
         void setJobDescriptor(
             std::shared_ptr<PickleJobDescriptor> job_descriptor
         );
+        void warnIfOutsideRanges(
+            const Addr work_addr, const Addr pf_vaddr
+        ) const;
         void addWorkItem(Addr vaddr);
         void processIncomingPrefetch(const Addr pf_vaddr);
         bool hasOutstandingPrefetch() const;
-        Addr nextPrefetch() const;
+        Addr peekNextPrefetch() const;
         void popPrefetch();
 };  // class PrefetcherWorkTracker
 

@@ -93,31 +93,10 @@ PrefetcherInterface::clockTick()
 void
 PrefetcherInterface::processPrefetcherOutQueue()
 {
-    //while (prefetcher->hasNextPf()) // TODO: do we want to limit how many
-    //                                // requests we send out per cycle?
-    //{
-    //    Addr nextPfVAddr = prefetcher->nextPf();
-    //    bool status = \
-    //      owner->request_manager->enqueueLoadRequest(nextPfVAddr);
-    //    if (status) {
-    //        DPRINTF(
-    //            PickleDevicePrefetcherDebug,
-    //            "PREFETCH OUT ---> vaddr 0x%llx\n",
-    //            nextPfVAddr
-    //        );
-    //        packet_status[nextPfVAddr] = PacketStatus::SENT;
-    //        prefetcher->popNextPf(curTick());
-    //    } else {
-    //        DPRINTF(
-    //            PickleDevicePrefetcherDebug, "Warn: outqueue is full\n"
-    //        );
-    //        break;
-    //    }
-    //}
     // TODO: a better scheduling policy?
     for (auto &tracker: owner->prefetcher_work_trackers) {
         while (tracker.hasOutstandingPrefetch()) {
-            Addr prefetchVAddr = tracker.nextPrefetch();
+            Addr prefetchVAddr = tracker.peekNextPrefetch();
             bool status = \
                 owner->request_manager->enqueueLoadRequest(prefetchVAddr);
             if (status) {
