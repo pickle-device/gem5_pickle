@@ -77,7 +77,7 @@ PrefetcherWorkTracker::addWorkItem(Addr vaddr)
 
     vaddr += 4; // the backend prefetches the next iter
 
-    WorkItem workItem(vaddr);
+    std::shared_ptr<WorkItem> workItem(new WorkItem(vaddr));
 
     constexpr Addr BLOCK_SHIFT = 6;
     uint64_t lv1_node_id = 0;
@@ -106,7 +106,7 @@ PrefetcherWorkTracker::addWorkItem(Addr vaddr)
         lv1_node_id = \
             (uint64_t)(pkt->getConstPtr<uint32_t>()[node_id_offset]);
         // We add expected prefetches
-        workItem.addExpectedPrefetch(block_aligned_vaddr);
+        workItem->addExpectedPrefetch(block_aligned_vaddr, 0);
         DPRINTF(
             PickleDevicePrefetcherTrace,
             "Work Item = 0x%llx, node_id = %lld\n",
@@ -139,7 +139,7 @@ PrefetcherWorkTracker::addWorkItem(Addr vaddr)
             (first_item_vaddr - first_item_vaddr_block_aligned) / item_size;
         lv2_start_edge_vaddr = (pkt->getConstPtr<uint64_t>()[start_index]);
         // We add expected prefetches
-        workItem.addExpectedPrefetch(first_item_vaddr_block_aligned);
+        workItem->addExpectedPrefetch(first_item_vaddr_block_aligned, 1);
         DPRINTF(
             PickleDevicePrefetcherTrace,
             "Work Item = 0x%llx, edge_start_ptr = 0x%llx\n",
@@ -171,7 +171,7 @@ PrefetcherWorkTracker::addWorkItem(Addr vaddr)
             (second_item_vaddr - second_item_vaddr_block_aligned) / item_size;
         lv2_end_edge_vaddr = (pkt->getConstPtr<uint64_t>()[end_index]);
         // We add expected prefetches
-        workItem.addExpectedPrefetch(second_item_vaddr_block_aligned);
+        workItem->addExpectedPrefetch(second_item_vaddr_block_aligned, 1);
         DPRINTF(
             PickleDevicePrefetcherTrace,
             "Work Item = 0x%llx, edge_end_ptr = 0x%llx\n",
@@ -211,7 +211,7 @@ PrefetcherWorkTracker::addWorkItem(Addr vaddr)
                 curr_block_vaddr = edge_vaddr_block_aligned;
                 data_ptr = pkt->getPtr<uint32_t>();
                 // We add expected prefetches
-                workItem.addExpectedPrefetch(curr_block_vaddr);
+                workItem->addExpectedPrefetch(curr_block_vaddr, 2);
             }
             constexpr Addr item_size = 4;
             Addr edge_index = \
@@ -233,7 +233,7 @@ PrefetcherWorkTracker::addWorkItem(Addr vaddr)
             Addr visited_vaddr_block_aligned = \
                 (visited_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
             // We add expected prefetches
-            workItem.addExpectedPrefetch(visited_vaddr_block_aligned);
+            workItem->addExpectedPrefetch(visited_vaddr_block_aligned, 3);
             DPRINTF(
                 PickleDevicePrefetcherTrace,
                 "Work Item = 0x%llx, visited = 0x%llx\n",
@@ -248,7 +248,40 @@ PrefetcherWorkTracker::addWorkItem(Addr vaddr)
 void
 PrefetcherWorkTracker::processIncomingPrefetch(const Addr pf_vaddr)
 {
-    // TODO: check if the prefetch is expected
+    std::vector<std::shared_ptr<WorkItem>>& related_work = \
+        pf_vaddr_to_work_items_map[pf_vaddr];
+    for (auto &work: related_work) {
+        work->removeExpectedPrefetch(pf_vaddr);
+        if (work->isDoneWithCurrStep()) {
+            work->moveToNextStep();
+            if (work->isDone()) {
+                // TODO: remove the work/profile the work
+                return;
+            }
+            // TODO: move to next step and add prefetches
+            for (auto addr: work->getCurrStepExpectedPrefetches()) {
+                outstanding_prefetches.push(addr);
+            }
+        }
+    }
+}
+
+bool
+PrefetcherWorkTracker::hasOutstandingPrefetch() const
+{
+    return !(outstanding_prefetches.empty());
+}
+
+Addr
+PrefetcherWorkTracker::nextPrefetch() const
+{
+    return outstanding_prefetches.front();
+}
+
+void
+PrefetcherWorkTracker::popPrefetch()
+{
+    outstanding_prefetches.pop();
 }
 
 }; // namespace gem5

@@ -33,7 +33,10 @@
 #define __PREFETCHER_WORK_TRACKER_HH__
 
 #include <array>
+#include <memory>
+#include <queue>
 #include <unordered_set>
+#include <vector>
 
 #include "mem/packet.hh"
 #include "pickle/application_specific/pickle_job.hh"
@@ -48,10 +51,10 @@ class WorkItem
     private:
         Addr vaddr;
         std::array<std::unordered_set<Addr>, 4> expected_prefetches;
-        uint64_t step;
+        uint64_t curr_step;
     public:
-        WorkItem() : step(0) {}
-        WorkItem(Addr vaddr) : vaddr(vaddr), step(0) {}
+        WorkItem() : curr_step(0) {}
+        WorkItem(Addr vaddr) : vaddr(vaddr), curr_step(0) {}
         Addr getVAddr() const
         {
             return vaddr;
@@ -60,19 +63,30 @@ class WorkItem
         {
             expected_prefetches[step].insert(addr);
         }
-        const std::unordered_set<Addr>& getExpectedPrefetches(
-            const uint64_t step
-        ) const
+        void removeExpectedPrefetch(Addr addr)
         {
-            return expected_prefetches[step];
+            std::unordered_set<Addr>& curr_set = \
+                expected_prefetches[curr_step];
+            auto it = curr_set.find(addr);
+            if (it != curr_set.end()) {
+                curr_set.erase(it);
+            }
+        }
+        const std::unordered_set<Addr>& getCurrStepExpectedPrefetches() const
+        {
+            return expected_prefetches[curr_step];
         }
         void moveToNextStep()
         {
-            step += 1;
+            curr_step += 1;
+        }
+        bool isDoneWithCurrStep() const
+        {
+            return expected_prefetches[curr_step].empty();
         }
         bool isDone() const
         {
-            return step == 5;
+            return curr_step == 4;
         }
 }; // class WorkItem
 
@@ -82,7 +96,10 @@ class PrefetcherWorkTracker
         bool is_activated;
         PickleDevice* owner;
         std::shared_ptr<PickleJobDescriptor> job_descriptor;
-        std::unordered_map<Addr, WorkItem> work_items;
+        std::unordered_map<Addr, std::shared_ptr<WorkItem>> work_items;
+        std::unordered_map<Addr, std::vector<std::shared_ptr<WorkItem>>> \
+            pf_vaddr_to_work_items_map;
+        std::queue<Addr> outstanding_prefetches;
         uint64_t software_hint_distance;
         uint64_t hardware_prefetch_distance;
         uint64_t current_core_work_item;
@@ -94,6 +111,9 @@ class PrefetcherWorkTracker
         );
         void addWorkItem(Addr vaddr);
         void processIncomingPrefetch(const Addr pf_vaddr);
+        bool hasOutstandingPrefetch() const;
+        Addr nextPrefetch() const;
+        void popPrefetch();
 };  // class PrefetcherWorkTracker
 
 };  // namespace gem5

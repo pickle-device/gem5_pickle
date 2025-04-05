@@ -93,31 +93,47 @@ PrefetcherInterface::clockTick()
 void
 PrefetcherInterface::processPrefetcherOutQueue()
 {
-    if (prefetcher->outQSize() > 0)
-    {
-        DPRINTF(
-            PickleDevicePrefetcherDebug,
-            "OutQueue size: %d\n", prefetcher->outQSize()
-        );
-    }
-    while (prefetcher->hasNextPf()) // TODO: do we want to limit how many
-                                    // requests we send out per cycle?
-    {
-        Addr nextPfVAddr = prefetcher->nextPf();
-        bool status = owner->request_manager->enqueueLoadRequest(nextPfVAddr);
-        if (status) {
-            DPRINTF(
-                PickleDevicePrefetcherDebug,
-                "PREFETCH OUT ---> vaddr 0x%llx\n",
-                nextPfVAddr
-            );
-            packet_status[nextPfVAddr] = PacketStatus::SENT;
-            prefetcher->popNextPf(curTick());
-        } else {
-            DPRINTF(
-                PickleDevicePrefetcherDebug, "Warn: outqueue is full\n"
-            );
-            break;
+    //while (prefetcher->hasNextPf()) // TODO: do we want to limit how many
+    //                                // requests we send out per cycle?
+    //{
+    //    Addr nextPfVAddr = prefetcher->nextPf();
+    //    bool status = \
+    //      owner->request_manager->enqueueLoadRequest(nextPfVAddr);
+    //    if (status) {
+    //        DPRINTF(
+    //            PickleDevicePrefetcherDebug,
+    //            "PREFETCH OUT ---> vaddr 0x%llx\n",
+    //            nextPfVAddr
+    //        );
+    //        packet_status[nextPfVAddr] = PacketStatus::SENT;
+    //        prefetcher->popNextPf(curTick());
+    //    } else {
+    //        DPRINTF(
+    //            PickleDevicePrefetcherDebug, "Warn: outqueue is full\n"
+    //        );
+    //        break;
+    //    }
+    //}
+    // TODO: a better scheduling policy?
+    for (auto &tracker: owner->prefetcher_work_trackers) {
+        while (tracker.hasOutstandingPrefetch()) {
+            Addr prefetchVAddr = tracker.nextPrefetch();
+            bool status = \
+                owner->request_manager->enqueueLoadRequest(prefetchVAddr);
+            if (status) {
+                DPRINTF(
+                    PickleDevicePrefetcherDebug,
+                    "PREFETCH OUT ---> vaddr 0x%llx\n",
+                    prefetchVAddr
+                );
+                packet_status[prefetchVAddr] = PacketStatus::SENT;
+                tracker.popPrefetch();
+            } else {
+                DPRINTF(
+                    PickleDevicePrefetcherDebug, "Warn: outqueue is full\n"
+                );
+                break;
+            }
         }
     }
 }
@@ -137,13 +153,13 @@ PrefetcherInterface::processPrefetcherInQueue()
             PickleDevicePrefetcherDebug,
             "PREFETCH IN <--- vaddr 0x%llx\n", vaddr
         );
-        prefetcher->captureResponse(
-            curTick(), vaddr, std::move(packet_data[vaddr]),
-            64 //block_size
-        );
+        //prefetcher->captureResponse(
+        //    curTick(), vaddr, std::move(packet_data[vaddr]),
+        //    64 //block_size
+        //);
         for (auto tracker : owner->prefetcher_work_trackers)
         {
-            tracker.trackIncomingPrefetch(vaddr);
+            tracker.processIncomingPrefetch(vaddr);
         }
         to_be_removed.push_back(vaddr);
     }
