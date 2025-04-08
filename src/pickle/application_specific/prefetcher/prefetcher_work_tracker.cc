@@ -33,6 +33,7 @@
 
 #include "debug/PickleDevicePrefetcherKnownBugs.hh"
 #include "debug/PickleDevicePrefetcherTrace.hh"
+#include "debug/PickleDevicePrefetcherWorkTrackerDebug.hh"
 #include "pickle/device/pickle_device.hh"
 
 namespace gem5
@@ -108,6 +109,11 @@ PrefetcherWorkTracker::addWorkItem(Addr work_vaddr)
         bool success = false;
         Addr block_aligned_vaddr = (work_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
         constexpr Addr item_size = 4;
+        DPRINTF(
+            PickleDevicePrefetcherWorkTrackerDebug,
+            "Fetching lv1 vaddr 0x%llx\n",
+            block_aligned_vaddr
+        );
         PacketPtr pkt = \
             owner->zeroCycleLoadWithVAddr(block_aligned_vaddr, success);
         if (!success) {
@@ -139,6 +145,11 @@ PrefetcherWorkTracker::addWorkItem(Addr work_vaddr)
         Addr first_item_vaddr = array_vaddr + first_item_index * 8;
         Addr first_item_vaddr_block_aligned = \
             (first_item_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+        DPRINTF(
+            PickleDevicePrefetcherWorkTrackerDebug,
+            "Fetching lv2 vaddr 0x%llx\n",
+            first_item_vaddr_block_aligned
+        );
         PacketPtr pkt = \
             owner->zeroCycleLoadWithVAddr(
                 first_item_vaddr_block_aligned, success
@@ -173,6 +184,11 @@ PrefetcherWorkTracker::addWorkItem(Addr work_vaddr)
         Addr second_item_vaddr = array_vaddr + second_item_index * 8;
         Addr second_item_vaddr_block_aligned = \
             (second_item_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+        DPRINTF(
+            PickleDevicePrefetcherWorkTrackerDebug,
+            "Fetching lv2 vaddr 0x%llx\n",
+            second_item_vaddr_block_aligned
+        );
         PacketPtr pkt = \
             owner->zeroCycleLoadWithVAddr(
                 second_item_vaddr_block_aligned, success
@@ -217,6 +233,11 @@ PrefetcherWorkTracker::addWorkItem(Addr work_vaddr)
                 (edge_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
             if (edge_vaddr_block_aligned != curr_block_vaddr) {
                 bool success = false;
+                DPRINTF(
+                    PickleDevicePrefetcherWorkTrackerDebug,
+                    "Fetching lv3 vaddr 0x%llx\n",
+                    edge_vaddr_block_aligned
+                );
                 pkt = owner->zeroCycleLoadWithVAddr(
                     edge_vaddr_block_aligned, success
                 );
@@ -265,27 +286,73 @@ PrefetcherWorkTracker::addWorkItem(Addr work_vaddr)
         }
     }
 
-    work_items[work_vaddr] = workItem;
+    work_vaddr_to_work_items_map[work_vaddr] = workItem;
+    populateCurrStepPrefetches(workItem);
 }
 
 void
 PrefetcherWorkTracker::processIncomingPrefetch(const Addr pf_vaddr)
 {
-    std::vector<std::shared_ptr<WorkItem>>& related_work = \
+    std::vector<std::shared_ptr<WorkItem>>& work_items_induced_pf_vaddr = \
         pf_vaddr_to_work_items_map[pf_vaddr];
-    for (auto &work: related_work) {
+    std::vector<std::shared_ptr<WorkItem>> work_items_have_more_requests;
+    for (auto &work: work_items_induced_pf_vaddr) {
         work->removeExpectedPrefetch(pf_vaddr);
+        DPRINTF(
+            PickleDevicePrefetcherWorkTrackerDebug,
+            "WorkItem 0x%llx receives pf 0x%llx\n",
+            work->getWorkVAddr(), pf_vaddr
+        );
         if (work->isDoneWithCurrStep()) {
             work->moveToNextStep();
+            DPRINTF(
+                PickleDevicePrefetcherWorkTrackerDebug,
+                "WorkItem 0x%llx moves to step %lld\n",
+                work->getWorkVAddr(), work->getStep()
+            );
             if (work->isDone()) {
-                // TODO: remove the work/profile the work
-                return;
+                // profile the work
+                profileWork(work);
+                // remove the work
+                work_vaddr_to_work_items_map.erase(work->getWorkVAddr());
+                continue;
             }
-            // TODO: move to next step and add prefetches
-            for (auto addr: work->getCurrStepExpectedPrefetches()) {
-                outstanding_prefetches.push(addr);
-            }
+            work_items_have_more_requests.push_back(work);
         }
+    }
+    pf_vaddr_to_work_items_map[pf_vaddr].clear();
+    for (auto work: work_items_have_more_requests) {
+        populateCurrStepPrefetches(work);
+    }
+    if (work_items_have_more_requests.size() > 0) {
+        DPRINTF(
+            PickleDevicePrefetcherWorkTrackerDebug,
+            "Scheduled out queue\n"
+        );
+        owner->getPrefetcher()->scheduleDueToNewOutstandingPrefetchRequests();
+    }
+}
+
+void
+PrefetcherWorkTracker::populateCurrStepPrefetches(
+    std::shared_ptr<WorkItem> work
+)
+{
+    for (auto addr: work->getCurrStepExpectedPrefetches()) {
+        outstanding_prefetches.push(addr);
+        if (
+            pf_vaddr_to_work_items_map.find(addr) \
+                == pf_vaddr_to_work_items_map.end()
+        ) {
+            pf_vaddr_to_work_items_map[addr] = \
+                std::vector<std::shared_ptr<WorkItem>>();
+        }
+        pf_vaddr_to_work_items_map[addr].push_back(work);
+        DPRINTF(
+            PickleDevicePrefetcherWorkTrackerDebug,
+            "Adding pf_vaddr 0x%llx from WorkItem = 0x%llx\n",
+            addr, work->getWorkVAddr()
+        );
     }
 }
 
@@ -305,6 +372,12 @@ void
 PrefetcherWorkTracker::popPrefetch()
 {
     outstanding_prefetches.pop();
+}
+
+void
+PrefetcherWorkTracker::profileWork(std::shared_ptr<WorkItem> work)
+{
+    // TODO
 }
 
 }; // namespace gem5

@@ -88,6 +88,10 @@ class WorkItem
         {
             return curr_step == 4;
         }
+        uint64_t getStep() const
+        {
+            return curr_step;
+        }
 }; // class WorkItem
 
 class PrefetcherWorkTracker
@@ -96,7 +100,10 @@ class PrefetcherWorkTracker
         bool is_activated;
         PickleDevice* owner;
         std::shared_ptr<PickleJobDescriptor> job_descriptor;
-        std::unordered_map<Addr, std::shared_ptr<WorkItem>> work_items;
+        // This is a map from work address to its WorkItem
+        std::unordered_map<Addr, std::shared_ptr<WorkItem>> \
+            work_vaddr_to_work_items_map;
+        // This is a map from prefetch addresses induced by multiple WorkItem
         std::unordered_map<Addr, std::vector<std::shared_ptr<WorkItem>>> \
             pf_vaddr_to_work_items_map;
         std::queue<Addr> outstanding_prefetches;
@@ -114,9 +121,11 @@ class PrefetcherWorkTracker
         ) const;
         void addWorkItem(Addr vaddr);
         void processIncomingPrefetch(const Addr pf_vaddr);
+        void populateCurrStepPrefetches(std::shared_ptr<WorkItem> work);
         bool hasOutstandingPrefetch() const;
         Addr peekNextPrefetch() const;
         void popPrefetch();
+        void profileWork(std::shared_ptr<WorkItem> work);
 };  // class PrefetcherWorkTracker
 
 };  // namespace gem5

@@ -101,7 +101,11 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
     }
 
     for (int i = 0; i < num_cores; ++i) {
-        prefetcher_work_trackers.emplace_back(this);
+        prefetcher_work_trackers.push_back(
+            std::shared_ptr<PrefetcherWorkTracker>(
+                new PrefetcherWorkTracker(this)
+            )
+        );
     }
 }
 
@@ -162,11 +166,6 @@ PickleDevice::processEvent()
 void
 PickleDevice::operate()
 {
-    schedule(event, curTick() + ticks_per_cycle);
-    //operateUncacheableResponseQueue();
-    if (prefetcher_interface) {
-        prefetcher_interface->clockTick();
-    }
     DPRINTF(
         PickleDeviceEvent, "Operate: schedule event at %lld\n",
         curTick() + ticks_per_cycle
@@ -646,8 +645,8 @@ PickleDevice::processJobDescriptor(std::vector<uint8_t>& _job_descriptor)
         new PickleJobDescriptor(_job_descriptor)
     );
     prefetcher_interface->configure(job_descriptor);
-    for (auto &tracker: prefetcher_work_trackers) {
-        tracker.setJobDescriptor(job_descriptor);
+    for (auto tracker: prefetcher_work_trackers) {
+        tracker->setJobDescriptor(job_descriptor);
     }
     DPRINTF(
         PickleDeviceControl,
@@ -692,26 +691,13 @@ PickleDevice::trySetThreadContextFromCore(uint64_t core_id)
             "TTBR0_EL1: 0x%llx\n",
             device_thread_context->readMiscReg(ArmISA::MISCREG_TTBR0_EL1)
         );
-        // testing address translation
-        /*
-        Addr va = 0x7ff7ff6000ULL;
-        RequestPtr req = std::shared_ptr<Request>(
-            new Request(va, 64, Request::Flags(0), this->requestor_id, -1, 0)
-        );
-        Fault f = mmu->translateFunctional(
-            req, device_thread_context.get(), BaseMMU::Mode::Read
-        );
-        if (f != NoFault) {
-            DPRINTF(PickleDeviceAddressTranslation, "fault: %s\n", f->name());
-        }
-        Addr pa = req->getPaddr();
-        DPRINTF(
-            PickleDeviceAddressTranslation,
-            "Testing translation: paddr = 0x%llx, vaddr = 0x%llx",
-            va, pa
-        );
-        */
     }
+}
+
+uint64_t
+PickleDevice::getNumTicksPerCycle() const
+{
+    return ticks_per_cycle;
 }
 
 System *

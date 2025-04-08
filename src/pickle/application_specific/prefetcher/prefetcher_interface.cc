@@ -50,6 +50,15 @@ PrefetcherInterface::PrefetcherInterface(
     prefetch_distance_offset_from_software_hint(
       params.prefetch_distance_offset_from_software_hint
     ),
+    processInQueueEvent(
+        [this]{processPrefetcherInQueue();},
+        name() + ".operate_prefetcher_in_queue_event"
+    ),
+    processOutQueueEvent(
+        [this]{processPrefetcherOutQueue();},
+        name() + ".operate_prefetcher_out_queue_event"
+    ),
+    ticks_per_cycle(1000),
     prefetcher(nullptr),
     prefetcher_initialized(false),
     owner(nullptr),
@@ -76,27 +85,16 @@ void
 PrefetcherInterface::setOwner(PickleDevice* pickle_device)
 {
     this->owner = pickle_device;
-}
-
-void
-PrefetcherInterface::clockTick()
-{
-    if (!prefetcher_initialized)
-        return;
-    prefetcher->operate(curTick());
-    prefetcherStats.histInQueueLength.sample(packet_status.size());
-    prefetcherStats.histOutQueueLength.sample(prefetcher->outQSize());
-    processPrefetcherOutQueue();
-    processPrefetcherInQueue();
+    this->ticks_per_cycle = pickle_device->getNumTicksPerCycle();
 }
 
 void
 PrefetcherInterface::processPrefetcherOutQueue()
 {
     // TODO: a better scheduling policy?
-    for (auto &tracker: owner->prefetcher_work_trackers) {
-        while (tracker.hasOutstandingPrefetch()) {
-            Addr prefetchVAddr = tracker.peekNextPrefetch();
+    for (auto tracker: owner->prefetcher_work_trackers) {
+        while (tracker->hasOutstandingPrefetch()) {
+            Addr prefetchVAddr = tracker->peekNextPrefetch();
             bool status = \
                 owner->request_manager->enqueueLoadRequest(prefetchVAddr);
             if (status) {
@@ -106,11 +104,12 @@ PrefetcherInterface::processPrefetcherOutQueue()
                     prefetchVAddr
                 );
                 packet_status[prefetchVAddr] = PacketStatus::SENT;
-                tracker.popPrefetch();
+                tracker->popPrefetch();
             } else {
                 DPRINTF(
                     PickleDevicePrefetcherDebug, "Warn: outqueue is full\n"
                 );
+                scheduleDueToNewOutstandingPrefetchRequests();
                 break;
             }
         }
@@ -127,27 +126,24 @@ PrefetcherInterface::processPrefetcherInQueue()
         const bool is_ready = (status == PacketStatus::ARRIVED);
         if (!is_ready)
             continue;
-
         DPRINTF(
             PickleDevicePrefetcherDebug,
             "PREFETCH IN <--- vaddr 0x%llx\n", vaddr
         );
-        //prefetcher->captureResponse(
-        //    curTick(), vaddr, std::move(packet_data[vaddr]),
-        //    64 //block_size
-        //);
         for (auto tracker : owner->prefetcher_work_trackers)
         {
-            tracker.processIncomingPrefetch(vaddr);
+            tracker->processIncomingPrefetch(vaddr);
         }
         to_be_removed.push_back(vaddr);
     }
-
     for (auto const& vaddr: to_be_removed)
     {
         packet_data.erase(vaddr);
         packet_status.erase(vaddr);
     }
+
+    // we don't need to reschedule in queue event because all arrived packets
+    // are processed
 }
 
 uint64_t
@@ -226,10 +222,11 @@ PrefetcherInterface::enqueueWork(
             packet_status.size()
         );
     }
-    prefetcher->captureRequest(curTick(), prefetchAddr);
-    owner->prefetcher_work_trackers[cpuId].addWorkItem(
+    //prefetcher->captureRequest(curTick(), prefetchAddr);
+    owner->prefetcher_work_trackers[cpuId]->addWorkItem(
         workData
     );
+    owner->getPrefetcher()->scheduleDueToNewOutstandingPrefetchRequests();
     DPRINTF(
         PickleDevicePrefetcherDebug,
         "NEW WORK: data = 0x%llx\n", prefetchAddr
@@ -250,6 +247,28 @@ PrefetcherInterface::receivePrefetch(
     // Update the packet status
     packet_status[vaddr] = PacketStatus::ARRIVED;
     packet_data[vaddr] = std::move(p);
+    // Trigger In Queue Processing
+    scheduleDueToIncomingPrefetch();
+}
+
+void
+PrefetcherInterface::scheduleDueToIncomingPrefetch()
+{
+    if (!processInQueueEvent.scheduled()) {
+        schedule(
+            processInQueueEvent, curTick() + ticks_per_cycle
+        );
+    }
+}
+
+void
+PrefetcherInterface::scheduleDueToNewOutstandingPrefetchRequests()
+{
+    if (!processOutQueueEvent.scheduled()) {
+        schedule(
+            processOutQueueEvent, curTick() + ticks_per_cycle
+        );
+    }
 }
 
 void

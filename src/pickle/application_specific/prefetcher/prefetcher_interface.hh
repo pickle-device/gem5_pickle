@@ -41,6 +41,7 @@
 #include "params/PrefetcherInterface.hh"
 #include "pickle/application_specific/pickle_job.hh"
 #include "sim/clocked_object.hh"
+#include "sim/eventq.hh"
 #include "sim/sim_object.hh"
 
 
@@ -63,6 +64,9 @@ class PrefetcherInterface: public ClockedObject
         int64_t prefetch_distance;
         int64_t prefetch_distance_offset_from_software_hint;
         PARAMS(PrefetcherInterface);
+        EventFunctionWrapper processInQueueEvent;
+        EventFunctionWrapper processOutQueueEvent;
+        uint64_t ticks_per_cycle;
     private:
         std::unique_ptr<c_cerebellum> prefetcher;
         std::unordered_map<Addr, std::unique_ptr<uint8_t[]>> packet_data;
@@ -80,7 +84,6 @@ class PrefetcherInterface: public ClockedObject
         void startup() override;
     public:
         void setOwner(PickleDevice* engine);
-        void clockTick(); // what to do every cycle
         void configure(std::shared_ptr<PickleJobDescriptor> job);
         void switchOn();
         void switchOff();
@@ -92,6 +95,8 @@ class PrefetcherInterface: public ClockedObject
         void receivePrefetch(
             const uint64_t vaddr, std::unique_ptr<uint8_t[]> p
         );
+        void scheduleDueToIncomingPrefetch();
+        void scheduleDueToNewOutstandingPrefetchRequests();
     public:
         uint64_t workCount;
         void regStats() override;

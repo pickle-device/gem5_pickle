@@ -37,6 +37,7 @@ DebugFlag('PickleDevicePrefetcherDebug')
 DebugFlag('PickleDevicePrefetcherKnownBugs')
 DebugFlag('PickleDevicePrefetcherTrace')
 DebugFlag('PickleDevicePrefetcherProgressTracker')
+DebugFlag('PickleDevicePrefetcherWorkTrackerDebug')
 
 Source('prefetcher_interface.cc')
 Source('prefetcher_work_tracker.cc')

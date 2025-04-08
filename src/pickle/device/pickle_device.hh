@@ -196,6 +196,7 @@ class PickleDevice: public ClockedObject
         // target workloads, required for address translation of the
         // workload
         void trySetThreadContextFromCore(uint64_t core_id);
+        uint64_t getNumTicksPerCycle() const;
         System *getSystem();
         BaseMMU *getMMUPtr();
         BaseISA *getIsaPtr();
@@ -210,7 +211,8 @@ class PickleDevice: public ClockedObject
         PrefetcherInterface* prefetcher_interface;
         std::shared_ptr<PickleJobDescriptor> job_descriptor;
         std::shared_ptr<PickleJobDescriptor> getJobDescriptor() const;
-        std::vector<PrefetcherWorkTracker> prefetcher_work_trackers;
+        std::vector<std::shared_ptr<PrefetcherWorkTracker>> \
+            prefetcher_work_trackers;
     public:
         struct PickleDeviceStats : public statistics::Group
         {
