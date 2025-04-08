@@ -97,6 +97,8 @@ class PrefetcherInterface: public ClockedObject
         );
         void scheduleDueToIncomingPrefetch();
         void scheduleDueToNewOutstandingPrefetchRequests();
+    public: // profile functions
+        void profilePrefetchWithUnknownVAddr();
     public:
         uint64_t workCount;
         void regStats() override;
@@ -106,8 +108,8 @@ class PrefetcherInterface: public ClockedObject
             void regStats() override;
             // See the .cc for the description of each stat
             statistics::Scalar numReceivedWork;
-            statistics::Scalar numPrefetchesSent;
             statistics::Scalar numPrefetches;
+            statistics::Scalar numUnknownPrefetches;
             statistics::Histogram histInQueueLength;
             statistics::Histogram histOutQueueLength;
         } prefetcherStats;

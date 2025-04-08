@@ -272,6 +272,12 @@ PrefetcherInterface::scheduleDueToNewOutstandingPrefetchRequests()
 }
 
 void
+PrefetcherInterface::profilePrefetchWithUnknownVAddr()
+{
+    prefetcherStats.numUnknownPrefetches++;
+}
+
+void
 PrefetcherInterface::regStats()
 {
     ClockedObject::regStats();
@@ -286,12 +292,12 @@ PrefetcherInterface::PrefetcherStats::PrefetcherStats(
         "Number of work sent from software"
     ),
     ADD_STAT(
-        numPrefetchesSent, statistics::units::Count::get(),
-        "Number of prefetches sent to the request manager"
+        numPrefetches, statistics::units::Count::get(),
+        "Number of prefetch requests generated"
     ),
     ADD_STAT(
-        numPrefetches, statistics::units::Count::get(),
-        "Number of prefetches received"
+        numUnknownPrefetches, statistics::units::Count::get(),
+        "Number of prefetches received that does not fit into any array"
     ),
     ADD_STAT(
         histInQueueLength, statistics::units::Count::get(),
