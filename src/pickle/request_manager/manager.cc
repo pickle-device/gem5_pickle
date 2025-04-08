@@ -99,9 +99,10 @@ PickleDeviceRequestManager::enqueueRequest(
     if (outstanding_requests.find(block_aligned_vaddr) != \
             outstanding_requests.end()) {
         already_requested = true;
+    } else {
+        outstanding_requests[block_aligned_vaddr] = \
+            std::vector<std::shared_ptr<RequestBookkeeper>>();
     }
-    outstanding_requests[block_aligned_vaddr] = \
-        std::vector<std::shared_ptr<RequestBookkeeper>>();
 
     // If the request is a load and the block has already been requested,
     // we ignore the request, aka coalescing.
