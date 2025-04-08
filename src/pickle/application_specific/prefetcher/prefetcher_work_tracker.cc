@@ -76,7 +76,7 @@ PrefetcherWorkTracker::warnIfOutsideRanges(
 ) const
 {
     uint64_t array_id = job_descriptor->get_array_id(pf_vaddr);
-    if (array_id) {
+    if (array_id == -1ULL) {
         DPRINTF(
             PickleDevicePrefetcherKnownBugs,
             "warn: unknown pf_vaddr: work=0x%llx, pf_vaddr=0x%llx\n",
