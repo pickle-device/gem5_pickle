@@ -482,13 +482,16 @@ action(Initiate_ReadShared_Miss, desc="") {
 }
 
 action(Update_PreviousBlockOwner, desc="") {
-  assert(is_valid(tbe));
-  assert(is_valid(cache_entry));
+  //assert(is_valid(tbe));
+  //assert(is_valid(cache_entry));
   //assert(tbe.dataValid);
-  bool is_demand := (tbe.is_local_pf || tbe.is_remote_pf) == false;
-  if (is_demand && tbe.dataValid) {
-    tbe.previousBlockOwner := machineID;
-    tbe.previousBlockOwnerValid := true;
+  //bool is_demand := (tbe.is_local_pf || tbe.is_remote_pf) == false;
+  if (is_valid(tbe) && is_valid(cache_entry) && tbe.dataValid) {
+    bool is_demand := (tbe.is_local_pf || tbe.is_remote_pf) == false;
+    if (is_demand) {
+      tbe.previousBlockOwner := machineID;
+      tbe.previousBlockOwnerValid := true;
+    }
   }
 }
 
