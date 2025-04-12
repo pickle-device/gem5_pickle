@@ -44,9 +44,6 @@
 #include "sim/eventq.hh"
 #include "sim/sim_object.hh"
 
-
-class c_cerebellum;
-
 namespace gem5
 {
 
@@ -68,7 +65,6 @@ class PrefetcherInterface: public ClockedObject
         EventFunctionWrapper processOutQueueEvent;
         uint64_t ticks_per_cycle;
     private:
-        std::unique_ptr<c_cerebellum> prefetcher;
         std::unordered_map<Addr, std::unique_ptr<uint8_t[]>> packet_data;
         std::unordered_map<Addr, PacketStatus> packet_status;
         bool prefetcher_initialized;

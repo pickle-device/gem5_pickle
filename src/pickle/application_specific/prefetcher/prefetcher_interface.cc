@@ -35,7 +35,6 @@
 #include "debug/PickleDevicePrefetcherProgressTracker.hh"
 #include "debug/PickleDevicePrefetcherTrace.hh"
 
-#include "pickle/application_specific/prefetcher/backend/cerebellum.hpp"
 #include "pickle/device/pickle_device.hh"
 #include "pickle/request_manager/manager.hh"
 
@@ -59,7 +58,6 @@ PrefetcherInterface::PrefetcherInterface(
         name() + ".operate_prefetcher_out_queue_event"
     ),
     ticks_per_cycle(1000),
-    prefetcher(nullptr),
     prefetcher_initialized(false),
     owner(nullptr),
     workCount(0),
@@ -171,7 +169,6 @@ PrefetcherInterface::switchOff()
 void
 PrefetcherInterface::configure(std::shared_ptr<PickleJobDescriptor> job)
 {
-    prefetcher = std::unique_ptr<c_cerebellum>(new c_cerebellum(this));
     // converting to the backend format
     std::vector<std::tuple<
         uint64_t, uint64_t, bool, bool, uint64_t, uint64_t, uint64_t
@@ -199,7 +196,6 @@ PrefetcherInterface::configure(std::shared_ptr<PickleJobDescriptor> job)
             array.vaddr_start, array.vaddr_end, array.element_size
         );
     }
-    prefetcher->configure(jobTuples);
     prefetcher_initialized = true;
 }
 
@@ -222,7 +218,6 @@ PrefetcherInterface::enqueueWork(
             packet_status.size()
         );
     }
-    //prefetcher->captureRequest(curTick(), prefetchAddr);
     owner->prefetcher_work_trackers[cpuId]->addWorkItem(
         workData
     );
