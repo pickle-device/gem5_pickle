@@ -309,4 +309,77 @@ PrefetcherInterface::PrefetcherStats::regStats()
 {
 }
 
+PrefetcherInterface::TaskStats::TaskStats(
+    statistics::Group *parent, const uint64_t cpuId
+) : statistics::Group(parent, csprintf("cpu_%d", cpuId).c_str()),
+    ADD_STAT(
+        taskCount, statistics::units::Count::get(),
+        csprintf("Number of tasks from core %d", cpuId).c_str()
+    ),
+    ADD_STAT(
+        queuedTime, statistics::units::Tick::get(),
+        "From task receive to first prefetch"
+    ),
+    ADD_STAT(
+        prefetchLv0Time, statistics::units::Tick::get(),
+        "From first prefetch to final prefetch of array 0"
+    ),
+    ADD_STAT(
+        prefetchLv1Time, statistics::units::Tick::get(),
+        "From first prefetch to final prefetch of array 1"
+    ),
+    ADD_STAT(
+        prefetchLv2Time, statistics::units::Tick::get(),
+        "From first prefetch to final prefetch of array 2"
+    ),
+    ADD_STAT(
+        prefetchLv3Time, statistics::units::Tick::get(),
+        "From first prefetch to final prefetch of array 3"
+    ),
+    ADD_STAT(
+        totalPrefetchTime, statistics::units::Tick::get(),
+        "From first prefetch to final prefetch"
+    ),
+    ADD_STAT(
+        prefetchCompleteToCoreConsumptionTimeForTimelyPrefetches,
+        statistics::units::Tick::get(),
+        "Time from prefetch complete to core consumption for timely prefetches"
+    ),
+    ADD_STAT(
+        coreConsumptionToPrefetchCompleteTimeForLatePrefetches,
+        statistics::units::Tick::get(),
+        "Time from core consumption to prefetch complete for late prefetches"
+    )
+{
+    queuedTime
+      .init(16)
+      .flags(statistics::pdf);
+    prefetchLv0Time
+      .init(16)
+      .flags(statistics::pdf);
+    prefetchLv1Time
+      .init(16)
+      .flags(statistics::pdf);
+    prefetchLv2Time
+      .init(16)
+      .flags(statistics::pdf);
+    prefetchLv3Time
+      .init(16)
+      .flags(statistics::pdf);
+    totalPrefetchTime
+      .init(16)
+      .flags(statistics::pdf);
+    prefetchCompleteToCoreConsumptionTimeForTimelyPrefetches
+      .init(16)
+      .flags(statistics::pdf);
+    coreConsumptionToPrefetchCompleteTimeForLatePrefetches
+      .init(16)
+      .flags(statistics::pdf);
+}
+
+void
+PrefetcherInterface::TaskStats::regStats()
+{
+}
+
 }; // namespace gem5

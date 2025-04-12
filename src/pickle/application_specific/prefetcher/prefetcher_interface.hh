@@ -108,13 +108,29 @@ class PrefetcherInterface: public ClockedObject
         {
             PrefetcherStats(statistics::Group *parent);
             void regStats() override;
-            // See the .cc for the description of each stat
             statistics::Scalar numReceivedWork;
             statistics::Scalar numPrefetches;
             statistics::Scalar numUnknownPrefetches;
             statistics::Histogram histInQueueLength;
             statistics::Histogram histOutQueueLength;
         } prefetcherStats;
+        struct TaskStats : public statistics::Group
+        {
+            TaskStats(statistics::Group *parent, const uint64_t cpuId);
+            void regStats() override;
+            statistics::Scalar taskCount;
+            statistics::Histogram queuedTime;
+            statistics::Histogram prefetchLv0Time;
+            statistics::Histogram prefetchLv1Time;
+            statistics::Histogram prefetchLv2Time;
+            statistics::Histogram prefetchLv3Time;
+            statistics::Histogram totalPrefetchTime;
+            statistics::Histogram \
+                prefetchCompleteToCoreConsumptionTimeForTimelyPrefetches;
+            statistics::Histogram \
+                coreConsumptionToPrefetchCompleteTimeForLatePrefetches;
+        };
+        std::vector<std::shared_ptr<TaskStats>> taskStats;
 };
 
 }; // namespace gem5
