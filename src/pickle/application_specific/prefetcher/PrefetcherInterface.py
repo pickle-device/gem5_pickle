@@ -49,3 +49,9 @@ class PrefetcherInterface(ClockedObject):
         16,
         "Prefetch distance offset from software hint",
     )
+    num_cores = Param.Int(
+        8,
+        "Number of cores connected to the cache that this prefetcher is "
+        "servicing. In the case of LLC prefetcher, this is the number of "
+        "core in the same CCD.",
+    )

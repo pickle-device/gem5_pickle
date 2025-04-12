@@ -34,6 +34,7 @@
 #include "debug/PickleDevicePrefetcherKnownBugs.hh"
 #include "debug/PickleDevicePrefetcherTrace.hh"
 #include "debug/PickleDevicePrefetcherWorkTrackerDebug.hh"
+#include "debug/PickleDevicePrefetcherWorkTrackerStatsDebug.hh"
 #include "pickle/device/pickle_device.hh"
 
 namespace gem5
@@ -63,8 +64,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
     hardware_prefetch_distance = \
         owner->getPrefetchDistance() - \
         owner->getPrefetchDistanceOffsetFromSoftwareHint();
-    prefetch_distance = \
-        software_hint_distance - hardware_prefetch_distance;
+    prefetch_distance = hardware_prefetch_distance;
 }
 
 void
@@ -295,6 +295,7 @@ PrefetcherWorkTracker::addWorkItem(Addr work_vaddr)
 
     work_vaddr_to_work_items_map[work_vaddr] = workItem;
     populateCurrStepPrefetches(workItem);
+    notifyCoreCurrentWork(work_vaddr - prefetch_distance * 4);
 }
 
 void
@@ -321,8 +322,7 @@ PrefetcherWorkTracker::processIncomingPrefetch(const Addr pf_vaddr)
                 // profile the work
                 profileWork(work);
                 // if the core has not worked on this work item, we keep
-                // the Tick when the work item has finished before
-                // the work is removed
+                // the Tick when the work item has finished
                 if (!(work->hasCoreWorkedOnThisWork())) {
                     pf_complete_time[work->getWorkVAddr()] = \
                         work->getPrefetchCompleteTime();
@@ -392,7 +392,7 @@ PrefetcherWorkTracker::popPrefetch()
 void
 PrefetcherWorkTracker::profileWork(std::shared_ptr<WorkItem> work)
 {
-    // TODO
+    owner->profileWork(work, id);
 }
 
 void
@@ -404,9 +404,23 @@ PrefetcherWorkTracker::notifyCoreCurrentWork(const Addr work_vaddr)
     // If the prefetch for this work is not done (late prefetch), we profile
     // the core access time. Note that, it's possible that this work has never
     // been requested by the core.
-    if (pf_complete_time.find(work_vaddr) != pf_complete_time.end()) {
-        // prefetch_complete_time = pf_complete_time[work_vaddr];
-        // TODO: tell the PDEV to profile this
+    auto it = pf_complete_time.find(work_vaddr);
+    DPRINTF(
+        PickleDevicePrefetcherWorkTrackerDebug,
+        "notifyCoreCurrentWork: core_id: %lld, work_vaddr 0x%llx\n",
+        id, work_vaddr
+    );
+    if (it != pf_complete_time.end()) {
+        const Tick complete_time = it->second;
+        owner->profileTimelyPrefetch(
+            complete_time, id
+        );
+        pf_complete_time.erase(it);
+        DPRINTF(
+            PickleDevicePrefetcherWorkTrackerDebug,
+            "notifyCoreCurrentWork: Found pf_complete_time = %lld\n",
+            complete_time
+        );
     } else {
         if (
             work_vaddr_to_work_items_map.find(work_vaddr) != \
@@ -415,6 +429,17 @@ PrefetcherWorkTracker::notifyCoreCurrentWork(const Addr work_vaddr)
             auto work_item = \
                 work_vaddr_to_work_items_map[work_vaddr];
             work_item->notifyCoreIsWorkingOnThisWork();
+            DPRINTF(
+                PickleDevicePrefetcherWorkTrackerDebug,
+                "notifyCoreCurrentWork: Notified work_item\n"
+            );
+        }
+        else
+        {
+            DPRINTF(
+                PickleDevicePrefetcherWorkTrackerDebug,
+                "notifyCoreCurrentWork: No work item found\n"
+            );
         }
     }
 }

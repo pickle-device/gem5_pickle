@@ -34,7 +34,7 @@
 #include "debug/PickleDevicePrefetcherDebug.hh"
 #include "debug/PickleDevicePrefetcherProgressTracker.hh"
 #include "debug/PickleDevicePrefetcherTrace.hh"
-
+#include "debug/PickleDevicePrefetcherWorkTrackerDebug.hh"
 #include "pickle/device/pickle_device.hh"
 #include "pickle/request_manager/manager.hh"
 
@@ -58,6 +58,7 @@ PrefetcherInterface::PrefetcherInterface(
         name() + ".operate_prefetcher_out_queue_event"
     ),
     ticks_per_cycle(1000),
+    num_cores(params.num_cores),
     prefetcher_initialized(false),
     owner(nullptr),
     workCount(0),
@@ -68,6 +69,20 @@ PrefetcherInterface::PrefetcherInterface(
         "Prefetch distance offset from software hint must not be greater "
         "than the prefetch distance\n"
     );
+
+    for (int i = 0; i < num_cores; ++i) {
+        prefetcher_work_trackers.push_back(
+            std::shared_ptr<PrefetcherWorkTracker>(
+                new PrefetcherWorkTracker(this, i)
+            )
+        );
+    }
+
+    for (int i = 0; i < num_cores; ++i) {
+        taskStats.push_back(
+            std::shared_ptr<TaskStats>(new TaskStats(this, i))
+        );
+    }
 }
 
 PrefetcherInterface::~PrefetcherInterface()
@@ -84,14 +99,11 @@ PrefetcherInterface::setOwner(PickleDevice* pickle_device)
 {
     this->owner = pickle_device;
     this->ticks_per_cycle = pickle_device->getNumTicksPerCycle();
-    this->num_cores = owner->getNumCores();
-    for (int i = 0; i < num_cores; ++i) {
-        prefetcher_work_trackers.push_back(
-            std::shared_ptr<PrefetcherWorkTracker>(
-                new PrefetcherWorkTracker(this, i)
-            )
-        );
-    }
+    panic_if(
+        num_cores != pickle_device->getNumCores(),
+        "The prefetcher and the pickle device must have the same number of "
+        "cores.\n"
+    );
 }
 
 void
@@ -188,6 +200,9 @@ PrefetcherInterface::enqueueWork(
     const uint64_t workData, const uint64_t cpuId
 )
 {
+    // workData: the pointer to the prefetch hint from software
+    //    = (core's current work + prefetch_distance)
+    // prefetchAddr = workData - offset * 4
     if (!prefetcher_initialized)
         return false;
     workCount++;
@@ -316,10 +331,10 @@ PrefetcherInterface::TaskStats::TaskStats(
         taskCount, statistics::units::Count::get(),
         csprintf("Number of tasks from core %d", cpuId).c_str()
     ),
-    ADD_STAT(
-        queuedTime, statistics::units::Tick::get(),
-        "From task receive to first prefetch"
-    ),
+    //ADD_STAT(
+    //    queuedTime, statistics::units::Tick::get(),
+    //    "From task receive to first prefetch"
+    //),
     ADD_STAT(
         prefetchLv0Time, statistics::units::Tick::get(),
         "From first prefetch to final prefetch of array 0"
@@ -341,19 +356,19 @@ PrefetcherInterface::TaskStats::TaskStats(
         "From first prefetch to final prefetch"
     ),
     ADD_STAT(
-        prefetchCompleteToCoreConsumptionTimeForTimelyPrefetches,
+        timelyPrefetchesDistance,
         statistics::units::Tick::get(),
         "Time from prefetch complete to core consumption for timely prefetches"
     ),
     ADD_STAT(
-        coreConsumptionToPrefetchCompleteTimeForLatePrefetches,
+        latePrefetchesDistance,
         statistics::units::Tick::get(),
         "Time from core consumption to prefetch complete for late prefetches"
     )
 {
-    queuedTime
-      .init(16)
-      .flags(statistics::pdf);
+    //queuedTime
+    //  .init(16)
+    //  .flags(statistics::pdf);
     prefetchLv0Time
       .init(16)
       .flags(statistics::pdf);
@@ -369,10 +384,10 @@ PrefetcherInterface::TaskStats::TaskStats(
     totalPrefetchTime
       .init(16)
       .flags(statistics::pdf);
-    prefetchCompleteToCoreConsumptionTimeForTimelyPrefetches
+    timelyPrefetchesDistance
       .init(16)
       .flags(statistics::pdf);
-    coreConsumptionToPrefetchCompleteTimeForLatePrefetches
+    latePrefetchesDistance
       .init(16)
       .flags(statistics::pdf);
 }
@@ -380,6 +395,53 @@ PrefetcherInterface::TaskStats::TaskStats(
 void
 PrefetcherInterface::TaskStats::regStats()
 {
+}
+
+void
+PrefetcherInterface::profileWork(
+    std::shared_ptr<WorkItem> work, const uint64_t core_id
+)
+{
+    DPRINTF(
+        PickleDevicePrefetcherWorkTrackerDebug,
+        "profileWork: core_id: %lld, work_vaddr 0x%llx\n",
+        core_id, work->getWorkVAddr()
+    );
+    std::shared_ptr<TaskStats> task_stat = taskStats[core_id];
+    task_stat->taskCount++;;
+    task_stat->prefetchLv0Time.sample(work->getPrefetchLvTime(0));
+    task_stat->prefetchLv1Time.sample(work->getPrefetchLvTime(1));
+    task_stat->prefetchLv2Time.sample(work->getPrefetchLvTime(2));
+    task_stat->prefetchLv3Time.sample(work->getPrefetchLvTime(3));
+    task_stat->totalPrefetchTime.sample(work->getTotalPrefetchTime());
+    if (work->hasCoreWorkedOnThisWork()) { // late prefetch
+        DPRINTF(
+            PickleDevicePrefetcherWorkTrackerDebug,
+            "profileWork: late pf, complete time: %lld, core use: %lld\n",
+            work->getPrefetchCompleteTime(), work->getCoreUseTime()
+        );
+        task_stat->latePrefetchesDistance
+            .sample(
+                work->getPrefetchCompleteTime() - work->getCoreUseTime()
+            );
+    } else { // timely prefetch
+        // nothing to do here as the core has not worked on this work item
+        DPRINTF(
+            PickleDevicePrefetcherWorkTrackerDebug,
+            "profileWork: maybe timely pf\n"
+        );
+    }
+}
+
+void
+PrefetcherInterface::profileTimelyPrefetch(
+    const Tick pf_complete_time, const uint64_t core_id
+)
+{
+    taskStats[core_id]->timelyPrefetchesDistance
+        .sample(
+            curTick() - pf_complete_time
+        );
 }
 
 }; // namespace gem5

@@ -41,6 +41,7 @@
 #include "params/PrefetcherInterface.hh"
 #include "pickle/application_specific/pickle_job.hh"
 #include "pickle/application_specific/prefetcher/prefetcher_work_tracker.hh"
+#include "pickle/application_specific/prefetcher/work_item.hh"
 #include "sim/clocked_object.hh"
 #include "sim/eventq.hh"
 #include "sim/sim_object.hh"
@@ -119,18 +120,22 @@ class PrefetcherInterface: public ClockedObject
             TaskStats(statistics::Group *parent, const uint64_t cpuId);
             void regStats() override;
             statistics::Scalar taskCount;
-            statistics::Histogram queuedTime;
+            //statistics::Histogram queuedTime;
             statistics::Histogram prefetchLv0Time;
             statistics::Histogram prefetchLv1Time;
             statistics::Histogram prefetchLv2Time;
             statistics::Histogram prefetchLv3Time;
             statistics::Histogram totalPrefetchTime;
-            statistics::Histogram \
-                prefetchCompleteToCoreConsumptionTimeForTimelyPrefetches;
-            statistics::Histogram \
-                coreConsumptionToPrefetchCompleteTimeForLatePrefetches;
+            statistics::Histogram timelyPrefetchesDistance;
+            statistics::Histogram latePrefetchesDistance;
         };
         std::vector<std::shared_ptr<TaskStats>> taskStats;
+        void profileWork(
+            std::shared_ptr<WorkItem> work, const uint64_t core_id
+        );
+        void profileTimelyPrefetch(
+            const Tick pf_complete_time, const uint64_t core_id
+        );
 };
 
 }; // namespace gem5
