@@ -202,7 +202,7 @@ PrefetcherInterface::enqueueWork(
             packet_status.size()
         );
     }
-    prefetcher_work_trackers[cpuId]->addWorkItem(workData);
+    prefetcher_work_trackers[cpuId]->addWorkItem(prefetchAddr);
     scheduleDueToNewOutstandingPrefetchRequests();
     DPRINTF(
         PickleDevicePrefetcherDebug,
