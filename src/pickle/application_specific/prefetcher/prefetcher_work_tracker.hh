@@ -44,7 +44,7 @@
 namespace gem5
 {
 
-class PickleDevice;
+class PrefetcherInterface;
 
 class WorkItem
 {
@@ -156,7 +156,7 @@ class PrefetcherWorkTracker
     private:
         uint64_t id;
         bool is_activated;
-        PickleDevice* owner;
+        PrefetcherInterface* owner;
         std::shared_ptr<PickleJobDescriptor> job_descriptor;
         // This is a map from work address to its WorkItem
         std::unordered_map<Addr, std::shared_ptr<WorkItem>> \
@@ -174,7 +174,7 @@ class PrefetcherWorkTracker
         uint64_t current_core_work_item;
     public:
         PrefetcherWorkTracker();
-        PrefetcherWorkTracker(PickleDevice* owner, const uint64_t _id);
+        PrefetcherWorkTracker(PrefetcherInterface* owner, const uint64_t _id);
         void setJobDescriptor(
             std::shared_ptr<PickleJobDescriptor> job_descriptor
         );

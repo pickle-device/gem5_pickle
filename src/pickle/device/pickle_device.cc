@@ -99,14 +99,6 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
             new PickleDeviceUncacheableSnoopPort(
                 csprintf("%s%d", "uncacheable_snoop_port", i), this, i, i));
     }
-
-    for (int i = 0; i < num_cores; ++i) {
-        prefetcher_work_trackers.push_back(
-            std::shared_ptr<PrefetcherWorkTracker>(
-                new PrefetcherWorkTracker(this, i)
-            )
-        );
-    }
 }
 
 PickleDevice::~PickleDevice()
@@ -645,9 +637,6 @@ PickleDevice::processJobDescriptor(std::vector<uint8_t>& _job_descriptor)
         new PickleJobDescriptor(_job_descriptor)
     );
     prefetcher_interface->configure(job_descriptor);
-    for (auto tracker: prefetcher_work_trackers) {
-        tracker->setJobDescriptor(job_descriptor);
-    }
     DPRINTF(
         PickleDeviceControl,
         "Received job descriptor: %s\n",
@@ -740,6 +729,12 @@ PrefetcherInterface *
 PickleDevice::getPrefetcher()
 {
     return prefetcher_interface;
+}
+
+uint64_t
+PickleDevice::getNumCores() const
+{
+    return num_cores;
 }
 
 Addr

@@ -52,17 +52,17 @@ PrefetcherWorkTracker::PrefetcherWorkTracker()
 }
 
 PrefetcherWorkTracker::PrefetcherWorkTracker(
-    PickleDevice* owner, const uint64_t _id
+    PrefetcherInterface* owner, const uint64_t _id
 ) : id(_id),
     is_activated(false),
     owner(owner),
     job_descriptor(nullptr),
     current_core_work_item(-1ULL)
 {
-    software_hint_distance = owner->getPrefetcher()->getPrefetchDistance();
+    software_hint_distance = owner->getPrefetchDistance();
     hardware_prefetch_distance = \
-        owner->getPrefetcher()->getPrefetchDistance() - \
-        owner->getPrefetcher()->getPrefetchDistanceOffsetFromSoftwareHint();
+        owner->getPrefetchDistance() - \
+        owner->getPrefetchDistanceOffsetFromSoftwareHint();
     prefetch_distance = \
         software_hint_distance - hardware_prefetch_distance;
 }
@@ -83,7 +83,7 @@ PrefetcherWorkTracker::warnIfOutsideRanges(
 {
     uint64_t array_id = job_descriptor->get_array_id(pf_vaddr);
     if (array_id == -1ULL) {
-        owner->getPrefetcher()->profilePrefetchWithUnknownVAddr();
+        owner->profilePrefetchWithUnknownVAddr();
         DPRINTF(
             PickleDevicePrefetcherKnownBugs,
             "warn: unknown pf_vaddr: work=0x%llx, pf_vaddr=0x%llx\n",
@@ -344,7 +344,7 @@ PrefetcherWorkTracker::processIncomingPrefetch(const Addr pf_vaddr)
             PickleDevicePrefetcherWorkTrackerDebug,
             "Scheduled out queue\n"
         );
-        owner->getPrefetcher()->scheduleDueToNewOutstandingPrefetchRequests();
+        owner->scheduleDueToNewOutstandingPrefetchRequests();
     }
 }
 

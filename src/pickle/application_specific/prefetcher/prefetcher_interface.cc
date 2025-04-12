@@ -84,13 +84,21 @@ PrefetcherInterface::setOwner(PickleDevice* pickle_device)
 {
     this->owner = pickle_device;
     this->ticks_per_cycle = pickle_device->getNumTicksPerCycle();
+    this->num_cores = owner->getNumCores();
+    for (int i = 0; i < num_cores; ++i) {
+        prefetcher_work_trackers.push_back(
+            std::shared_ptr<PrefetcherWorkTracker>(
+                new PrefetcherWorkTracker(this, i)
+            )
+        );
+    }
 }
 
 void
 PrefetcherInterface::processPrefetcherOutQueue()
 {
     // TODO: a better scheduling policy?
-    for (auto tracker: owner->prefetcher_work_trackers) {
+    for (auto tracker: prefetcher_work_trackers) {
         while (tracker->hasOutstandingPrefetch()) {
             Addr prefetchVAddr = tracker->peekNextPrefetch();
             bool status = \
@@ -128,7 +136,7 @@ PrefetcherInterface::processPrefetcherInQueue()
             PickleDevicePrefetcherDebug,
             "PREFETCH IN <--- vaddr 0x%llx\n", vaddr
         );
-        for (auto tracker : owner->prefetcher_work_trackers)
+        for (auto tracker : prefetcher_work_trackers)
         {
             tracker->processIncomingPrefetch(vaddr);
         }
@@ -169,32 +177,8 @@ PrefetcherInterface::switchOff()
 void
 PrefetcherInterface::configure(std::shared_ptr<PickleJobDescriptor> job)
 {
-    // converting to the backend format
-    std::vector<std::tuple<
-        uint64_t, uint64_t, bool, bool, uint64_t, uint64_t, uint64_t
-    >> jobTuples;
-    for (const auto& array : job->arrays)
-    {
-        jobTuples.push_back(
-            std::make_tuple(
-                array.array_id,
-                array.dst_id,
-                array.is_indexed_access,
-                array.is_ranged_access,
-                array.vaddr_start,
-                array.vaddr_end,
-                array.element_size
-            )
-        );
-        DPRINTF(
-            PickleDevicePrefetcherDebug,
-            "Prefetcher configured: array_id %lld, dst_id %lld, is_indexed %d"
-            ", is_ranged %d, vaddr_start 0x%llx, vaddr_end 0x%llx"
-            " element_size %lld\n",
-            array.array_id, array.dst_id,
-            array.is_indexed_access, array.is_ranged_access,
-            array.vaddr_start, array.vaddr_end, array.element_size
-        );
+    for (auto tracker: prefetcher_work_trackers) {
+        tracker->setJobDescriptor(job);
     }
     prefetcher_initialized = true;
 }
@@ -218,10 +202,8 @@ PrefetcherInterface::enqueueWork(
             packet_status.size()
         );
     }
-    owner->prefetcher_work_trackers[cpuId]->addWorkItem(
-        workData
-    );
-    owner->getPrefetcher()->scheduleDueToNewOutstandingPrefetchRequests();
+    prefetcher_work_trackers[cpuId]->addWorkItem(workData);
+    scheduleDueToNewOutstandingPrefetchRequests();
     DPRINTF(
         PickleDevicePrefetcherDebug,
         "NEW WORK: data = 0x%llx\n", prefetchAddr
@@ -264,6 +246,17 @@ PrefetcherInterface::scheduleDueToNewOutstandingPrefetchRequests()
             processOutQueueEvent, curTick() + ticks_per_cycle
         );
     }
+}
+
+PacketPtr
+PrefetcherInterface::zeroCycleLoadWithVAddr(const Addr& vaddr, bool& success)
+{
+    return owner->zeroCycleLoadWithVAddr(vaddr, success);
+}
+PacketPtr
+PrefetcherInterface::zeroCycleLoadWithPAddr(const Addr& paddr, bool& success)
+{
+    return owner->zeroCycleLoadWithPAddr(paddr, success);
 }
 
 void

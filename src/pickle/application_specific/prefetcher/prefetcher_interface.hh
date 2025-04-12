@@ -40,6 +40,7 @@
 #include "base/statistics.hh"
 #include "params/PrefetcherInterface.hh"
 #include "pickle/application_specific/pickle_job.hh"
+#include "pickle/application_specific/prefetcher/prefetcher_work_tracker.hh"
 #include "sim/clocked_object.hh"
 #include "sim/eventq.hh"
 #include "sim/sim_object.hh"
@@ -64,9 +65,12 @@ class PrefetcherInterface: public ClockedObject
         EventFunctionWrapper processInQueueEvent;
         EventFunctionWrapper processOutQueueEvent;
         uint64_t ticks_per_cycle;
+        uint64_t num_cores;
     private:
         std::unordered_map<Addr, std::unique_ptr<uint8_t[]>> packet_data;
         std::unordered_map<Addr, PacketStatus> packet_status;
+        std::vector<std::shared_ptr<PrefetcherWorkTracker>> \
+            prefetcher_work_trackers;
         bool prefetcher_initialized;
         // check and send prefetch requests for every cycle
         void processPrefetcherOutQueue();
@@ -93,6 +97,8 @@ class PrefetcherInterface: public ClockedObject
         );
         void scheduleDueToIncomingPrefetch();
         void scheduleDueToNewOutstandingPrefetchRequests();
+        PacketPtr zeroCycleLoadWithVAddr(const Addr& vaddr, bool& success);
+        PacketPtr zeroCycleLoadWithPAddr(const Addr& paddr, bool& success);
     public: // profile functions
         void profilePrefetchWithUnknownVAddr();
     public:
