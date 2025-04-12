@@ -52,9 +52,46 @@ class WorkItem
         Addr work_vaddr;
         std::array<std::unordered_set<Addr>, 4> expected_prefetches;
         uint64_t curr_step;
+
+        // statistics
+        // when did this work item was received by prefetcher
+        Tick work_received_time;
+        // when did the prefetcher receive all prefetches for a certain level
+        std::array<Tick, 4> prefetch_received_time;
+        // when did the prefetcher finish prefetch all four levels
+        Tick work_completed_time;
+        // when did the core use this work
+        Tick core_use_time;
+    private:
+        inline void profileWorkItemReceivedTime()
+        {
+            work_received_time = curTick();
+        }
+        inline void profilePrefetchReceivedTime(const uint64_t level)
+        {
+            prefetch_received_time[level] = curTick();
+        }
+        inline void profileWorkCompletedTime()
+        {
+            work_completed_time = curTick();
+        }
     public:
-        WorkItem() : curr_step(0) {}
-        WorkItem(Addr _work_vaddr) : work_vaddr(_work_vaddr), curr_step(0) {}
+        inline void profileCoreUseTime()
+        {
+            core_use_time = curTick();
+        }
+    public:
+        WorkItem()
+            : curr_step(0), work_received_time(0), work_completed_time(0),
+              core_use_time(0) {
+            prefetch_received_time.fill(0);
+        }
+        WorkItem(Addr _work_vaddr)
+            : work_vaddr(_work_vaddr), curr_step(0), work_received_time(0),
+              work_completed_time(0), core_use_time(0) {
+            profileWorkItemReceivedTime();
+            prefetch_received_time.fill(0);
+        }
         Addr getWorkVAddr() const
         {
             return work_vaddr;
@@ -70,6 +107,12 @@ class WorkItem
             auto it = curr_set.find(pf_vaddr);
             if (it != curr_set.end()) {
                 curr_set.erase(it);
+            }
+            if (curr_set.empty()) {
+                profilePrefetchReceivedTime(curr_step);
+                if (curr_step == 3) {
+                    profileWorkCompletedTime();
+                }
             }
         }
         const std::unordered_set<Addr>& getCurrStepExpectedPrefetches() const
