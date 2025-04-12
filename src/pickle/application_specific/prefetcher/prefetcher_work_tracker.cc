@@ -40,17 +40,21 @@ namespace gem5
 {
 
 PrefetcherWorkTracker::PrefetcherWorkTracker()
-  : is_activated(false),
+  : id(-1ULL),
+    is_activated(false),
     owner(nullptr),
     job_descriptor(nullptr),
     software_hint_distance(0),
     hardware_prefetch_distance(0),
+    prefetch_distance(0),
     current_core_work_item(-1ULL)
 {
 }
 
-PrefetcherWorkTracker::PrefetcherWorkTracker(PickleDevice* owner)
-  : is_activated(false),
+PrefetcherWorkTracker::PrefetcherWorkTracker(
+    PickleDevice* owner, const uint64_t _id
+) : id(_id),
+    is_activated(false),
     owner(owner),
     job_descriptor(nullptr),
     current_core_work_item(-1ULL)
@@ -59,6 +63,8 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(PickleDevice* owner)
     hardware_prefetch_distance = \
         owner->getPrefetcher()->getPrefetchDistance() - \
         owner->getPrefetcher()->getPrefetchDistanceOffsetFromSoftwareHint();
+    prefetch_distance = \
+        software_hint_distance - hardware_prefetch_distance;
 }
 
 void
@@ -314,6 +320,14 @@ PrefetcherWorkTracker::processIncomingPrefetch(const Addr pf_vaddr)
             if (work->isDone()) {
                 // profile the work
                 profileWork(work);
+                // if the core has not worked on this work item, we keep
+                // the Tick when the work item has finished before
+                // the work is removed
+                if (!(work->hasCoreWorkedOnThisWork())) {
+                    pf_complete_time[work->getWorkVAddr()] = \
+                        work->getPrefetchCompleteTime();
+                    assert(work->getPrefetchCompleteTime() != 0);
+                }
                 // remove the work
                 work_vaddr_to_work_items_map.erase(work->getWorkVAddr());
                 continue;
@@ -379,6 +393,30 @@ void
 PrefetcherWorkTracker::profileWork(std::shared_ptr<WorkItem> work)
 {
     // TODO
+}
+
+void
+PrefetcherWorkTracker::notifyCoreCurrentWork(const Addr work_vaddr)
+{
+    // If the prefetch for this work is complete (timely prefetch), we have the
+    // prefetch complete time in pf_complete_time. It's possible that the core
+    // has already worked on this work item but never sent a prefetch request.
+    // If the prefetch for this work is not done (late prefetch), we profile
+    // the core access time. Note that, it's possible that this work has never
+    // been requested by the core.
+    if (pf_complete_time.find(work_vaddr) != pf_complete_time.end()) {
+        // prefetch_complete_time = pf_complete_time[work_vaddr];
+        // TODO: tell the PDEV to profile this
+    } else {
+        if (
+            work_vaddr_to_work_items_map.find(work_vaddr) != \
+                work_vaddr_to_work_items_map.end()
+        ) {
+            auto work_item = \
+                work_vaddr_to_work_items_map[work_vaddr];
+            work_item->notifyCoreIsWorkingOnThisWork();
+        }
+    }
 }
 
 }; // namespace gem5

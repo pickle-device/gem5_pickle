@@ -52,6 +52,7 @@ class WorkItem
         Addr work_vaddr;
         std::array<std::unordered_set<Addr>, 4> expected_prefetches;
         uint64_t curr_step;
+        bool core_worked_on_this_work;
 
         // statistics
         // when did this work item was received by prefetcher
@@ -91,6 +92,19 @@ class WorkItem
               work_completed_time(0), core_use_time(0) {
             profileWorkItemReceivedTime();
             prefetch_received_time.fill(0);
+        }
+        void notifyCoreIsWorkingOnThisWork()
+        {
+            core_worked_on_this_work = true;
+            profileCoreUseTime();
+        }
+        bool hasCoreWorkedOnThisWork() const
+        {
+            return core_worked_on_this_work;
+        }
+        Tick getPrefetchCompleteTime() const
+        {
+            return work_completed_time;
         }
         Addr getWorkVAddr() const
         {
@@ -140,6 +154,7 @@ class WorkItem
 class PrefetcherWorkTracker
 {
     private:
+        uint64_t id;
         bool is_activated;
         PickleDevice* owner;
         std::shared_ptr<PickleJobDescriptor> job_descriptor;
@@ -149,13 +164,17 @@ class PrefetcherWorkTracker
         // This is a map from prefetch addresses induced by multiple WorkItem
         std::unordered_map<Addr, std::vector<std::shared_ptr<WorkItem>>> \
             pf_vaddr_to_work_items_map;
+        // This is a map from work address to its prefetch complete time
+        // This is used when the prefetch task is done before the core uses it
+        std::unordered_map<Addr, Tick> pf_complete_time;
         std::queue<Addr> outstanding_prefetches;
         uint64_t software_hint_distance;
         uint64_t hardware_prefetch_distance;
+        uint64_t prefetch_distance;
         uint64_t current_core_work_item;
     public:
         PrefetcherWorkTracker();
-        PrefetcherWorkTracker(PickleDevice* owner);
+        PrefetcherWorkTracker(PickleDevice* owner, const uint64_t _id);
         void setJobDescriptor(
             std::shared_ptr<PickleJobDescriptor> job_descriptor
         );
@@ -169,6 +188,7 @@ class PrefetcherWorkTracker
         Addr peekNextPrefetch() const;
         void popPrefetch();
         void profileWork(std::shared_ptr<WorkItem> work);
+        void notifyCoreCurrentWork(const Addr work_vaddr);
 };  // class PrefetcherWorkTracker
 
 };  // namespace gem5

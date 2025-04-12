@@ -103,7 +103,7 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
     for (int i = 0; i < num_cores; ++i) {
         prefetcher_work_trackers.push_back(
             std::shared_ptr<PrefetcherWorkTracker>(
-                new PrefetcherWorkTracker(this)
+                new PrefetcherWorkTracker(this, i)
             )
         );
     }
