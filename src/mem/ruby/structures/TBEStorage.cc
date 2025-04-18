@@ -54,8 +54,16 @@ TBEStorage::TBEStorageStats::TBEStorageStats(statistics::Group *parent)
     : statistics::Group(parent),
       ADD_STAT(avg_size, "Avg. number of slots allocated"),
       ADD_STAT(avg_util, "Avg. utilization"),
-      ADD_STAT(avg_reserved, "Avg. number of slots reserved")
+      ADD_STAT(avg_reserved, "Avg. number of slots reserved"),
+      ADD_STAT(size_hist, statistics::units::Count::get(),
+               "Histogram of TBE util"),
+      ADD_STAT(total_full_utilization_ticks, statistics::units::Tick::get(),
+               "Total number of ticks with full utilization")
 {
+    m_last_update_time = curTick();
+    size_hist
+      .init(16)
+      .flags(statistics::pdf);
 }
 
 } // namespace ruby

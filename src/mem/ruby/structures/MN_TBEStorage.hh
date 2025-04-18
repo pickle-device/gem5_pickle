@@ -43,6 +43,7 @@
 #include <vector>
 
 #include <base/statistics.hh>
+#include <sim/stats.hh>
 
 #include "mem/ruby/common/MachineID.hh"
 #include "mem/ruby/structures/TBEStorage.hh"
@@ -138,6 +139,7 @@ class MN_TBEStorage
     void
     incrementReserved(int partition)
     {
+        updateStats();
         if (partition &&
             partitions[partition]->areNSlotsAvailable(1)) {
             partitions[partition]->incrementReserved();
@@ -150,6 +152,7 @@ class MN_TBEStorage
     void
     decrementReserved(int partition)
     {
+        updateStats();
         if (partition && (partitions[partition]->reserved() > 0)) {
             partitions[partition]->decrementReserved();
         } else {
@@ -165,6 +168,7 @@ class MN_TBEStorage
     int
     addEntryToNewSlot(int partition)
     {
+        updateStats();
         if (partition && partitions[partition]->areNSlotsAvailable(1)) {
             int part_slot = partitions[partition]->addEntryToNewSlot();
 
@@ -189,6 +193,7 @@ class MN_TBEStorage
     void
     removeEntryFromSlot(int slot, int partition)
     {
+        updateStats();
         auto part_capacity = partitions[partition]->capacity();
         if (slot < part_capacity) {
             partitions[partition]->removeEntryFromSlot(slot);
@@ -238,18 +243,52 @@ class MN_TBEStorage
           : statistics::Group(parent),
             ADD_STAT(avg_size, "Avg. number of slots allocated"),
             ADD_STAT(avg_util, "Avg. utilization"),
-            ADD_STAT(avg_reserved, "Avg. number of slots reserved")
-        {}
+            ADD_STAT(avg_reserved, "Avg. number of slots reserved"),
+            ADD_STAT(size_hist,
+                     statistics::units::Count::get(),
+                     "Histogram of MNTBE util"),
+            ADD_STAT(total_full_utilization_ticks,
+                     statistics::units::Tick::get(),
+                     "Total number of ticks with full utilization")
+        {
+            m_last_update_time = curTick();
+            size_hist
+              .init(16)
+              .flags(statistics::pdf);
+        }
 
         // Statistical variables
+        Tick m_last_update_time;
+
         statistics::Average avg_size;
         statistics::Average avg_util;
         statistics::Average avg_reserved;
+        statistics::Histogram size_hist;
+        statistics::Scalar total_full_utilization_ticks;
     } m_stats;
 
     std::vector<TBEStorage *> partitions;
 
     std::list<RetryEntry> m_retryEntries;
+
+    void
+    updateStats()
+    {
+        // time
+        const Tick old_time = m_stats.m_last_update_time;
+        const Tick current_time = curTick();
+
+        // total stats
+        const uint64_t old_size = size();
+        const float old_util = utilization();
+        m_stats.size_hist.sample(old_size);
+        if (old_util > 0.99)
+        {
+            m_stats.total_full_utilization_ticks += current_time - old_time;
+        }
+
+        m_stats.m_last_update_time = current_time;
+    }
 
     typename std::list<RetryEntry>::iterator
     getNextRetryEntryIter()

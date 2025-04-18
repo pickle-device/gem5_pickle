@@ -43,6 +43,7 @@
 #include <unordered_map>
 
 #include <base/statistics.hh>
+#include "sim/stats.hh"
 
 namespace gem5
 {
@@ -124,14 +125,20 @@ class TBEStorage
     std::stack<int> m_slots_avail;
     std::unordered_map<int, int> m_slots_used;
 
+    void updateStats();
+
     struct TBEStorageStats : public statistics::Group
     {
         TBEStorageStats(statistics::Group *parent);
+        Tick m_last_update_time;
 
         // Statistical variables
         statistics::Average avg_size;
         statistics::Average avg_util;
         statistics::Average avg_reserved;
+
+        statistics::Histogram size_hist;
+        statistics::Scalar total_full_utilization_ticks;
     } m_stats;
 };
 
@@ -144,6 +151,7 @@ TBEStorage::areNSlotsAvailable(int n, Tick current_time) const
 inline void
 TBEStorage::incrementReserved()
 {
+    updateStats();
     ++m_reserved;
     m_stats.avg_reserved = m_reserved;
 }
@@ -152,6 +160,7 @@ inline void
 TBEStorage::decrementReserved()
 {
     assert(m_reserved > 0);
+    updateStats();
     --m_reserved;
     m_stats.avg_reserved = m_reserved;
 }
@@ -161,6 +170,9 @@ TBEStorage::addEntryToNewSlot()
 {
     assert(slotsAvailable() > 0);
     assert(m_slots_avail.size() > 0);
+
+    updateStats();
+
     int slot = m_slots_avail.top();
     m_slots_used[slot] = 1;
     m_slots_avail.pop();
@@ -180,6 +192,8 @@ TBEStorage::addEntryToSlot(int slot)
 inline void
 TBEStorage::removeEntryFromSlot(int slot)
 {
+    updateStats();
+
     auto iter = m_slots_used.find(slot);
     assert(iter != m_slots_used.end());
     assert(iter->second > 0);
@@ -191,6 +205,26 @@ TBEStorage::removeEntryFromSlot(int slot)
     m_stats.avg_size = size();
     m_stats.avg_util = utilization();
 }
+
+inline void
+TBEStorage::updateStats()
+{
+    // time
+    const Tick old_time = m_stats.m_last_update_time;
+    const Tick current_time = curTick();
+
+    // total stats
+    const uint64_t old_size = size();
+    const float old_util = utilization();
+    m_stats.size_hist.sample(old_size);
+    if (old_util > 0.99)
+    {
+        m_stats.total_full_utilization_ticks += current_time - old_time;
+    }
+
+    m_stats.m_last_update_time = current_time;
+}
+
 
 } // namespace ruby
 } // namespace gem5
