@@ -70,6 +70,7 @@ class PrefetcherInterface: public ClockedObject
     private:
         std::unordered_map<Addr, std::unique_ptr<uint8_t[]>> packet_data;
         std::unordered_map<Addr, PacketStatus> packet_status;
+        std::unordered_set<Addr> received_packets_to_be_processed;
         std::vector<std::shared_ptr<PrefetcherWorkTracker>> \
             prefetcher_work_trackers;
         bool prefetcher_initialized;

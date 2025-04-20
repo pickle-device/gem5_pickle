@@ -137,28 +137,21 @@ PrefetcherInterface::processPrefetcherOutQueue()
 void
 PrefetcherInterface::processPrefetcherInQueue()
 {
-    std::vector<Addr> to_be_removed;
-    to_be_removed.reserve(16);
-    for (auto& [vaddr, status] : packet_status)
-    {
-        const bool is_ready = (status == PacketStatus::ARRIVED);
-        if (!is_ready)
-            continue;
+    for (auto vaddr: received_packets_to_be_processed) {
         DPRINTF(
             PickleDevicePrefetcherDebug,
             "PREFETCH IN <--- vaddr 0x%llx\n", vaddr
         );
-        for (auto tracker : prefetcher_work_trackers)
-        {
+        assert(packet_status[vaddr] == PacketStatus::ARRIVED);
+        for (auto tracker: prefetcher_work_trackers) {
             tracker->processIncomingPrefetch(vaddr);
         }
-        to_be_removed.push_back(vaddr);
     }
-    for (auto const& vaddr: to_be_removed)
-    {
+    for (auto vaddr: received_packets_to_be_processed) {
         packet_data.erase(vaddr);
         packet_status.erase(vaddr);
     }
+    received_packets_to_be_processed.clear();
 
     // we don't need to reschedule in queue event because all arrived packets
     // are processed
@@ -239,6 +232,7 @@ PrefetcherInterface::receivePrefetch(
     // Update the packet status
     packet_status[vaddr] = PacketStatus::ARRIVED;
     packet_data[vaddr] = std::move(p);
+    received_packets_to_be_processed.insert(vaddr);
     // Trigger In Queue Processing
     scheduleDueToIncomingPrefetch();
 }
