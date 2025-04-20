@@ -109,10 +109,20 @@ PrefetcherInterface::setOwner(PickleDevice* pickle_device)
 void
 PrefetcherInterface::processPrefetcherOutQueue()
 {
-    // TODO: a better scheduling policy?
+    // TODO: a better scheduling policy?)
     for (auto tracker: prefetcher_work_trackers) {
         while (tracker->hasOutstandingPrefetch()) {
             Addr prefetchVAddr = tracker->peekNextPrefetch();
+            if (packet_status.find(prefetchVAddr) != packet_status.end()) {
+                DPRINTF(
+                    PickleDevicePrefetcherDebug,
+                    "PREFETCH OUT COALESCED ---> vaddr 0x%llx already in "
+                    "queue\n",
+                    prefetchVAddr
+                );
+                tracker->popPrefetch();
+                continue;
+            }
             bool status = \
                 owner->request_manager->enqueueLoadRequest(prefetchVAddr);
             if (status) {
