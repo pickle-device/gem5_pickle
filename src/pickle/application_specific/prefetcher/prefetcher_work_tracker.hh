@@ -83,7 +83,7 @@ class PrefetcherWorkTracker
         );
         void addWorkItem(Addr vaddr);
         void processIncomingPrefetch(const Addr pf_vaddr);
-        void populateCurrStepPrefetches(std::shared_ptr<WorkItem> work);
+        void populateCurrLevelPrefetches(std::shared_ptr<WorkItem> work);
         bool hasOutstandingPrefetch() const;
         Addr peekNextPrefetch() const;
         void popPrefetch();

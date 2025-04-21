@@ -46,8 +46,9 @@ class WorkItem
     private:
         Addr work_vaddr;
         std::array<std::unordered_set<Addr>, 4> expected_prefetches;
-        uint64_t curr_step;
+        uint64_t curr_level;
         bool core_worked_on_this_work;
+        uint64_t num_indirection_levels;
 
         // statistics
         // when did this work item was received by prefetcher
@@ -78,13 +79,13 @@ class WorkItem
         bool hasCoreWorkedOnThisWork() const;
         Tick getPrefetchCompleteTime() const;
         Addr getWorkVAddr() const;
-        void addExpectedPrefetch(Addr pf_vaddr, const uint64_t step);
+        void addExpectedPrefetch(Addr pf_vaddr, const uint64_t level);
         void removeExpectedPrefetch(Addr pf_vaddr);
-        const std::unordered_set<Addr>& getCurrStepExpectedPrefetches() const;
-        void moveToNextStep();
-        bool isDoneWithCurrStep() const;
+        const std::unordered_set<Addr>& getCurrLevelExpectedPrefetches() const;
+        void moveToNextLevel();
+        bool isDoneWithCurrLevel() const;
         bool isDone() const;
-        uint64_t getStep() const;
+        uint64_t getLevel() const;
 }; // class WorkItem
 
 }; // namespace gem5

@@ -94,7 +94,7 @@ PrefetcherWorkTracker::addWorkItem(Addr work_vaddr)
     }
     auto workItem = prefetch_generator->generateWorkItem(work_vaddr);
     work_vaddr_to_work_items_map[work_vaddr] = workItem;
-    populateCurrStepPrefetches(workItem);
+    populateCurrLevelPrefetches(workItem);
     notifyCoreCurrentWork(work_vaddr - prefetch_distance * 4);
 }
 
@@ -111,12 +111,12 @@ PrefetcherWorkTracker::processIncomingPrefetch(const Addr pf_vaddr)
             "WorkItem 0x%llx receives pf 0x%llx\n",
             work->getWorkVAddr(), pf_vaddr
         );
-        if (work->isDoneWithCurrStep()) {
-            work->moveToNextStep();
+        if (work->isDoneWithCurrLevel()) {
+            work->moveToNextLevel();
             DPRINTF(
                 PickleDevicePrefetcherWorkTrackerDebug,
-                "WorkItem 0x%llx moves to step %lld\n",
-                work->getWorkVAddr(), work->getStep()
+                "WorkItem 0x%llx moves to level %lld\n",
+                work->getWorkVAddr(), work->getLevel()
             );
             if (work->isDone()) {
                 // profile the work
@@ -137,7 +137,7 @@ PrefetcherWorkTracker::processIncomingPrefetch(const Addr pf_vaddr)
     }
     pf_vaddr_to_work_items_map[pf_vaddr].clear();
     for (auto work: work_items_have_more_requests) {
-        populateCurrStepPrefetches(work);
+        populateCurrLevelPrefetches(work);
     }
     if (work_items_have_more_requests.size() > 0) {
         DPRINTF(
@@ -149,11 +149,11 @@ PrefetcherWorkTracker::processIncomingPrefetch(const Addr pf_vaddr)
 }
 
 void
-PrefetcherWorkTracker::populateCurrStepPrefetches(
+PrefetcherWorkTracker::populateCurrLevelPrefetches(
     std::shared_ptr<WorkItem> work
 )
 {
-    for (auto addr: work->getCurrStepExpectedPrefetches()) {
+    for (auto addr: work->getCurrLevelExpectedPrefetches()) {
         outstanding_prefetches.push(addr);
         if (
             pf_vaddr_to_work_items_map.find(addr) \

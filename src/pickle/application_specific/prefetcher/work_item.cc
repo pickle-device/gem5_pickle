@@ -35,15 +35,15 @@ namespace gem5
 {
 
 WorkItem::WorkItem()
-  : curr_step(0), work_received_time(0), work_completed_time(0),
-    core_use_time(0)
+  : curr_level(0), num_indirection_levels(0), work_received_time(0),
+    work_completed_time(0), core_use_time(0)
 {
     prefetch_received_time.fill(0);
 }
 
 WorkItem::WorkItem(const Addr _work_vaddr)
-  : work_vaddr(_work_vaddr), curr_step(0), work_received_time(0),
-    work_completed_time(0), core_use_time(0)
+  : work_vaddr(_work_vaddr), curr_level(0), num_indirection_levels(0),
+    work_received_time(0), work_completed_time(0), core_use_time(0)
 {
   profileWorkItemReceivedTime();
   prefetch_received_time.fill(0);
@@ -136,56 +136,58 @@ WorkItem::getWorkVAddr() const
 }
 
 void
-WorkItem::addExpectedPrefetch(Addr pf_vaddr, const uint64_t step)
+WorkItem::addExpectedPrefetch(Addr pf_vaddr, const uint64_t level)
 {
-    expected_prefetches[step].insert(pf_vaddr);
+    if (level + 1 > num_indirection_levels) {
+        num_indirection_levels = level + 1;
+    }
+    expected_prefetches[level].insert(pf_vaddr);
 }
 
 void
 WorkItem::removeExpectedPrefetch(Addr pf_vaddr)
 {
-    std::unordered_set<Addr>& curr_set = \
-        expected_prefetches[curr_step];
+    std::unordered_set<Addr>& curr_set = expected_prefetches[curr_level];
     auto it = curr_set.find(pf_vaddr);
     if (it != curr_set.end()) {
         curr_set.erase(it);
     }
     if (curr_set.empty()) {
-        profilePrefetchReceivedTime(curr_step);
-        if (curr_step == 3) {
+        profilePrefetchReceivedTime(curr_level);
+        if (curr_level == num_indirection_levels - 1) {
             profileWorkCompletedTime();
         }
     }
 }
 
 const std::unordered_set<Addr>&
-WorkItem::getCurrStepExpectedPrefetches() const
+WorkItem::getCurrLevelExpectedPrefetches() const
 {
-    return expected_prefetches[curr_step];
+    return expected_prefetches[curr_level];
 }
 
 void
-WorkItem::moveToNextStep()
+WorkItem::moveToNextLevel()
 {
-    curr_step += 1;
+    curr_level += 1;
 }
 
 bool
-WorkItem::isDoneWithCurrStep() const
+WorkItem::isDoneWithCurrLevel() const
 {
-    return expected_prefetches[curr_step].empty();
+    return expected_prefetches[curr_level].empty();
 }
 
 bool
 WorkItem::isDone() const
 {
-    return curr_step == 4;
+    return curr_level == num_indirection_levels;
 }
 
 uint64_t
-WorkItem::getStep() const
+WorkItem::getLevel() const
 {
-    return curr_step;
+    return curr_level;
 }
 
 }; // namespace gem5
