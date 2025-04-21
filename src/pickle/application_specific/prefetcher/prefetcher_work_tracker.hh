@@ -46,14 +46,17 @@ namespace gem5
 {
 
 class PrefetcherInterface;
+class PrefetchGenerator;
 
 class PrefetcherWorkTracker
 {
     private:
         uint64_t id;
         bool is_activated;
+    public:
         PrefetcherInterface* owner;
         std::shared_ptr<PickleJobDescriptor> job_descriptor;
+    private:
         // This is a map from work address to its WorkItem
         std::unordered_map<Addr, std::shared_ptr<WorkItem>> \
             work_vaddr_to_work_items_map;
@@ -68,15 +71,16 @@ class PrefetcherWorkTracker
         uint64_t hardware_prefetch_distance;
         uint64_t prefetch_distance;
         uint64_t current_core_work_item;
+        std::shared_ptr<PrefetchGenerator> prefetch_generator;
     public:
         PrefetcherWorkTracker();
-        PrefetcherWorkTracker(PrefetcherInterface* owner, const uint64_t _id);
+        PrefetcherWorkTracker(
+            PrefetcherInterface* owner, const uint64_t _id,
+            std::string prefetch_generator_mode
+        );
         void setJobDescriptor(
             std::shared_ptr<PickleJobDescriptor> job_descriptor
         );
-        void warnIfOutsideRanges(
-            const Addr work_addr, const Addr pf_vaddr
-        ) const;
         void addWorkItem(Addr vaddr);
         void processIncomingPrefetch(const Addr pf_vaddr);
         void populateCurrStepPrefetches(std::shared_ptr<WorkItem> work);
@@ -85,6 +89,7 @@ class PrefetcherWorkTracker
         void popPrefetch();
         void profileWork(std::shared_ptr<WorkItem> work);
         void notifyCoreCurrentWork(const Addr work_vaddr);
+        friend class PrefetchGenerator;
 };  // class PrefetcherWorkTracker
 
 };  // namespace gem5

@@ -31,7 +31,6 @@
 
 #include "pickle/application_specific/prefetcher/prefetcher_work_tracker.hh"
 
-#include "debug/PickleDevicePrefetcherKnownBugs.hh"
 #include "debug/PickleDevicePrefetcherTrace.hh"
 #include "debug/PickleDevicePrefetcherWorkTrackerDebug.hh"
 #include "debug/PickleDevicePrefetcherWorkTrackerStatsDebug.hh"
@@ -53,7 +52,8 @@ PrefetcherWorkTracker::PrefetcherWorkTracker()
 }
 
 PrefetcherWorkTracker::PrefetcherWorkTracker(
-    PrefetcherInterface* owner, const uint64_t _id
+    PrefetcherInterface* owner, const uint64_t _id,
+    std::string prefetch_generator_mode
 ) : id(_id),
     is_activated(false),
     owner(owner),
@@ -65,6 +65,16 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
         owner->getPrefetchDistance() - \
         owner->getPrefetchDistanceOffsetFromSoftwareHint();
     prefetch_distance = hardware_prefetch_distance;
+
+    if (prefetch_generator_mode == "bfs") {
+        prefetch_generator = std::make_shared<BFSPrefetchGenerator>(
+            "BFSPrefetchGenerator", this
+        );
+    } else {
+        panic(
+            "Unknown prefetch generator mode: %s\n", prefetch_generator_mode
+        );
+    }
 }
 
 void
@@ -77,222 +87,12 @@ PrefetcherWorkTracker::setJobDescriptor(
 }
 
 void
-PrefetcherWorkTracker::warnIfOutsideRanges(
-    const Addr work_vaddr, const Addr pf_vaddr
-) const
-{
-    uint64_t array_id = job_descriptor->get_array_id(pf_vaddr);
-    if (array_id == -1ULL) {
-        owner->profilePrefetchWithUnknownVAddr();
-        DPRINTF(
-            PickleDevicePrefetcherKnownBugs,
-            "warn: unknown pf_vaddr: work=0x%llx, pf_vaddr=0x%llx\n",
-            work_vaddr, pf_vaddr
-        );
-    }
-}
-
-void
 PrefetcherWorkTracker::addWorkItem(Addr work_vaddr)
 {
     if (!is_activated) {
         return;
     }
-
-    work_vaddr += 4; // the backend prefetches the next iter
-
-    std::shared_ptr<WorkItem> workItem(new WorkItem(work_vaddr));
-
-    constexpr Addr BLOCK_SHIFT = 6;
-    uint64_t lv1_node_id = 0;
-    uint64_t lv2_start_edge_vaddr = 0;
-    uint64_t lv2_end_edge_vaddr = 0;
-    std::vector<uint64_t> lv3_edge_indices;
-
-    // 2 -> 0 -> 1 -> 3 -> -1
-
-    // level 1: we fetch the node id
-    {
-        bool success = false;
-        Addr block_aligned_vaddr = (work_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
-        constexpr Addr item_size = 4;
-        DPRINTF(
-            PickleDevicePrefetcherWorkTrackerDebug,
-            "Fetching lv1 vaddr 0x%llx\n",
-            block_aligned_vaddr
-        );
-        PacketPtr pkt = \
-            owner->zeroCycleLoadWithVAddr(block_aligned_vaddr, success);
-        if (!success) {
-            DPRINTF(
-                PickleDevicePrefetcherTrace,
-                "Failed to fetch level = 1, vaddr = 0x%llx\n",
-                work_vaddr
-            );
-            return;
-        }
-        Addr node_id_offset = (work_vaddr - block_aligned_vaddr) / item_size;
-        lv1_node_id = \
-            (uint64_t)(pkt->getConstPtr<uint32_t>()[node_id_offset]);
-        // We add expected prefetches
-        workItem->addExpectedPrefetch(block_aligned_vaddr, 0);
-        warnIfOutsideRanges(work_vaddr, block_aligned_vaddr);
-        DPRINTF(
-            PickleDevicePrefetcherTrace,
-            "Work Item = 0x%llx, node_id = %lld\n",
-            work_vaddr, lv1_node_id
-        );
-    }
-    // level 2: we fetch the start and the end of the edge indices
-    {
-        bool success = false;
-        Addr first_item_index = lv1_node_id;
-        Addr array_vaddr = job_descriptor->get_array(0).vaddr_start;
-
-        Addr first_item_vaddr = array_vaddr + first_item_index * 8;
-        Addr first_item_vaddr_block_aligned = \
-            (first_item_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
-        DPRINTF(
-            PickleDevicePrefetcherWorkTrackerDebug,
-            "Fetching lv2 vaddr 0x%llx\n",
-            first_item_vaddr_block_aligned
-        );
-        PacketPtr pkt = \
-            owner->zeroCycleLoadWithVAddr(
-                first_item_vaddr_block_aligned, success
-            );
-        if (!success) {
-            DPRINTF(
-                PickleDevicePrefetcherTrace,
-                "Failed to fetch level = 2, Work Item = 0x%llx, "
-                "pf_vaddr = 0x%llx, start_node\n",
-                work_vaddr, first_item_vaddr_block_aligned
-            );
-            return;
-        }
-        constexpr Addr item_size = 8;
-        Addr start_index = \
-            (first_item_vaddr - first_item_vaddr_block_aligned) / item_size;
-        lv2_start_edge_vaddr = (pkt->getConstPtr<uint64_t>()[start_index]);
-        // We add expected prefetches
-        workItem->addExpectedPrefetch(first_item_vaddr_block_aligned, 1);
-        warnIfOutsideRanges(work_vaddr, first_item_vaddr_block_aligned);
-        DPRINTF(
-            PickleDevicePrefetcherTrace,
-            "Work Item = 0x%llx, edge_start_ptr = 0x%llx\n",
-            work_vaddr, lv2_start_edge_vaddr
-        );
-    }
-    {
-        bool success = false;
-        Addr second_item_index = lv1_node_id + 1;
-        Addr array_vaddr = job_descriptor->get_array(0).vaddr_start;
-
-        Addr second_item_vaddr = array_vaddr + second_item_index * 8;
-        Addr second_item_vaddr_block_aligned = \
-            (second_item_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
-        DPRINTF(
-            PickleDevicePrefetcherWorkTrackerDebug,
-            "Fetching lv2 vaddr 0x%llx\n",
-            second_item_vaddr_block_aligned
-        );
-        PacketPtr pkt = \
-            owner->zeroCycleLoadWithVAddr(
-                second_item_vaddr_block_aligned, success
-            );
-        if (!success) {
-            DPRINTF(
-                PickleDevicePrefetcherTrace,
-                "Failed to fetch level = 2, Work Item = 0x%llx, "
-                "pf_vaddr = 0x%llx, end_node\n",
-                work_vaddr, second_item_vaddr_block_aligned
-            );
-            return;
-        }
-        constexpr Addr item_size = 8;
-        Addr end_index = \
-            (second_item_vaddr - second_item_vaddr_block_aligned) / item_size;
-        lv2_end_edge_vaddr = (pkt->getConstPtr<uint64_t>()[end_index]);
-        // We add expected prefetches
-        workItem->addExpectedPrefetch(second_item_vaddr_block_aligned, 1);
-        warnIfOutsideRanges(work_vaddr, second_item_vaddr_block_aligned);
-        DPRINTF(
-            PickleDevicePrefetcherTrace,
-            "Work Item = 0x%llx, edge_end_ptr = 0x%llx\n",
-            work_vaddr, lv2_end_edge_vaddr
-        );
-    }
-    // level 3: we fetch the edge indices
-    {
-        Addr curr_block_vaddr = 1;
-        PacketPtr pkt = nullptr;
-        uint32_t* data_ptr = nullptr;
-        lv3_edge_indices.reserve(
-            (lv2_end_edge_vaddr - lv2_start_edge_vaddr) / 4
-        );
-        for (
-            Addr edge_vaddr = lv2_start_edge_vaddr;
-            edge_vaddr < lv2_end_edge_vaddr;
-            edge_vaddr += 4
-        )
-        {
-            Addr edge_vaddr_block_aligned = \
-                (edge_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
-            if (edge_vaddr_block_aligned != curr_block_vaddr) {
-                bool success = false;
-                DPRINTF(
-                    PickleDevicePrefetcherWorkTrackerDebug,
-                    "Fetching lv3 vaddr 0x%llx\n",
-                    edge_vaddr_block_aligned
-                );
-                pkt = owner->zeroCycleLoadWithVAddr(
-                    edge_vaddr_block_aligned, success
-                );
-                if (!success) {
-                    DPRINTF(
-                        PickleDevicePrefetcherTrace,
-                        "Failed to fetch level = 3, Work Item = 0x%llx, "
-                        "vaddr = 0x%llx\n",
-                        work_vaddr, edge_vaddr_block_aligned
-                    );
-                    return;
-                }
-                curr_block_vaddr = edge_vaddr_block_aligned;
-                data_ptr = pkt->getPtr<uint32_t>();
-                // We add expected prefetches
-                workItem->addExpectedPrefetch(curr_block_vaddr, 2);
-                warnIfOutsideRanges(work_vaddr, curr_block_vaddr);
-            }
-            constexpr Addr item_size = 4;
-            Addr edge_index = \
-                (edge_vaddr - curr_block_vaddr) / item_size;
-            lv3_edge_indices.push_back(data_ptr[edge_index]);
-            DPRINTF(
-                PickleDevicePrefetcherTrace,
-                "Work Item = 0x%llx, edge_index = %lld\n",
-                work_vaddr, lv3_edge_indices.back()
-            );
-        }
-    }
-
-    // level 4: we fetch the visited array
-    {
-        Addr visited_start_vaddr = job_descriptor->get_array(3).vaddr_start;
-        for (auto edge_index : lv3_edge_indices) {
-            Addr visited_vaddr = visited_start_vaddr + edge_index * 4;
-            Addr visited_vaddr_block_aligned = \
-                (visited_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
-            // We add expected prefetches
-            workItem->addExpectedPrefetch(visited_vaddr_block_aligned, 3);
-            warnIfOutsideRanges(work_vaddr, visited_vaddr_block_aligned);
-            DPRINTF(
-                PickleDevicePrefetcherTrace,
-                "Work Item = 0x%llx, visited = 0x%llx\n",
-                work_vaddr, visited_vaddr_block_aligned
-            );
-        }
-    }
-
+    auto workItem = prefetch_generator->generateWorkItem(work_vaddr);
     work_vaddr_to_work_items_map[work_vaddr] = workItem;
     populateCurrStepPrefetches(workItem);
     notifyCoreCurrentWork(work_vaddr - prefetch_distance * 4);

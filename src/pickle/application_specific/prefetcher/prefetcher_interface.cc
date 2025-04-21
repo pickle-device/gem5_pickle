@@ -59,6 +59,9 @@ PrefetcherInterface::PrefetcherInterface(
     ),
     ticks_per_cycle(1000),
     num_cores(params.num_cores),
+    prefetch_generator_mode(
+        params.prefetch_generator_mode
+    ),
     prefetcher_initialized(false),
     owner(nullptr),
     workCount(0),
@@ -73,7 +76,7 @@ PrefetcherInterface::PrefetcherInterface(
     for (int i = 0; i < num_cores; ++i) {
         prefetcher_work_trackers.push_back(
             std::shared_ptr<PrefetcherWorkTracker>(
-                new PrefetcherWorkTracker(this, i)
+                new PrefetcherWorkTracker(this, i, prefetch_generator_mode)
             )
         );
     }
@@ -177,6 +180,12 @@ uint64_t
 PrefetcherInterface::getPrefetchDistanceOffsetFromSoftwareHint() const
 {
     return prefetch_distance_offset_from_software_hint;
+}
+
+std::shared_ptr<PrefetchGenerator>
+PrefetcherInterface::getPrefetchGenerator() const
+{
+    return prefetch_generator;
 }
 
 void

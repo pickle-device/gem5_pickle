@@ -33,6 +33,7 @@
 #define __PREFETCHER_INTERFACE_HH__
 
 #include <queue>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -40,6 +41,7 @@
 #include "base/statistics.hh"
 #include "params/PrefetcherInterface.hh"
 #include "pickle/application_specific/pickle_job.hh"
+#include "pickle/application_specific/prefetcher/prefetch_generators/all_prefetch_generators.hh"
 #include "pickle/application_specific/prefetcher/prefetcher_work_tracker.hh"
 #include "pickle/application_specific/prefetcher/work_item.hh"
 #include "sim/clocked_object.hh"
@@ -67,6 +69,8 @@ class PrefetcherInterface: public ClockedObject
         EventFunctionWrapper processOutQueueEvent;
         uint64_t ticks_per_cycle;
         uint64_t num_cores;
+        std::string prefetch_generator_mode;
+        std::shared_ptr<PrefetchGenerator> prefetch_generator;
     private:
         std::unordered_map<Addr, std::unique_ptr<uint8_t[]>> packet_data;
         std::unordered_map<Addr, PacketStatus> packet_status;
@@ -92,6 +96,7 @@ class PrefetcherInterface: public ClockedObject
         bool isActivated() const { return prefetcher_initialized; }
         uint64_t getPrefetchDistance() const;
         uint64_t getPrefetchDistanceOffsetFromSoftwareHint() const;
+        std::shared_ptr<PrefetchGenerator> getPrefetchGenerator() const;
     public: // the interface
         bool enqueueWork(const uint64_t workData, const uint64_t cpuId);
         void receivePrefetch(
