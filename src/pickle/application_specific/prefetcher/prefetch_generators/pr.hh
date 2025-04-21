@@ -29,11 +29,31 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __ALL_PREFETCH_GENERATORS_HH__
-#define __ALL_PREFETCH_GENERATORS_HH__
+#ifndef __PR_PREFETCH_GENERATOR_HH__
+#define __PR_PREFETCH_GENERATOR_HH__
 
-#include "pickle/application_specific/prefetcher/prefetch_generators/bfs.hh"
-#include "pickle/application_specific/prefetcher/prefetch_generators/pr.hh"
+#include <memory>
+#include <string>
+
 #include "pickle/application_specific/prefetcher/prefetch_generators/prefetch_generator.hh"
 
-#endif // __ALL_PREFETCH_GENERATORS_HH__
+namespace gem5
+{
+
+class PrefetcherWorkTracker;
+
+class PRPrefetchGenerator: public PrefetchGenerator
+{
+  public:
+    PRPrefetchGenerator(
+        std::string _name,
+        PrefetcherWorkTracker* _work_tracker
+    );
+
+    // Function to generate prefetch requests
+    std::shared_ptr<WorkItem> generateWorkItem(Addr work_data) override;
+}; // class PRPrefetchGenerator
+
+} // namespace gem5
+
+#endif // __PR_PREFETCH_GENERATOR_HH__

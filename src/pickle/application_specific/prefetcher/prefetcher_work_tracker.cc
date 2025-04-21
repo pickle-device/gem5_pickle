@@ -53,7 +53,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker()
 
 PrefetcherWorkTracker::PrefetcherWorkTracker(
     PrefetcherInterface* owner, const uint64_t _id,
-    std::string prefetch_generator_mode
+    std::string _prefetch_generator_mode
 ) : id(_id),
     is_activated(false),
     owner(owner),
@@ -66,9 +66,15 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
         owner->getPrefetchDistanceOffsetFromSoftwareHint();
     prefetch_distance = hardware_prefetch_distance;
 
+    prefetch_generator_mode = _prefetch_generator_mode;
+
     if (prefetch_generator_mode == "bfs") {
         prefetch_generator = std::make_shared<BFSPrefetchGenerator>(
             "BFSPrefetchGenerator", this
+        );
+    } else if (prefetch_generator_mode == "pr") {
+        prefetch_generator = std::make_shared<PRPrefetchGenerator>(
+            "PRPrefetchGenerator", this
         );
     } else {
         panic(

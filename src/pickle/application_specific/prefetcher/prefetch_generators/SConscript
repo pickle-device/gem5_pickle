@@ -33,3 +33,4 @@ Import('*')
 
 Source('prefetch_generator.cc')
 Source('bfs.cc')
+Source('pr.cc')
