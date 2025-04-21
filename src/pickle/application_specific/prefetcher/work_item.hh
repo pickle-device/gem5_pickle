@@ -44,7 +44,7 @@ namespace gem5
 class WorkItem
 {
     private:
-        Addr work_vaddr;
+        Addr work_id;
         std::array<std::unordered_set<Addr>, 4> expected_prefetches;
         uint64_t curr_level;
         bool core_worked_on_this_work;
@@ -70,7 +70,7 @@ class WorkItem
         void profileCoreUseTime();
     public:
         WorkItem();
-        WorkItem(const Addr _work_vaddr);
+        WorkItem(const Addr _work_id);
         //Tick getQueueTime() const;
         Tick getPrefetchLvTime(const uint64_t lv) const;
         Tick getTotalPrefetchTime() const;
@@ -78,7 +78,7 @@ class WorkItem
         void notifyCoreIsWorkingOnThisWork();
         bool hasCoreWorkedOnThisWork() const;
         Tick getPrefetchCompleteTime() const;
-        Addr getWorkVAddr() const;
+        Addr getWorkId() const;
         void addExpectedPrefetch(Addr pf_vaddr, const uint64_t level);
         void removeExpectedPrefetch(Addr pf_vaddr);
         const std::unordered_set<Addr>& getCurrLevelExpectedPrefetches() const;

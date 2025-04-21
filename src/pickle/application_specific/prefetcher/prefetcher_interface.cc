@@ -417,8 +417,8 @@ PrefetcherInterface::profileWork(
 {
     DPRINTF(
         PickleDevicePrefetcherWorkTrackerDebug,
-        "profileWork: core_id: %lld, work_vaddr 0x%llx\n",
-        core_id, work->getWorkVAddr()
+        "profileWork: core_id: %lld, work_id 0x%llx\n",
+        core_id, work->getWorkId()
     );
     std::shared_ptr<TaskStats> task_stat = taskStats[core_id];
     task_stat->taskCount++;;

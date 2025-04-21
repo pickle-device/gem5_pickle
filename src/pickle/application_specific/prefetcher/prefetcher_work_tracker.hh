@@ -59,7 +59,7 @@ class PrefetcherWorkTracker
     private:
         // This is a map from work address to its WorkItem
         std::unordered_map<Addr, std::shared_ptr<WorkItem>> \
-            work_vaddr_to_work_items_map;
+            work_id_to_work_items_map;
         // This is a map from prefetch addresses induced by multiple WorkItem
         std::unordered_map<Addr, std::vector<std::shared_ptr<WorkItem>>> \
             pf_vaddr_to_work_items_map;
@@ -89,7 +89,7 @@ class PrefetcherWorkTracker
         Addr peekNextPrefetch() const;
         void popPrefetch();
         void profileWork(std::shared_ptr<WorkItem> work);
-        void notifyCoreCurrentWork(const Addr work_vaddr);
+        void notifyCoreCurrentWork(const Addr work_id);
         friend class PrefetchGenerator;
 };  // class PrefetcherWorkTracker
 

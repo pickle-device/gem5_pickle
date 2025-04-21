@@ -93,15 +93,23 @@ PrefetcherWorkTracker::setJobDescriptor(
 }
 
 void
-PrefetcherWorkTracker::addWorkItem(Addr work_vaddr)
+PrefetcherWorkTracker::addWorkItem(Addr work_id)
 {
     if (!is_activated) {
         return;
     }
-    auto workItem = prefetch_generator->generateWorkItem(work_vaddr);
-    work_vaddr_to_work_items_map[work_vaddr] = workItem;
+    auto workItem = prefetch_generator->generateWorkItem(work_id);
+    work_id_to_work_items_map[work_id] = workItem;
     populateCurrLevelPrefetches(workItem);
-    notifyCoreCurrentWork(work_vaddr - prefetch_distance * 4);
+    if (prefetch_generator_mode == "bfs") {
+        notifyCoreCurrentWork(work_id - prefetch_distance * 4);
+    } else if (prefetch_generator_mode == "pr") {
+        notifyCoreCurrentWork(work_id);
+    } else {
+        panic(
+            "Unknown prefetch generator mode: %s\n", prefetch_generator_mode
+        );
+    }
 }
 
 void
@@ -115,14 +123,14 @@ PrefetcherWorkTracker::processIncomingPrefetch(const Addr pf_vaddr)
         DPRINTF(
             PickleDevicePrefetcherWorkTrackerDebug,
             "WorkItem 0x%llx receives pf 0x%llx\n",
-            work->getWorkVAddr(), pf_vaddr
+            work->getWorkId(), pf_vaddr
         );
         if (work->isDoneWithCurrLevel()) {
             work->moveToNextLevel();
             DPRINTF(
                 PickleDevicePrefetcherWorkTrackerDebug,
                 "WorkItem 0x%llx moves to level %lld\n",
-                work->getWorkVAddr(), work->getLevel()
+                work->getWorkId(), work->getLevel()
             );
             if (work->isDone()) {
                 // profile the work
@@ -130,12 +138,12 @@ PrefetcherWorkTracker::processIncomingPrefetch(const Addr pf_vaddr)
                 // if the core has not worked on this work item, we keep
                 // the Tick when the work item has finished
                 if (!(work->hasCoreWorkedOnThisWork())) {
-                    pf_complete_time[work->getWorkVAddr()] = \
+                    pf_complete_time[work->getWorkId()] = \
                         work->getPrefetchCompleteTime();
                     assert(work->getPrefetchCompleteTime() != 0);
                 }
                 // remove the work
-                work_vaddr_to_work_items_map.erase(work->getWorkVAddr());
+                work_id_to_work_items_map.erase(work->getWorkId());
                 continue;
             }
             work_items_have_more_requests.push_back(work);
@@ -172,7 +180,7 @@ PrefetcherWorkTracker::populateCurrLevelPrefetches(
         DPRINTF(
             PickleDevicePrefetcherWorkTrackerDebug,
             "Adding pf_vaddr 0x%llx from WorkItem = 0x%llx\n",
-            addr, work->getWorkVAddr()
+            addr, work->getWorkId()
         );
     }
 }
@@ -202,7 +210,7 @@ PrefetcherWorkTracker::profileWork(std::shared_ptr<WorkItem> work)
 }
 
 void
-PrefetcherWorkTracker::notifyCoreCurrentWork(const Addr work_vaddr)
+PrefetcherWorkTracker::notifyCoreCurrentWork(const Addr work_id)
 {
     // If the prefetch for this work is complete (timely prefetch), we have the
     // prefetch complete time in pf_complete_time. It's possible that the core
@@ -210,11 +218,11 @@ PrefetcherWorkTracker::notifyCoreCurrentWork(const Addr work_vaddr)
     // If the prefetch for this work is not done (late prefetch), we profile
     // the core access time. Note that, it's possible that this work has never
     // been requested by the core.
-    auto it = pf_complete_time.find(work_vaddr);
+    auto it = pf_complete_time.find(work_id);
     DPRINTF(
         PickleDevicePrefetcherWorkTrackerDebug,
-        "notifyCoreCurrentWork: core_id: %lld, work_vaddr 0x%llx\n",
-        id, work_vaddr
+        "notifyCoreCurrentWork: core_id: %lld, work_id 0x%llx\n",
+        id, work_id
     );
     if (it != pf_complete_time.end()) {
         const Tick complete_time = it->second;
@@ -229,11 +237,11 @@ PrefetcherWorkTracker::notifyCoreCurrentWork(const Addr work_vaddr)
         );
     } else {
         if (
-            work_vaddr_to_work_items_map.find(work_vaddr) != \
-                work_vaddr_to_work_items_map.end()
+            work_id_to_work_items_map.find(work_id) != \
+                work_id_to_work_items_map.end()
         ) {
             auto work_item = \
-                work_vaddr_to_work_items_map[work_vaddr];
+                work_id_to_work_items_map[work_id];
             work_item->notifyCoreIsWorkingOnThisWork();
             DPRINTF(
                 PickleDevicePrefetcherWorkTrackerDebug,

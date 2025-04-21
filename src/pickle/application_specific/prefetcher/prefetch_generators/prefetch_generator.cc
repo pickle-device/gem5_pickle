@@ -52,7 +52,7 @@ PrefetchGenerator::name() const
 
 void
 PrefetchGenerator::warnIfOutsideRanges(
-    const Addr work_vaddr, const Addr pf_vaddr
+    const Addr work_id, const Addr pf_vaddr
 ) const
 {
     uint64_t array_id = work_tracker->job_descriptor->get_array_id(pf_vaddr);
@@ -60,8 +60,8 @@ PrefetchGenerator::warnIfOutsideRanges(
         work_tracker->owner->profilePrefetchWithUnknownVAddr();
         DPRINTF(
             PickleDevicePrefetcherKnownBugs,
-            "warn: unknown pf_vaddr: work=0x%llx, pf_vaddr=0x%llx\n",
-            work_vaddr, pf_vaddr
+            "warn: unknown pf_vaddr: work_id=0x%llx, pf_vaddr=0x%llx\n",
+            work_id, pf_vaddr
         );
     }
 }
