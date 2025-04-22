@@ -36,7 +36,7 @@
 #include "debug/PickleDevicePrefetcherTrace.hh"
 #include "debug/PickleDevicePrefetcherWorkTrackerDebug.hh"
 #include "mem/packet.hh"
-#include "pickle/application_specific/prefetcher/prefetcher_interface.hh"
+#include "pickle/application_specific/prefetcher/pickle_prefetcher.hh"
 #include "pickle/application_specific/prefetcher/prefetcher_work_tracker.hh"
 
 namespace gem5

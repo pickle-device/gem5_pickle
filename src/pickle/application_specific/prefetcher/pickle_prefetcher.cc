@@ -29,7 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "pickle/application_specific/prefetcher/prefetcher_interface.hh"
+#include "pickle/application_specific/prefetcher/pickle_prefetcher.hh"
 
 #include "debug/PickleDevicePrefetcherDebug.hh"
 #include "debug/PickleDevicePrefetcherProgressTracker.hh"
@@ -41,8 +41,8 @@
 namespace gem5
 {
 
-PrefetcherInterface::PrefetcherInterface(
-  const PrefetcherInterfaceParams &params
+PicklePrefetcher::PicklePrefetcher(
+  const PicklePrefetcherParams &params
 )
   : ClockedObject(params),
     software_hint_prefetch_distance(params.software_hint_prefetch_distance),
@@ -89,17 +89,17 @@ PrefetcherInterface::PrefetcherInterface(
     }
 }
 
-PrefetcherInterface::~PrefetcherInterface()
+PicklePrefetcher::~PicklePrefetcher()
 {
 }
 
 void
-PrefetcherInterface::startup()
+PicklePrefetcher::startup()
 {
 }
 
 void
-PrefetcherInterface::setOwner(PickleDevice* pickle_device)
+PicklePrefetcher::setOwner(PickleDevice* pickle_device)
 {
     this->owner = pickle_device;
     this->ticks_per_cycle = pickle_device->getNumTicksPerCycle();
@@ -111,7 +111,7 @@ PrefetcherInterface::setOwner(PickleDevice* pickle_device)
 }
 
 void
-PrefetcherInterface::processPrefetcherOutQueue()
+PicklePrefetcher::processPrefetcherOutQueue()
 {
     // TODO: a better scheduling policy?)
     for (auto tracker: prefetcher_work_trackers) {
@@ -149,7 +149,7 @@ PrefetcherInterface::processPrefetcherOutQueue()
 }
 
 void
-PrefetcherInterface::processPrefetcherInQueue()
+PicklePrefetcher::processPrefetcherInQueue()
 {
     for (auto vaddr: received_packets_to_be_processed) {
         DPRINTF(
@@ -172,35 +172,35 @@ PrefetcherInterface::processPrefetcherInQueue()
 }
 
 uint64_t
-PrefetcherInterface::getSoftwareHintPrefetchDistance() const
+PicklePrefetcher::getSoftwareHintPrefetchDistance() const
 {
     return software_hint_prefetch_distance;
 }
 
 uint64_t
-PrefetcherInterface::getPrefetchDistanceOffsetFromSoftwareHint() const
+PicklePrefetcher::getPrefetchDistanceOffsetFromSoftwareHint() const
 {
     return prefetch_distance_offset_from_software_hint;
 }
 
 std::shared_ptr<PrefetchGenerator>
-PrefetcherInterface::getPrefetchGenerator() const
+PicklePrefetcher::getPrefetchGenerator() const
 {
     return prefetch_generator;
 }
 
 void
-PrefetcherInterface::switchOn()
+PicklePrefetcher::switchOn()
 {
 }
 
 void
-PrefetcherInterface::switchOff()
+PicklePrefetcher::switchOff()
 {
 }
 
 void
-PrefetcherInterface::configure(std::shared_ptr<PickleJobDescriptor> job)
+PicklePrefetcher::configure(std::shared_ptr<PickleJobDescriptor> job)
 {
     for (auto tracker: prefetcher_work_trackers) {
         tracker->setJobDescriptor(job);
@@ -209,7 +209,7 @@ PrefetcherInterface::configure(std::shared_ptr<PickleJobDescriptor> job)
 }
 
 bool
-PrefetcherInterface::enqueueWork(
+PicklePrefetcher::enqueueWork(
     const uint64_t workData, const uint64_t cpuId
 )
 {
@@ -237,7 +237,7 @@ PrefetcherInterface::enqueueWork(
 }
 
 void
-PrefetcherInterface::receivePrefetch(
+PicklePrefetcher::receivePrefetch(
   const uint64_t vaddr, std::unique_ptr<uint8_t[]> p
 )
 {
@@ -255,7 +255,7 @@ PrefetcherInterface::receivePrefetch(
 }
 
 void
-PrefetcherInterface::scheduleDueToIncomingPrefetch()
+PicklePrefetcher::scheduleDueToIncomingPrefetch()
 {
     if (!processInQueueEvent.scheduled()) {
         schedule(
@@ -265,7 +265,7 @@ PrefetcherInterface::scheduleDueToIncomingPrefetch()
 }
 
 void
-PrefetcherInterface::scheduleDueToNewOutstandingPrefetchRequests()
+PicklePrefetcher::scheduleDueToNewOutstandingPrefetchRequests()
 {
     if (!processOutQueueEvent.scheduled()) {
         schedule(
@@ -275,30 +275,30 @@ PrefetcherInterface::scheduleDueToNewOutstandingPrefetchRequests()
 }
 
 PacketPtr
-PrefetcherInterface::zeroCycleLoadWithVAddr(const Addr& vaddr, bool& success)
+PicklePrefetcher::zeroCycleLoadWithVAddr(const Addr& vaddr, bool& success)
 {
     return owner->zeroCycleLoadWithVAddr(vaddr, success);
 }
 PacketPtr
-PrefetcherInterface::zeroCycleLoadWithPAddr(const Addr& paddr, bool& success)
+PicklePrefetcher::zeroCycleLoadWithPAddr(const Addr& paddr, bool& success)
 {
     return owner->zeroCycleLoadWithPAddr(paddr, success);
 }
 
 void
-PrefetcherInterface::profilePrefetchWithUnknownVAddr()
+PicklePrefetcher::profilePrefetchWithUnknownVAddr()
 {
     prefetcherStats.numUnknownPrefetches++;
 }
 
 void
-PrefetcherInterface::regStats()
+PicklePrefetcher::regStats()
 {
     ClockedObject::regStats();
     prefetcherStats.regStats();
 }
 
-PrefetcherInterface::PrefetcherStats::PrefetcherStats(
+PicklePrefetcher::PrefetcherStats::PrefetcherStats(
     statistics::Group *parent
 ) : statistics::Group(parent),
     ADD_STAT(
@@ -331,11 +331,11 @@ PrefetcherInterface::PrefetcherStats::PrefetcherStats(
 }
 
 void
-PrefetcherInterface::PrefetcherStats::regStats()
+PicklePrefetcher::PrefetcherStats::regStats()
 {
 }
 
-PrefetcherInterface::TaskStats::TaskStats(
+PicklePrefetcher::TaskStats::TaskStats(
     statistics::Group *parent, const uint64_t cpuId
 ) : statistics::Group(parent, csprintf("cpu_%d", cpuId).c_str()),
     ADD_STAT(
@@ -404,12 +404,12 @@ PrefetcherInterface::TaskStats::TaskStats(
 }
 
 void
-PrefetcherInterface::TaskStats::regStats()
+PicklePrefetcher::TaskStats::regStats()
 {
 }
 
 void
-PrefetcherInterface::profileWork(
+PicklePrefetcher::profileWork(
     std::shared_ptr<WorkItem> work, const uint64_t core_id
 )
 {
@@ -445,7 +445,7 @@ PrefetcherInterface::profileWork(
 }
 
 void
-PrefetcherInterface::profileTimelyPrefetch(
+PicklePrefetcher::profileTimelyPrefetch(
     const Tick pf_complete_time, const uint64_t core_id
 )
 {

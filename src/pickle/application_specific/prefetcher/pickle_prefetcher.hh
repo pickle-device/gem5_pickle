@@ -29,8 +29,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __PREFETCHER_INTERFACE_HH__
-#define __PREFETCHER_INTERFACE_HH__
+#ifndef __PICKLE_PREFETCHER_HH__
+#define __PICKLE_PREFETCHER_HH__
 
 #include <queue>
 #include <string>
@@ -39,7 +39,7 @@
 #include <vector>
 
 #include "base/statistics.hh"
-#include "params/PrefetcherInterface.hh"
+#include "params/PicklePrefetcher.hh"
 #include "pickle/application_specific/pickle_job.hh"
 #include "pickle/application_specific/prefetcher/prefetch_generators/all_prefetch_generators.hh"
 #include "pickle/application_specific/prefetcher/prefetcher_work_tracker.hh"
@@ -59,12 +59,12 @@ enum PacketStatus
 
 class PickleDevice;
 
-class PrefetcherInterface: public ClockedObject
+class PicklePrefetcher: public ClockedObject
 {
     private:
         int64_t software_hint_prefetch_distance;
         int64_t prefetch_distance_offset_from_software_hint;
-        PARAMS(PrefetcherInterface);
+        PARAMS(PicklePrefetcher);
         EventFunctionWrapper processInQueueEvent;
         EventFunctionWrapper processOutQueueEvent;
         uint64_t ticks_per_cycle;
@@ -85,8 +85,8 @@ class PrefetcherInterface: public ClockedObject
     public:
         PickleDevice* owner;
     public:
-        PrefetcherInterface(const PrefetcherInterfaceParams &params);
-        ~PrefetcherInterface();
+        PicklePrefetcher(const PicklePrefetcherParams &params);
+        ~PicklePrefetcher();
         void startup() override;
     public:
         void setOwner(PickleDevice* engine);
@@ -146,4 +146,4 @@ class PrefetcherInterface: public ClockedObject
 
 }; // namespace gem5
 
-#endif // __PREFETCHER_INTERFACE_HH__
+#endif // __PICKLE_PREFETCHER_HH__

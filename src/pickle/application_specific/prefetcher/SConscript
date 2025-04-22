@@ -31,7 +31,7 @@
 
 Import('*')
 
-SimObject('PrefetcherInterface.py', sim_objects=['PrefetcherInterface'])
+SimObject('PicklePrefetcher.py', sim_objects=['PicklePrefetcher'])
 
 DebugFlag('PickleDevicePrefetcherDebug')
 DebugFlag('PickleDevicePrefetcherKnownBugs')
@@ -40,6 +40,6 @@ DebugFlag('PickleDevicePrefetcherProgressTracker')
 DebugFlag('PickleDevicePrefetcherWorkTrackerDebug')
 DebugFlag('PickleDevicePrefetcherWorkTrackerStatsDebug')
 
-Source('prefetcher_interface.cc')
+Source('pickle_prefetcher.cc')
 Source('prefetcher_work_tracker.cc')
 Source('work_item.cc')

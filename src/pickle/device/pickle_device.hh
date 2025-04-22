@@ -50,7 +50,7 @@
 #include "cpu/thread_context.hh"
 #include "mem/ruby/protocol/CHI/Cache_Controller.hh"
 #include "params/PickleDevice.hh"
-#include "pickle/application_specific/prefetcher/prefetcher_interface.hh"
+#include "pickle/application_specific/prefetcher/pickle_prefetcher.hh"
 #include "pickle/device/device_thread_context.hh"
 #include "pickle/gadgets/traffic_snooper.hh"
 #include "sim/clocked_object.hh"
@@ -202,13 +202,13 @@ class PickleDevice: public ClockedObject
         InstDecoder *getDecoderPtr();
         ThreadContext *getThreadContextPtr();
         PickleDeviceState getDeviceState() const;
-        PrefetcherInterface *getPrefetcher();
+        PicklePrefetcher *getPrefetcher();
         uint64_t getNumCores() const;
         PacketPtr zeroCycleLoadWithVAddr(const Addr& vaddr, bool& success);
         PacketPtr zeroCycleLoadWithPAddr(const Addr& paddr, bool& success);
         Addr getCommandAddr() const;
     public: // application speicific
-        PrefetcherInterface* prefetcher_interface;
+        PicklePrefetcher* pickle_prefetcher;
         std::shared_ptr<PickleJobDescriptor> job_descriptor;
         std::shared_ptr<PickleJobDescriptor> getJobDescriptor() const;
     public:

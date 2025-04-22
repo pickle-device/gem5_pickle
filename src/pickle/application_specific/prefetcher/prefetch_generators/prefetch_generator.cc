@@ -32,7 +32,7 @@
 #include "pickle/application_specific/prefetcher/prefetch_generators/prefetch_generator.hh"
 
 #include "debug/PickleDevicePrefetcherKnownBugs.hh"
-#include "pickle/application_specific/prefetcher/prefetcher_interface.hh"
+#include "pickle/application_specific/prefetcher/pickle_prefetcher.hh"
 
 namespace gem5
 {

@@ -67,7 +67,7 @@ class PickleDevice(ClockedObject):
     )
 
     # application specifics
-    prefetcher = Param.PrefetcherInterface("Prefetcher")
+    prefetcher = Param.PicklePrefetcher("Prefetcher")
 
     # design parameters
     # prefetcher = Param.CerebellumPrefetcher(NULL, "Prefetcher")

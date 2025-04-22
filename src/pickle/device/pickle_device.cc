@@ -81,7 +81,7 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
     device_command_address(0),
     coalesce_requests(params.coalesce_requests),
     coalesce_address_translations(params.coalesce_address_translations),
-    prefetcher_interface(params.prefetcher),
+    pickle_prefetcher(params.prefetcher),
     device_stats(this)
 {
     if (params.is_on) {
@@ -111,7 +111,7 @@ PickleDevice::startup()
     request_manager->setOwner(this);
     request_manager->setMMU(mmu);
     request_manager->setRequestorID(requestor_id);
-    prefetcher_interface->setOwner(this);
+    pickle_prefetcher->setOwner(this);
 }
 
 void
@@ -263,7 +263,7 @@ PickleDevice::PickleDeviceRequestPort::recvTimingResp(PacketPtr pkt)
     const uint8_t* pkt_data = pkt->getConstPtr<uint8_t>();
     uint8_t* data = new uint8_t[req->getSize()];
     std::memcpy(data, pkt_data, req->getSize());
-    owner->prefetcher_interface->receivePrefetch(
+    owner->pickle_prefetcher->receivePrefetch(
         req->getVaddr(), std::unique_ptr<uint8_t[]>(data)
     );
     owner->request_manager->handleRequestCompletion(pkt);
@@ -355,7 +355,7 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
             } else {
                 const uint64_t* ptr = pkt->getConstPtr<uint64_t>();
                 uint64_t data = ptr[0];
-                owner->prefetcher_interface->enqueueWork(data, internal_id);
+                owner->pickle_prefetcher->enqueueWork(data, internal_id);
                 DPRINTF(
                     PickleDeviceUncacheableForwarding,
                     "Received store request: addr = 0x%llx, data = 0x%llx\n",
@@ -600,7 +600,7 @@ PickleDevice::enqueueResponse(PacketPtr pkt, uint8_t internal_port_id)
 void
 PickleDevice::handleRequestTranslationFault(const Addr vaddr)
 {
-    prefetcher_interface->receivePrefetch(vaddr, nullptr);
+    pickle_prefetcher->receivePrefetch(vaddr, nullptr);
 }
 
 void
@@ -639,7 +639,7 @@ PickleDevice::processJobDescriptor(std::vector<uint8_t>& _job_descriptor)
     job_descriptor = std::shared_ptr<PickleJobDescriptor>(
         new PickleJobDescriptor(_job_descriptor)
     );
-    prefetcher_interface->configure(job_descriptor);
+    pickle_prefetcher->configure(job_descriptor);
     DPRINTF(
         PickleDeviceControl,
         "Received job descriptor: %s\n",
@@ -728,10 +728,10 @@ PickleDevice::getDeviceState() const
     return device_state;
 }
 
-PrefetcherInterface *
+PicklePrefetcher *
 PickleDevice::getPrefetcher()
 {
-    return prefetcher_interface;
+    return pickle_prefetcher;
 }
 
 uint64_t

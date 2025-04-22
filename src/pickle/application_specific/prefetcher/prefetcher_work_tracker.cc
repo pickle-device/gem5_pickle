@@ -51,7 +51,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker()
 }
 
 PrefetcherWorkTracker::PrefetcherWorkTracker(
-    PrefetcherInterface* owner, const uint64_t _id,
+    PicklePrefetcher* owner, const uint64_t _id,
     std::string _prefetch_generator_mode
 ) : id(_id),
     is_activated(false),

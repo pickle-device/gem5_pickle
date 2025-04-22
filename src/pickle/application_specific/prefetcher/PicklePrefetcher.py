@@ -36,12 +36,10 @@ from m5.SimObject import (
 )
 
 
-class PrefetcherInterface(ClockedObject):
-    type = "PrefetcherInterface"
-    cxx_header = (
-        "pickle/application_specific/prefetcher/prefetcher_interface.hh"
-    )
-    cxx_class = "gem5::PrefetcherInterface"
+class PicklePrefetcher(ClockedObject):
+    type = "PicklePrefetcher"
+    cxx_header = "pickle/application_specific/prefetcher/pickle_prefetcher.hh"
+    cxx_class = "gem5::PicklePrefetcher"
     cxx_exports = [PyBindMethod("switchOn"), PyBindMethod("switchOff")]
 
     software_hint_prefetch_distance = Param.Int(1, "Prefetch distance")
