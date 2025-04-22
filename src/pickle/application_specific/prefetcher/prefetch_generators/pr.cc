@@ -44,9 +44,11 @@ namespace gem5
 
 PRPrefetchGenerator::PRPrefetchGenerator(
     std::string _name,
-    const uint64_t _prefetch_distance,
+    const uint64_t _prefetch_distance_offset_from_software_hint,
     PrefetcherWorkTracker* _work_tracker
-) : PrefetchGenerator(_name, _prefetch_distance, _work_tracker)
+) : PrefetchGenerator(
+        _name, _prefetch_distance_offset_from_software_hint, _work_tracker
+    )
 {
 }
 

@@ -47,7 +47,7 @@ class PRPrefetchGenerator: public PrefetchGenerator
   public:
     PRPrefetchGenerator(
         std::string _name,
-        const uint64_t _prefetch_distance,
+        const uint64_t _prefetch_distance_offset_from_software_hint,
         PrefetcherWorkTracker* _work_tracker
     );
 

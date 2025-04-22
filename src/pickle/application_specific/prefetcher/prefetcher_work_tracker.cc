@@ -68,11 +68,15 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
 
     if (prefetch_generator_mode == "bfs") {
         prefetch_generator = std::make_shared<BFSPrefetchGenerator>(
-            "BFSPrefetchGenerator", hardware_prefetch_distance, this
+            "BFSPrefetchGenerator",
+            owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            this
         );
     } else if (prefetch_generator_mode == "pr") {
         prefetch_generator = std::make_shared<PRPrefetchGenerator>(
-            "PRPrefetchGenerator", hardware_prefetch_distance, this
+            "PRPrefetchGenerator",
+            owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            this
         );
     } else {
         panic(
@@ -100,9 +104,9 @@ PrefetcherWorkTracker::addWorkItem(Addr work_id)
     work_id_to_work_items_map[work_id] = workItem;
     populateCurrLevelPrefetches(workItem);
     if (prefetch_generator_mode == "bfs") {
-        notifyCoreCurrentWork(work_id - hardware_prefetch_distance * 4);
+        notifyCoreCurrentWork(work_id - software_hint_distance * 4);
     } else if (prefetch_generator_mode == "pr") {
-        notifyCoreCurrentWork(work_id);
+        notifyCoreCurrentWork(work_id - software_hint_distance);
     } else {
         panic(
             "Unknown prefetch generator mode: %s\n", prefetch_generator_mode

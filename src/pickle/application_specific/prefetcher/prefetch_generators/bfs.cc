@@ -44,16 +44,20 @@ namespace gem5
 
 BFSPrefetchGenerator::BFSPrefetchGenerator(
     std::string _name,
-    const uint64_t _prefetch_distance,
+    const uint64_t _prefetch_distance_offset_from_software_hint,
     PrefetcherWorkTracker* _work_tracker
-) : PrefetchGenerator(_name, _prefetch_distance, _work_tracker)
+) : PrefetchGenerator(
+    _name, _prefetch_distance_offset_from_software_hint, _work_tracker
+    )
 {
 }
 
 std::shared_ptr<WorkItem>
-BFSPrefetchGenerator::generateWorkItem(Addr work_vaddr)
+BFSPrefetchGenerator::generateWorkItem(Addr pf_hint_vaddr)
 {
-    work_vaddr += 4; // the backend prefetches the next iter
+    Addr work_id = \
+        pf_hint_vaddr - prefetch_distance_offset_from_software_hint * 4;
+    Addr work_vaddr = work_id;
 
     std::shared_ptr<WorkItem> workItem(new WorkItem(work_vaddr));
 

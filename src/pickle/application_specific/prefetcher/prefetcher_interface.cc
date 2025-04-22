@@ -213,14 +213,9 @@ PrefetcherInterface::enqueueWork(
     const uint64_t workData, const uint64_t cpuId
 )
 {
-    // workData: the pointer to the prefetch hint from software
-    //    = (core's current work + prefetch_distance)
-    // prefetchAddr = workData - offset * 4
     if (!prefetcher_initialized)
         return false;
     workCount++;
-    Addr prefetchAddr = \
-        workData - prefetch_distance_offset_from_software_hint * 4;
     prefetcherStats.numReceivedWork++;
     if (workCount % 1000 == 0 || workCount == 1) {
         DPRINTF(
@@ -230,11 +225,13 @@ PrefetcherInterface::enqueueWork(
             packet_status.size()
         );
     }
-    prefetcher_work_trackers[cpuId]->addWorkItem(prefetchAddr);
+    // For BFS: workData = curr_ptr + sw_prefetch_distance * 4 of the workQueue
+    // For PR: workData = node_id + sw_prefetch_distance
+    prefetcher_work_trackers[cpuId]->addWorkItem(workData);
     scheduleDueToNewOutstandingPrefetchRequests();
     DPRINTF(
         PickleDevicePrefetcherDebug,
-        "NEW WORK: data = 0x%llx\n", prefetchAddr
+        "NEW WORK: data = 0x%llx\n", workData
     );
     return true;
 }

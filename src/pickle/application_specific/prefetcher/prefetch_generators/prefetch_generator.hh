@@ -46,12 +46,12 @@ class PrefetchGenerator
 {
   protected:
     std::string generator_name;
-    uint64_t prefetch_distance;
+    uint64_t prefetch_distance_offset_from_software_hint;
     PrefetcherWorkTracker* work_tracker;
   public:
     PrefetchGenerator(
         std::string _name,
-        const uint64_t _prefetch_distance,
+        const uint64_t _prefetch_distance_offset_from_software_hint,
         PrefetcherWorkTracker* _work_tracker
     );
 
@@ -61,7 +61,7 @@ class PrefetchGenerator
     virtual std::shared_ptr<WorkItem> generateWorkItem(Addr work_data) = 0;
 
     void warnIfOutsideRanges(
-      const Addr work_addr, const Addr pf_vaddr
+      const Addr work_id, const Addr pf_vaddr
     ) const;
 }; // class PrefetchGenerator
 
