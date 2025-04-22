@@ -46,10 +46,12 @@ class PrefetchGenerator
 {
   protected:
     std::string generator_name;
+    uint64_t prefetch_distance;
     PrefetcherWorkTracker* work_tracker;
   public:
     PrefetchGenerator(
         std::string _name,
+        const uint64_t _prefetch_distance,
         PrefetcherWorkTracker* _work_tracker
     );
 

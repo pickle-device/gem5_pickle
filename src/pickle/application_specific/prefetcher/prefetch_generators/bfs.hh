@@ -47,6 +47,7 @@ class BFSPrefetchGenerator: public PrefetchGenerator
   public:
     BFSPrefetchGenerator(
         std::string _name,
+        const uint64_t _prefetch_distance,
         PrefetcherWorkTracker* _work_tracker
     );
 

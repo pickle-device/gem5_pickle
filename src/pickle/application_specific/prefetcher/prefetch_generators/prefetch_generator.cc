@@ -39,8 +39,10 @@ namespace gem5
 
 PrefetchGenerator::PrefetchGenerator(
     std::string _name,
+    const uint64_t _prefetch_distance,
     PrefetcherWorkTracker* _work_tracker
-) : generator_name(_name), work_tracker(_work_tracker)
+) : generator_name(_name), prefetch_distance(_prefetch_distance),
+    work_tracker(_work_tracker)
 {
 }
 
