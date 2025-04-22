@@ -45,7 +45,7 @@ PrefetcherInterface::PrefetcherInterface(
   const PrefetcherInterfaceParams &params
 )
   : ClockedObject(params),
-    prefetch_distance(params.prefetch_distance),
+    software_hint_prefetch_distance(params.software_hint_prefetch_distance),
     prefetch_distance_offset_from_software_hint(
       params.prefetch_distance_offset_from_software_hint
     ),
@@ -68,7 +68,8 @@ PrefetcherInterface::PrefetcherInterface(
     prefetcherStats(this)
 {
     panic_if(
-        prefetch_distance < prefetch_distance_offset_from_software_hint,
+        software_hint_prefetch_distance < \
+            prefetch_distance_offset_from_software_hint,
         "Prefetch distance offset from software hint must not be greater "
         "than the prefetch distance\n"
     );
@@ -171,9 +172,9 @@ PrefetcherInterface::processPrefetcherInQueue()
 }
 
 uint64_t
-PrefetcherInterface::getPrefetchDistance() const
+PrefetcherInterface::getSoftwareHintPrefetchDistance() const
 {
-    return prefetch_distance;
+    return software_hint_prefetch_distance;
 }
 
 uint64_t

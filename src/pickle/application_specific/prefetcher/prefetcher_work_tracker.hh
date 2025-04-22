@@ -69,7 +69,6 @@ class PrefetcherWorkTracker
         std::queue<Addr> outstanding_prefetches;
         uint64_t software_hint_distance;
         uint64_t hardware_prefetch_distance;
-        uint64_t prefetch_distance;
         uint64_t current_core_work_item;
         std::string prefetch_generator_mode;
         std::shared_ptr<PrefetchGenerator> prefetch_generator;

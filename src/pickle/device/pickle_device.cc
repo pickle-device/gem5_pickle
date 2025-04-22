@@ -329,7 +329,8 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
                     data = owner->getDeviceState() != PickleDeviceState::SLEEP;
                     break;
                 case 0x10110018:
-                    data = owner->getPrefetcher()->getPrefetchDistance();
+                    data = owner->getPrefetcher()\
+                                ->getSoftwareHintPrefetchDistance();
                     break;
             };
             uint8_t* data_ptr = (uint8_t*) &data;
@@ -414,7 +415,8 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvAtomic(PacketPtr pkt)
                     data = owner->getDeviceState() != PickleDeviceState::SLEEP;
                     break;
                 case 0x10110018:
-                    data = owner->getPrefetcher()->getPrefetchDistance();
+                    data = owner->getPrefetcher()\
+                                ->getSoftwareHintPrefetchDistance();
                     break;
             };
             uint8_t* data_ptr = (uint8_t*) &data;
@@ -481,7 +483,8 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvFunctional(PacketPtr pkt)
                     data = owner->getDeviceState() != PickleDeviceState::SLEEP;
                     break;
                 case 0x10110018:
-                    data = owner->getPrefetcher()->getPrefetchDistance();
+                    data = owner->getPrefetcher()\
+                                ->getSoftwareHintPrefetchDistance();
                     break;
             };
             uint8_t* data_ptr = (uint8_t*) &data;

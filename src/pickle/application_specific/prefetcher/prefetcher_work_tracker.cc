@@ -46,7 +46,6 @@ PrefetcherWorkTracker::PrefetcherWorkTracker()
     job_descriptor(nullptr),
     software_hint_distance(0),
     hardware_prefetch_distance(0),
-    prefetch_distance(0),
     current_core_work_item(-1ULL)
 {
 }
@@ -60,21 +59,20 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
     job_descriptor(nullptr),
     current_core_work_item(-1ULL)
 {
-    software_hint_distance = owner->getPrefetchDistance();
+    software_hint_distance = owner->getSoftwareHintPrefetchDistance();
     hardware_prefetch_distance = \
-        owner->getPrefetchDistance() - \
+        owner->getSoftwareHintPrefetchDistance() - \
         owner->getPrefetchDistanceOffsetFromSoftwareHint();
-    prefetch_distance = hardware_prefetch_distance;
 
     prefetch_generator_mode = _prefetch_generator_mode;
 
     if (prefetch_generator_mode == "bfs") {
         prefetch_generator = std::make_shared<BFSPrefetchGenerator>(
-            "BFSPrefetchGenerator", this
+            "BFSPrefetchGenerator", hardware_prefetch_distance, this
         );
     } else if (prefetch_generator_mode == "pr") {
         prefetch_generator = std::make_shared<PRPrefetchGenerator>(
-            "PRPrefetchGenerator", this
+            "PRPrefetchGenerator", hardware_prefetch_distance, this
         );
     } else {
         panic(
@@ -102,7 +100,7 @@ PrefetcherWorkTracker::addWorkItem(Addr work_id)
     work_id_to_work_items_map[work_id] = workItem;
     populateCurrLevelPrefetches(workItem);
     if (prefetch_generator_mode == "bfs") {
-        notifyCoreCurrentWork(work_id - prefetch_distance * 4);
+        notifyCoreCurrentWork(work_id - hardware_prefetch_distance * 4);
     } else if (prefetch_generator_mode == "pr") {
         notifyCoreCurrentWork(work_id);
     } else {

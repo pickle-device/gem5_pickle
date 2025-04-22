@@ -62,7 +62,7 @@ class PickleDevice;
 class PrefetcherInterface: public ClockedObject
 {
     private:
-        int64_t prefetch_distance;
+        int64_t software_hint_prefetch_distance;
         int64_t prefetch_distance_offset_from_software_hint;
         PARAMS(PrefetcherInterface);
         EventFunctionWrapper processInQueueEvent;
@@ -94,7 +94,7 @@ class PrefetcherInterface: public ClockedObject
         void switchOn();
         void switchOff();
         bool isActivated() const { return prefetcher_initialized; }
-        uint64_t getPrefetchDistance() const;
+        uint64_t getSoftwareHintPrefetchDistance() const;
         uint64_t getPrefetchDistanceOffsetFromSoftwareHint() const;
         std::shared_ptr<PrefetchGenerator> getPrefetchGenerator() const;
     public: // the interface
