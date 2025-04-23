@@ -641,14 +641,16 @@ PickleDevice::scheduleOperateUncacheableResponseQueueEvent()
 void
 PickleDevice::processJobDescriptor(std::vector<uint8_t>& _job_descriptor)
 {
-    job_descriptor = std::shared_ptr<PickleJobDescriptor>(
-        new PickleJobDescriptor(_job_descriptor)
+    job_descriptors.push_back(
+        std::shared_ptr<PickleJobDescriptor>(
+            new PickleJobDescriptor(_job_descriptor)
+        )
     );
-    pickle_prefetcher->configure(job_descriptor);
+    pickle_prefetcher->configure(job_descriptors.back());
     DPRINTF(
         PickleDeviceControl,
         "Received job descriptor: %s\n",
-        job_descriptor->to_string()
+        job_descriptors.back()->to_string()
     );
 }
 
@@ -752,9 +754,9 @@ PickleDevice::getCommandAddr() const
 }
 
 std::shared_ptr<PickleJobDescriptor>
-PickleDevice::getJobDescriptor() const
+PickleDevice::getJobDescriptor(const uint64_t job_id) const
 {
-    return job_descriptor;
+    return job_descriptors[job_id];
 }
 
 PacketPtr

@@ -59,9 +59,6 @@ PicklePrefetcher::PicklePrefetcher(
     ),
     ticks_per_cycle(1000),
     num_cores(params.num_cores),
-    prefetch_generator_mode(
-        params.prefetch_generator_mode
-    ),
     prefetcher_initialized(false),
     owner(nullptr),
     workCount(0),
@@ -73,16 +70,6 @@ PicklePrefetcher::PicklePrefetcher(
         "Prefetch distance offset from software hint must not be greater "
         "than the prefetch distance\n"
     );
-
-    /*
-    for (int i = 0; i < num_cores; ++i) {
-        prefetcher_work_trackers.push_back(
-            std::shared_ptr<PrefetcherWorkTracker>(
-                new PrefetcherWorkTracker(this, i, prefetch_generator_mode)
-            )
-        );
-    }
-    */
 
     for (int i = 0; i < num_cores; ++i) {
         taskStats.push_back(

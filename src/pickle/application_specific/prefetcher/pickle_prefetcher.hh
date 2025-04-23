@@ -69,7 +69,6 @@ class PicklePrefetcher: public ClockedObject
         EventFunctionWrapper processOutQueueEvent;
         uint64_t ticks_per_cycle;
         uint64_t num_cores;
-        std::string prefetch_generator_mode;
         std::shared_ptr<PrefetchGenerator> prefetch_generator;
     private:
         std::unordered_map<Addr, std::unique_ptr<uint8_t[]>> packet_data;

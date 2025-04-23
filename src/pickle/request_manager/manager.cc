@@ -377,45 +377,27 @@ PickleDeviceRequestManagerStats::PickleDeviceRequestManagerStats(
              "Number of translation faults"),
     ADD_STAT(requestQueueLength, statistics::units::Count::get(),
              "Histogram of the request queue length over time"),
-    ADD_STAT(requestsCountPerArray, statistics::units::Count::get(),
-             "Number of requests per array"),
-    ADD_STAT(requestsCountAfterCoalescingPerArray,
+    ADD_STAT(requestsCount, statistics::units::Count::get(),
+             "Number of requests"),
+    ADD_STAT(requestsCountAfterCoalescing,
              statistics::units::Count::get(),
-             "Number of requests per array after coalescing")
+             "Number of requests after coalescing")
 {
     requestQueueLength
       .init(16)
       .flags(statistics::pdf);
-    requestsCountPerArray
-      .init(16)
-      .flags(statistics::nozero | statistics::total);
-    requestsCountAfterCoalescingPerArray
-      .init(16)
-      .flags(statistics::nozero | statistics::total);
 }
 
 void
 PickleDeviceRequestManager::profileRequest(const Addr vaddr)
 {
-    uint64_t array_id = owner->getJobDescriptor()->get_array_id(vaddr);
-    if (array_id == -1ULL) {
-        return;
-    }
-    request_manager_stats.requestsCountPerArray[array_id]++;
+    request_manager_stats.requestsCount++;
 }
 
 void
 PickleDeviceRequestManager::profileRequestCoalescing(const Addr vaddr)
 {
-    uint64_t array_id = owner->getJobDescriptor()->get_array_id(vaddr);
-    if (array_id == -1ULL) {
-        return;
-    }
-    request_manager_stats.requestsCountAfterCoalescingPerArray[array_id]++;
-    DPRINTF(PickleDeviceRequestManagerDebug,
-        "Request coalescing for vaddr 0x%llx, array_id: %lld\n",
-        vaddr, array_id
-    );
+    request_manager_stats.requestsCountAfterCoalescing++;
 }
 
 }; // namespace gem5

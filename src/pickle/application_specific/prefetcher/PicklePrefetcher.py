@@ -44,7 +44,7 @@ class PicklePrefetcher(ClockedObject):
 
     software_hint_prefetch_distance = Param.Int(1, "Prefetch distance")
     prefetch_distance_offset_from_software_hint = Param.Int(
-        16,
+        0,
         "Prefetch distance offset from software hint",
     )
     num_cores = Param.Int(
@@ -52,10 +52,4 @@ class PicklePrefetcher(ClockedObject):
         "Number of cores connected to the cache that this prefetcher is "
         "servicing. In the case of the LLC prefetcher, this is the number of "
         "core in the same CCD.",
-    )
-    prefetch_generator_mode = Param.String(
-        "unknown",
-        "Prefetch generators are hardcoded in gem5. This field should contain "
-        "the name of the prefetch generators that you want to use. "
-        "Options are: bfs, pr",
     )

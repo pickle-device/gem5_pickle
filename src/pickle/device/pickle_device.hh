@@ -209,8 +209,10 @@ class PickleDevice: public ClockedObject
         Addr getCommandAddr() const;
     public: // application speicific
         PicklePrefetcher* pickle_prefetcher;
-        std::shared_ptr<PickleJobDescriptor> job_descriptor;
-        std::shared_ptr<PickleJobDescriptor> getJobDescriptor() const;
+        std::vector<std::shared_ptr<PickleJobDescriptor>> job_descriptors;
+        std::shared_ptr<PickleJobDescriptor> getJobDescriptor(
+            const uint64_t job_id
+        ) const;
     public:
         struct PickleDeviceStats : public statistics::Group
         {

@@ -113,8 +113,8 @@ class PickleDeviceRequestManager : public SimObject
             statistics::Scalar numRequestsCompleted;
             statistics::Scalar numTranslationFaults;
             statistics::Histogram requestQueueLength;
-            statistics::Vector requestsCountPerArray;
-            statistics::Vector requestsCountAfterCoalescingPerArray;
+            statistics::Scalar requestsCount;
+            statistics::Scalar requestsCountAfterCoalescing;
         } request_manager_stats;
 }; // class PickleDeviceRequestManager
 
