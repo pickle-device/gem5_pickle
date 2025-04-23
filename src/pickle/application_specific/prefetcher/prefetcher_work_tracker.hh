@@ -70,15 +70,11 @@ class PrefetcherWorkTracker
         uint64_t software_hint_distance;
         uint64_t hardware_prefetch_distance;
         uint64_t current_core_work_item;
-        std::string prefetch_generator_mode;
         std::shared_ptr<PrefetchGenerator> prefetch_generator;
     public:
         PrefetcherWorkTracker();
         PrefetcherWorkTracker(
             PicklePrefetcher* owner, const uint64_t _id,
-            std::string prefetch_generator_mode
-        );
-        void setJobDescriptor(
             std::shared_ptr<PickleJobDescriptor> job_descriptor
         );
         void addWorkItem(Addr vaddr);

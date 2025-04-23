@@ -52,11 +52,11 @@ PrefetcherWorkTracker::PrefetcherWorkTracker()
 
 PrefetcherWorkTracker::PrefetcherWorkTracker(
     PicklePrefetcher* owner, const uint64_t _id,
-    std::string _prefetch_generator_mode
+    std::shared_ptr<PickleJobDescriptor> _job_descriptor
 ) : id(_id),
-    is_activated(false),
+    is_activated(true),
     owner(owner),
-    job_descriptor(nullptr),
+    job_descriptor(_job_descriptor),
     current_core_work_item(-1ULL)
 {
     software_hint_distance = owner->getSoftwareHintPrefetchDistance();
@@ -64,15 +64,13 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
         owner->getSoftwareHintPrefetchDistance() - \
         owner->getPrefetchDistanceOffsetFromSoftwareHint();
 
-    prefetch_generator_mode = _prefetch_generator_mode;
-
-    if (prefetch_generator_mode == "bfs") {
+    if (job_descriptor->kernel_name == "bfs_kernel") {
         prefetch_generator = std::make_shared<BFSPrefetchGenerator>(
             "BFSPrefetchGenerator",
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             this
         );
-    } else if (prefetch_generator_mode == "pr") {
+    } else if (job_descriptor->kernel_name == "pr_kernel") {
         prefetch_generator = std::make_shared<PRPrefetchGenerator>(
             "PRPrefetchGenerator",
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
@@ -80,18 +78,10 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
         );
     } else {
         panic(
-            "Unknown prefetch generator mode: %s\n", prefetch_generator_mode
+            "Unknown prefetch generator mode: %s\n",
+            job_descriptor->kernel_name
         );
     }
-}
-
-void
-PrefetcherWorkTracker::setJobDescriptor(
-    std::shared_ptr<PickleJobDescriptor> _job_descriptor
-)
-{
-    is_activated = true;
-    this->job_descriptor = _job_descriptor;
 }
 
 void
@@ -103,13 +93,14 @@ PrefetcherWorkTracker::addWorkItem(Addr work_id)
     auto workItem = prefetch_generator->generateWorkItem(work_id);
     work_id_to_work_items_map[work_id] = workItem;
     populateCurrLevelPrefetches(workItem);
-    if (prefetch_generator_mode == "bfs") {
+    if (job_descriptor->kernel_name == "bfs_kernel") {
         notifyCoreCurrentWork(work_id - software_hint_distance * 4);
-    } else if (prefetch_generator_mode == "pr") {
+    } else if (job_descriptor->kernel_name == "pr_kernel") {
         notifyCoreCurrentWork(work_id - software_hint_distance);
     } else {
         panic(
-            "Unknown prefetch generator mode: %s\n", prefetch_generator_mode
+            "Unknown prefetch generator mode: %s\n",
+            job_descriptor->kernel_name
         );
     }
 }

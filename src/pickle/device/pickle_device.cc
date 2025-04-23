@@ -355,7 +355,12 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
             } else {
                 const uint64_t* ptr = pkt->getConstPtr<uint64_t>();
                 uint64_t data = ptr[0];
-                owner->pickle_prefetcher->enqueueWork(data, internal_id);
+                const Addr paddr = pkt->req->getPaddr();
+                const uint64_t prefetch_generator_kernel_id = \
+                    (paddr & 0xFFF) / 8;
+                owner->pickle_prefetcher->enqueueWork(
+                    data, prefetch_generator_kernel_id, internal_id
+                );
                 DPRINTF(
                     PickleDeviceUncacheableForwarding,
                     "Received store request: addr = 0x%llx, data = 0x%llx\n",

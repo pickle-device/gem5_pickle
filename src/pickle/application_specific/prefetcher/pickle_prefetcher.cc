@@ -74,6 +74,7 @@ PicklePrefetcher::PicklePrefetcher(
         "than the prefetch distance\n"
     );
 
+    /*
     for (int i = 0; i < num_cores; ++i) {
         prefetcher_work_trackers.push_back(
             std::shared_ptr<PrefetcherWorkTracker>(
@@ -81,6 +82,7 @@ PicklePrefetcher::PicklePrefetcher(
             )
         );
     }
+    */
 
     for (int i = 0; i < num_cores; ++i) {
         taskStats.push_back(
@@ -114,35 +116,37 @@ void
 PicklePrefetcher::processPrefetcherOutQueue()
 {
     // TODO: a better scheduling policy?)
-    for (auto tracker: prefetcher_work_trackers) {
-        while (tracker->hasOutstandingPrefetch()) {
-            Addr prefetchVAddr = tracker->peekNextPrefetch();
-            if (packet_status.find(prefetchVAddr) != packet_status.end()) {
-                DPRINTF(
-                    PickleDevicePrefetcherDebug,
-                    "PREFETCH OUT COALESCED ---> vaddr 0x%llx already in "
-                    "queue\n",
-                    prefetchVAddr
-                );
-                tracker->popPrefetch();
-                continue;
-            }
-            bool status = \
-                owner->request_manager->enqueueLoadRequest(prefetchVAddr);
-            if (status) {
-                DPRINTF(
-                    PickleDevicePrefetcherDebug,
-                    "PREFETCH OUT ---> vaddr 0x%llx\n",
-                    prefetchVAddr
-                );
-                packet_status[prefetchVAddr] = PacketStatus::SENT;
-                tracker->popPrefetch();
-            } else {
-                DPRINTF(
-                    PickleDevicePrefetcherDebug, "Warn: outqueue is full\n"
-                );
-                scheduleDueToNewOutstandingPrefetchRequests();
-                break;
+    for (auto tracker_array: prefetcher_work_trackers) {
+        for (auto tracker: tracker_array) {
+            while (tracker->hasOutstandingPrefetch()) {
+                Addr prefetchVAddr = tracker->peekNextPrefetch();
+                if (packet_status.find(prefetchVAddr) != packet_status.end()) {
+                    DPRINTF(
+                        PickleDevicePrefetcherDebug,
+                        "PREFETCH OUT COALESCED ---> vaddr 0x%llx already in "
+                        "queue\n",
+                        prefetchVAddr
+                    );
+                    tracker->popPrefetch();
+                    continue;
+                }
+                bool status = \
+                    owner->request_manager->enqueueLoadRequest(prefetchVAddr);
+                if (status) {
+                    DPRINTF(
+                        PickleDevicePrefetcherDebug,
+                        "PREFETCH OUT ---> vaddr 0x%llx\n",
+                        prefetchVAddr
+                    );
+                    packet_status[prefetchVAddr] = PacketStatus::SENT;
+                    tracker->popPrefetch();
+                } else {
+                    DPRINTF(
+                        PickleDevicePrefetcherDebug, "Warn: outqueue is full\n"
+                    );
+                    scheduleDueToNewOutstandingPrefetchRequests();
+                    break;
+                }
             }
         }
     }
@@ -157,8 +161,10 @@ PicklePrefetcher::processPrefetcherInQueue()
             "PREFETCH IN <--- vaddr 0x%llx\n", vaddr
         );
         assert(packet_status[vaddr] == PacketStatus::ARRIVED);
-        for (auto tracker: prefetcher_work_trackers) {
-            tracker->processIncomingPrefetch(vaddr);
+        for (auto tracker_array: prefetcher_work_trackers) {
+            for (auto tracker: tracker_array) {
+                tracker->processIncomingPrefetch(vaddr);
+            }
         }
     }
     for (auto vaddr: received_packets_to_be_processed) {
@@ -202,15 +208,24 @@ PicklePrefetcher::switchOff()
 void
 PicklePrefetcher::configure(std::shared_ptr<PickleJobDescriptor> job)
 {
-    for (auto tracker: prefetcher_work_trackers) {
-        tracker->setJobDescriptor(job);
+    prefetcher_work_trackers.push_back(
+        std::vector<std::shared_ptr<PrefetcherWorkTracker>>()
+    );
+    prefetcher_work_trackers.back().reserve(num_cores);
+    for (int i = 0; i < num_cores; ++i) {
+        prefetcher_work_trackers.back().push_back(
+            std::shared_ptr<PrefetcherWorkTracker>(
+                new PrefetcherWorkTracker(this, i, job)
+            )
+        );
     }
     prefetcher_initialized = true;
 }
 
 bool
 PicklePrefetcher::enqueueWork(
-    const uint64_t workData, const uint64_t cpuId
+    const uint64_t workData, const uint64_t prefetchKernelId,
+    const uint64_t cpuId
 )
 {
     if (!prefetcher_initialized)
@@ -227,7 +242,7 @@ PicklePrefetcher::enqueueWork(
     }
     // For BFS: workData = curr_ptr + sw_prefetch_distance * 4 of the workQueue
     // For PR: workData = node_id + sw_prefetch_distance
-    prefetcher_work_trackers[cpuId]->addWorkItem(workData);
+    prefetcher_work_trackers[prefetchKernelId][cpuId]->addWorkItem(workData);
     scheduleDueToNewOutstandingPrefetchRequests();
     DPRINTF(
         PickleDevicePrefetcherDebug,

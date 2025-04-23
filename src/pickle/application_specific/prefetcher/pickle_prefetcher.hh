@@ -75,7 +75,8 @@ class PicklePrefetcher: public ClockedObject
         std::unordered_map<Addr, std::unique_ptr<uint8_t[]>> packet_data;
         std::unordered_map<Addr, PacketStatus> packet_status;
         std::unordered_set<Addr> received_packets_to_be_processed;
-        std::vector<std::shared_ptr<PrefetcherWorkTracker>> \
+        // there is a work tracker for each prefetch kernel for each core
+        std::vector<std::vector<std::shared_ptr<PrefetcherWorkTracker>>> \
             prefetcher_work_trackers;
         bool prefetcher_initialized;
         // check and send prefetch requests for every cycle
@@ -98,7 +99,10 @@ class PicklePrefetcher: public ClockedObject
         uint64_t getPrefetchDistanceOffsetFromSoftwareHint() const;
         std::shared_ptr<PrefetchGenerator> getPrefetchGenerator() const;
     public: // the interface
-        bool enqueueWork(const uint64_t workData, const uint64_t cpuId);
+        bool enqueueWork(
+            const uint64_t workData, const uint64_t prefetchKernelId,
+            const uint64_t cpuId
+        );
         void receivePrefetch(
             const uint64_t vaddr, std::unique_ptr<uint8_t[]> p
         );
