@@ -56,8 +56,9 @@ class PickleJobArrayDescriptor
             uint64_t array_id, uint64_t dst_id, uint64_t vaddr_start,
             uint64_t vaddr_end, uint64_t element_size,
             bool is_ranged_access, bool is_indexed_access
-        ) : array_id(array_id), dst_id(dst_id), vaddr_start(vaddr_start),
-            vaddr_end(vaddr_end), element_size(element_size),
+        ) : array_id(array_id), dst_id(dst_id),
+            vaddr_start(vaddr_start), vaddr_end(vaddr_end),
+            element_size(element_size),
             is_ranged_access(is_ranged_access),
             is_indexed_access(is_indexed_access) {}
         std::string to_string() const
@@ -76,6 +77,7 @@ class PickleJobArrayDescriptor
 class PickleJobDescriptor
 {
     public:
+        std::string kernel_name; // select with prefetch generator to use
         std::vector<PickleJobArrayDescriptor> arrays;
         PickleJobDescriptor() {}
         PickleJobDescriptor(std::vector<uint8_t> &job_ptr)
@@ -110,10 +112,18 @@ class PickleJobDescriptor
                     vaddr_start, vaddr_end, element_size,
                     is_ranged_access, is_indexed_access);
             }
+            std::stringstream s;
+            while (job_ptr_i < job_ptr.size())
+            {
+                s << job_ptr[job_ptr_i];
+                job_ptr_i++;
+            }
+            kernel_name = s.str();
         }
         std::string to_string() const
         {
             std::stringstream ss;
+            ss << "kernel_name: " << kernel_name << "\n";
             for (const auto &array : arrays) {
                 ss << array.to_string() << "\n";
             }
