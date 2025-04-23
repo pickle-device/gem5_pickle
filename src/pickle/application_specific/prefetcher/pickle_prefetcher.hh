@@ -69,7 +69,6 @@ class PicklePrefetcher: public ClockedObject
         EventFunctionWrapper processOutQueueEvent;
         uint64_t ticks_per_cycle;
         uint64_t num_cores;
-        std::shared_ptr<PrefetchGenerator> prefetch_generator;
     private:
         std::unordered_map<Addr, std::unique_ptr<uint8_t[]>> packet_data;
         std::unordered_map<Addr, PacketStatus> packet_status;
@@ -96,7 +95,6 @@ class PicklePrefetcher: public ClockedObject
         bool isActivated() const { return prefetcher_initialized; }
         uint64_t getSoftwareHintPrefetchDistance() const;
         uint64_t getPrefetchDistanceOffsetFromSoftwareHint() const;
-        std::shared_ptr<PrefetchGenerator> getPrefetchGenerator() const;
     public: // the interface
         bool enqueueWork(
             const uint64_t workData, const uint64_t prefetchKernelId,

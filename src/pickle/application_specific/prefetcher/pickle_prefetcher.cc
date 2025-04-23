@@ -176,12 +176,6 @@ PicklePrefetcher::getPrefetchDistanceOffsetFromSoftwareHint() const
     return prefetch_distance_offset_from_software_hint;
 }
 
-std::shared_ptr<PrefetchGenerator>
-PicklePrefetcher::getPrefetchGenerator() const
-{
-    return prefetch_generator;
-}
-
 void
 PicklePrefetcher::switchOn()
 {
