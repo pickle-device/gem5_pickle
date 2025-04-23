@@ -44,7 +44,8 @@ namespace gem5
 class WorkItem
 {
     private:
-        Addr work_id;
+        uint64_t job_id; // which prefetch generator generated this work
+        Addr work_id; // used to identify work from the core
         std::array<std::unordered_set<Addr>, 4> expected_prefetches;
         uint64_t curr_level;
         bool core_worked_on_this_work;
@@ -71,6 +72,7 @@ class WorkItem
     public:
         WorkItem();
         WorkItem(const Addr _work_id);
+        void setJobId(const uint64_t _job_id);
         //Tick getQueueTime() const;
         Tick getPrefetchLvTime(const uint64_t lv) const;
         Tick getTotalPrefetchTime() const;

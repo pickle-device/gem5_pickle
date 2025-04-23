@@ -49,6 +49,9 @@ PicklePrefetcher::PicklePrefetcher(
     prefetch_distance_offset_from_software_hint(
       params.prefetch_distance_offset_from_software_hint
     ),
+    expected_number_of_prefetch_generators(
+      params.expected_number_of_prefetch_generators
+    ),
     processInQueueEvent(
         [this]{processPrefetcherInQueue();},
         name() + ".operate_prefetcher_in_queue_event"
@@ -71,10 +74,21 @@ PicklePrefetcher::PicklePrefetcher(
         "than the prefetch distance\n"
     );
 
-    for (int i = 0; i < num_cores; ++i) {
+    for (
+        int job_id = 0; job_id < expected_number_of_prefetch_generators;
+        job_id++
+    ) {
         taskStats.push_back(
-            std::shared_ptr<TaskStats>(new TaskStats(this, i))
+            std::vector<std::shared_ptr<TaskStats>>()
         );
+        taskStats.back().reserve(num_cores);
+        for (int core_id = 0; core_id < num_cores; core_id++) {
+            taskStats.back().push_back(
+                std::shared_ptr<TaskStats>(
+                    new TaskStats(this, job_id, core_id)
+                )
+            );
+        }
     }
 }
 
@@ -192,11 +206,12 @@ PicklePrefetcher::configure(std::shared_ptr<PickleJobDescriptor> job)
     prefetcher_work_trackers.push_back(
         std::vector<std::shared_ptr<PrefetcherWorkTracker>>()
     );
+    const uint64_t job_id = prefetcher_work_trackers.size() - 1;
     prefetcher_work_trackers.back().reserve(num_cores);
-    for (int i = 0; i < num_cores; ++i) {
+    for (int core_id = 0; core_id < num_cores; core_id++) {
         prefetcher_work_trackers.back().push_back(
             std::shared_ptr<PrefetcherWorkTracker>(
-                new PrefetcherWorkTracker(this, i, job)
+                new PrefetcherWorkTracker(this, job_id, core_id, job)
             )
         );
     }
@@ -332,8 +347,11 @@ PicklePrefetcher::PrefetcherStats::regStats()
 }
 
 PicklePrefetcher::TaskStats::TaskStats(
-    statistics::Group *parent, const uint64_t cpuId
-) : statistics::Group(parent, csprintf("cpu_%d", cpuId).c_str()),
+    statistics::Group *parent,
+    const uint64_t jobId, const uint64_t cpuId
+) : statistics::Group(
+        parent, csprintf("cpu_%d.job_%d", cpuId, jobId).c_str()
+    ),
     ADD_STAT(
         taskCount, statistics::units::Count::get(),
         csprintf("Number of tasks from core %d", cpuId).c_str()
@@ -406,15 +424,16 @@ PicklePrefetcher::TaskStats::regStats()
 
 void
 PicklePrefetcher::profileWork(
-    std::shared_ptr<WorkItem> work, const uint64_t core_id
+    std::shared_ptr<WorkItem> work,
+    const uint64_t job_id, const uint64_t core_id
 )
 {
     DPRINTF(
         PickleDevicePrefetcherWorkTrackerDebug,
-        "profileWork: core_id: %lld, work_id 0x%llx\n",
-        core_id, work->getWorkId()
+        "profileWork: job_id: %lld, core_id: %lld, work_id 0x%llx\n",
+        job_id, core_id, work->getWorkId()
     );
-    std::shared_ptr<TaskStats> task_stat = taskStats[core_id];
+    std::shared_ptr<TaskStats> task_stat = taskStats[job_id][core_id];
     task_stat->taskCount++;;
     task_stat->prefetchLv0Time.sample(work->getPrefetchLvTime(0));
     task_stat->prefetchLv1Time.sample(work->getPrefetchLvTime(1));
@@ -442,10 +461,11 @@ PicklePrefetcher::profileWork(
 
 void
 PicklePrefetcher::profileTimelyPrefetch(
-    const Tick pf_complete_time, const uint64_t core_id
+    const Tick pf_complete_time,
+    const uint64_t job_id, const uint64_t core_id
 )
 {
-    taskStats[core_id]->timelyPrefetchesDistance
+    taskStats[job_id][core_id]->timelyPrefetchesDistance
         .sample(
             curTick() - pf_complete_time
         );

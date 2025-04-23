@@ -64,6 +64,7 @@ class PicklePrefetcher: public ClockedObject
     private:
         int64_t software_hint_prefetch_distance;
         int64_t prefetch_distance_offset_from_software_hint;
+        uint64_t expected_number_of_prefetch_generators;
         PARAMS(PicklePrefetcher);
         EventFunctionWrapper processInQueueEvent;
         EventFunctionWrapper processOutQueueEvent;
@@ -124,7 +125,10 @@ class PicklePrefetcher: public ClockedObject
         } prefetcherStats;
         struct TaskStats : public statistics::Group
         {
-            TaskStats(statistics::Group *parent, const uint64_t cpuId);
+            TaskStats(
+                statistics::Group *parent,
+                const uint64_t jobId, const uint64_t cpuId
+            );
             void regStats() override;
             statistics::Scalar taskCount;
             //statistics::Histogram queuedTime;
@@ -136,12 +140,14 @@ class PicklePrefetcher: public ClockedObject
             statistics::Histogram timelyPrefetchesDistance;
             statistics::Histogram latePrefetchesDistance;
         };
-        std::vector<std::shared_ptr<TaskStats>> taskStats;
+        std::vector<std::vector<std::shared_ptr<TaskStats>>> taskStats;
         void profileWork(
-            std::shared_ptr<WorkItem> work, const uint64_t core_id
+            std::shared_ptr<WorkItem> work,
+            const uint64_t job_id, const uint64_t core_id
         );
         void profileTimelyPrefetch(
-            const Tick pf_complete_time, const uint64_t core_id
+            const Tick pf_complete_time,
+            const uint64_t job_id, const uint64_t core_id
         );
 };
 

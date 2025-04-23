@@ -40,7 +40,8 @@ namespace gem5
 {
 
 PrefetcherWorkTracker::PrefetcherWorkTracker()
-  : id(-1ULL),
+  : job_id(-1ULL),
+    core_id(-1ULL),
     is_activated(false),
     owner(nullptr),
     job_descriptor(nullptr),
@@ -51,9 +52,11 @@ PrefetcherWorkTracker::PrefetcherWorkTracker()
 }
 
 PrefetcherWorkTracker::PrefetcherWorkTracker(
-    PicklePrefetcher* owner, const uint64_t _id,
+    PicklePrefetcher* owner,
+    const uint64_t _job_id, const uint64_t _core_id,
     std::shared_ptr<PickleJobDescriptor> _job_descriptor
-) : id(_id),
+) : job_id(_job_id),
+    core_id(_core_id),
     is_activated(true),
     owner(owner),
     job_descriptor(_job_descriptor),
@@ -91,6 +94,7 @@ PrefetcherWorkTracker::addWorkItem(Addr work_id)
         return;
     }
     auto workItem = prefetch_generator->generateWorkItem(work_id);
+    workItem->setJobId(job_id);
     work_id_to_work_items_map[work_id] = workItem;
     populateCurrLevelPrefetches(workItem);
     if (job_descriptor->kernel_name == "bfs_kernel") {
@@ -199,7 +203,7 @@ PrefetcherWorkTracker::popPrefetch()
 void
 PrefetcherWorkTracker::profileWork(std::shared_ptr<WorkItem> work)
 {
-    owner->profileWork(work, id);
+    owner->profileWork(work, job_id, core_id);
 }
 
 void
@@ -215,12 +219,12 @@ PrefetcherWorkTracker::notifyCoreCurrentWork(const Addr work_id)
     DPRINTF(
         PickleDevicePrefetcherWorkTrackerDebug,
         "notifyCoreCurrentWork: core_id: %lld, work_id 0x%llx\n",
-        id, work_id
+        core_id, work_id
     );
     if (it != pf_complete_time.end()) {
         const Tick complete_time = it->second;
         owner->profileTimelyPrefetch(
-            complete_time, id
+            complete_time, job_id, core_id
         );
         pf_complete_time.erase(it);
         DPRINTF(

@@ -53,3 +53,8 @@ class PicklePrefetcher(ClockedObject):
         "servicing. In the case of the LLC prefetcher, this is the number of "
         "core in the same CCD.",
     )
+    expected_number_of_prefetch_generators = Param.Int(
+        1,
+        "How many prefetch generators will be used. Helps determining how "
+        "many sets of task-related stats to allocate.",
+    )

@@ -51,7 +51,8 @@ class PrefetchGenerator;
 class PrefetcherWorkTracker
 {
     private:
-        uint64_t id;
+        uint64_t job_id;
+        uint64_t core_id;
         bool is_activated;
     public:
         PicklePrefetcher* owner;
@@ -74,7 +75,8 @@ class PrefetcherWorkTracker
     public:
         PrefetcherWorkTracker();
         PrefetcherWorkTracker(
-            PicklePrefetcher* owner, const uint64_t _id,
+            PicklePrefetcher* owner,
+            const uint64_t job_id, const uint64_t core_id,
             std::shared_ptr<PickleJobDescriptor> job_descriptor
         );
         void addWorkItem(Addr vaddr);
