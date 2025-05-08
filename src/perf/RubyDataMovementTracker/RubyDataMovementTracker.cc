@@ -16,6 +16,7 @@
 #include "debug/RubyDataMovementTrackerDebug.hh"
 #include "debug/RubyDataMovementTrackerStatsDebug.hh"
 #include "mem/ruby/common/MachineID.hh"
+#include "mem/ruby/protocol/CHI/Cache_State.hh"
 #include "mem/ruby/slicc_interface/RubySlicc_ComponentMapping.hh"
 #include "mem/ruby/system/RubySystem.hh"
 #include "sim/probe/probe.hh"
@@ -63,6 +64,25 @@ void RubyDataMovementTracker::regStats() {
         latency_hist_stat_desc.c_str());
     constexpr uint64_t num_bins = 10;
     stats.dataSenderLatencyHistogram[machineID]->init(num_bins);
+    stats.dataSenderLatencyHistogramByState[machineID] =
+        std::unordered_map<unsigned, statistics::Histogram*>();
+    for (unsigned i = 0; i < CHI::Cache_State::Cache_State_NUM; i++) {
+      stats.dataSenderLatencyHistogramByState[machineID][i] =
+          new statistics::Histogram(
+              &stats,
+              csprintf(
+                "%s_%s", machine_id_str,
+                CHI::Cache_State_to_string(CHI::Cache_State(i))
+                ).c_str(),
+              statistics::units::Tick::get(),
+              csprintf(
+                "Latency of receiving data blocks from %s in state %s",
+                controller->name(),
+                CHI::Cache_State_to_string(CHI::Cache_State(i)).c_str()
+              ).c_str()
+          );
+      stats.dataSenderLatencyHistogramByState[machineID][i]->init(num_bins);
+    }
   }
 }
 

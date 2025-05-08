@@ -15,6 +15,7 @@
 #include "mem/cache/simple_cache_probe_arg.hh"
 #include "mem/ruby/common/Address.hh"
 #include "mem/ruby/network/MessageBuffer.hh"
+#include "mem/ruby/protocol/CHI/Cache_State.hh"
 #include "mem/ruby/slicc_interface/AbstractController.hh"
 #include "mem/ruby/slicc_interface/RubyRequest.hh"
 #include "mem/ruby/system/RubySystem.hh"
@@ -53,6 +54,8 @@ class RubyDataMovementTracker : public ProbeListenerObject
     std::unordered_map<MachineID, statistics::Scalar *> dataSenderCount;
     std::unordered_map<MachineID, statistics::Histogram *> \
         dataSenderLatencyHistogram;
+    std::unordered_map<MachineID, std::unordered_map<unsigned, \
+        statistics::Histogram *>> dataSenderLatencyHistogramByState;
   } stats;
 };
 
