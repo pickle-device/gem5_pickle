@@ -23,12 +23,14 @@ class SimpleCacheAccessProbeArg
     ruby::MachineID machineID;
     bool machineIDValid;
     Tick latency;
+    unsigned cache_state;
     SimpleCacheAccessProbeArg(
         RequestPtr _req, SimpleCacheAccessor& _cache,
         ruby::MachineID _machineID, bool _machineIDValid,
-        Tick _latency
+        Tick _latency, unsigned _cache_state
     ) : req(_req), cache(_cache), machineID(_machineID),
-        machineIDValid(_machineIDValid), latency(_latency)
+        machineIDValid(_machineIDValid), latency(_latency),
+        cache_state(_cache_state)
     {
     }
 };

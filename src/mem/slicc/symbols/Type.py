@@ -742,6 +742,9 @@ ${{self.c_ident}} string_to_${{self.c_ident}}(const ::std::string& str);
 // Code to convert state to a string
 ::std::string ${{self.c_ident}}_to_string(const ${{self.c_ident}}& obj);
 
+// Code to convert state to an integer
+int ${{self.c_ident}}_to_int(const ${{self.c_ident}}& obj);
+
 // Code to increment an enumeration type
 ${{self.c_ident}} &operator++(${{self.c_ident}} &e);
 """
@@ -996,6 +999,17 @@ operator++(${{self.c_ident}}& e)
     assert(e < ${{self.c_ident}}_NUM);
     return e = ${{self.c_ident}}(e+1);
 }
+"""
+        )
+
+        code(
+            """
+// Code to convert state to an integer
+int ${{self.c_ident}}_to_int(const ${{self.c_ident}}& obj)
+{
+     return (int)(obj);
+}
+
 """
         )
 

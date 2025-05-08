@@ -89,6 +89,23 @@ class StateDeclAST(DeclAST):
         )
         self.symtab.newSymbol(func)
 
+        # Add the implicit State_to_int method
+        func_id = f"{t.c_ident}_to_int"
+
+        pairs = {"external": "yes"}
+        func = Func(
+            self.symtab,
+            func_id + "_" + t.ident,
+            func_id,
+            self.location,
+            self.symtab.find("int", Type),
+            [t],
+            [],
+            "",
+            pairs,
+        )
+        self.symtab.newSymbol(func)
+
         # Add the State_to_permission method
         func_id = f"{t.c_ident}_to_permission"
 

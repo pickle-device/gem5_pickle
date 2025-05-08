@@ -3801,9 +3801,10 @@ action(Profile_Hit, desc="") {
   assert(tbe.dataValid);
   bool is_demand := (tbe.is_local_pf || tbe.is_remote_pf) == false;
   bool is_remote_can_notify := tbe.is_remote_pf && upstream_prefetch_trains_prefetcher;
+  int tbe_state_int := Cache_State_to_int(tbe.state);
   if (is_demand) {
     cache.profileDemandHit();
-    dmvProxy.notifyHit(tbe.seqReq, machineID, tbe.addr);
+    dmvProxy.notifyHit(tbe.seqReq, machineID, tbe.addr, tbe_state_int);
   } else {
     assert(use_prefetcher || tbe.is_remote_pf);
     cache.profilePrefetchHit();
@@ -3837,10 +3838,11 @@ action(Profile_Fill, desc="") {
     pfProxy.notifyPfFill(tbe.seqReq, tbe.dataBlk, tbe.is_local_pf);
   }
   if (tbe.isSeqReqValid) {
+    int tbe_state_int := Cache_State_to_int(tbe.state);
     dmvProxy.notifyWriteback(
         tbe.seqReq, tbe.requestor, tbe.previousBlockOwner,
         tbe.previousBlockOwnerValid, curTick() - tbe.requestInitiationTick,
-        tbe.dataBlk
+        tbe.dataBlk, tbe_state_int
     );
   }
 }

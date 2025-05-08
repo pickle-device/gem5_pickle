@@ -35,37 +35,40 @@ void
 RubyDataMovementTrackerProxy::notifyWriteback(
     const RequestPtr& req, const MachineID& requestor_id,
     const MachineID data_sender_id, const bool data_sender_id_valid,
-    const Tick latency, const DataBlock& data_blk
+    const Tick latency, const DataBlock& data_blk, const unsigned cache_state
 )
 {
     assert(req);
     RequestPtr req_copy(new Request(*req));
     ppWriteback->notify(SimpleCacheAccessProbeArg(
-        req_copy, *this, data_sender_id, data_sender_id_valid, latency)
+        req_copy, *this, data_sender_id, data_sender_id_valid, latency,
+        cache_state)
     );
 }
 
 void
 RubyDataMovementTrackerProxy::notifyHit(
-    const RequestPtr& req, const MachineID machine_id, const Addr addr
+    const RequestPtr& req, const MachineID machine_id, const Addr addr,
+    const unsigned cache_state
 )
 {
     assert(req);
     RequestPtr req_copy(new Request(*req));
     ppHit->notify(SimpleCacheAccessProbeArg(
-        req_copy, *this, machine_id, true, 0
+        req_copy, *this, machine_id, true, 0, 0
     ));
 }
 
 void
 RubyDataMovementTrackerProxy::notifyAccess(
-    const RequestPtr& req, const MachineID machine_id, const Addr addr
+    const RequestPtr& req, const MachineID machine_id, const Addr addr,
+    const unsigned cache_state
 )
 {
     assert(req);
     RequestPtr req_copy(new Request(*req));
     ppAccess->notify(SimpleCacheAccessProbeArg(
-        req_copy, *this, machine_id, true, 0
+        req_copy, *this, machine_id, true, 0, 0
     ));
 }
 

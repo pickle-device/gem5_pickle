@@ -715,7 +715,7 @@ machine(MachineType:Memory, "Memory controller interface") :
   }
 
   action(Profile_Mem, desc="") {
-    dmvProxy.notifyHit(tbe.reqPtr, machineID, tbe.addr);
+    dmvProxy.notifyHit(tbe.reqPtr, machineID, tbe.addr, 0);
   }
 
   ////////////////////////////////////////////////////////////////////////////

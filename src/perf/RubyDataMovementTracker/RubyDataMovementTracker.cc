@@ -93,6 +93,8 @@ void RubyDataMovementTracker::observeWriteback(
     statistics::Scalar* s = stats.dataSenderCount[info.machineID];
     (*s)++;
     stats.dataSenderLatencyHistogram[info.machineID]->sample(info.latency);
+    stats.dataSenderLatencyHistogramByState[info.machineID][info.cache_state]\
+        ->sample(info.latency);
   }
   DPRINTF(RubyDataMovementTrackerDebug, "Observed writeback\n");
 }

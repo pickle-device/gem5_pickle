@@ -34,13 +34,16 @@
      void notifyWriteback(
          const RequestPtr& req, const MachineID& requestor_id,
          const MachineID data_sender_id, const bool data_send_id_valid,
-         const Tick latency, const DataBlock& data_blk
+         const Tick latency, const DataBlock& data_blk,
+         const unsigned cache_state
      );
      void notifyHit(
-         const RequestPtr& req, const MachineID machine_id, const Addr addr
+         const RequestPtr& req, const MachineID machine_id, const Addr addr,
+         const unsigned cache_state
      );
      void notifyAccess(
-         const RequestPtr& req, const MachineID requestor_id, const Addr addr
+         const RequestPtr& req, const MachineID requestor_id, const Addr addr,
+         const unsigned cache_state
      );
      void regProbePoints();
 
