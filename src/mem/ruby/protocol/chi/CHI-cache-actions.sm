@@ -262,6 +262,8 @@ action(Initiate_Request, desc="") {
   DirEntry dir_entry := getDirEntry(address);
   copyCacheAndDir(cache_entry, dir_entry, tbe, initial);
 
+  tbe.previousBlockOwnerCacheState := Cache_State_to_int(initial);
+
   tbe.use_DMT := is_HN && enable_DMT;
   tbe.use_DCT := enable_DCT;
 
@@ -490,6 +492,7 @@ action(Update_PreviousBlockOwner, desc="") {
     bool is_demand := (tbe.is_local_pf || tbe.is_remote_pf) == false;
     if (is_demand) {
       tbe.previousBlockOwner := machineID;
+      //tbe.previousBlockOwnerCacheState := Cache_State_to_int(state);
       tbe.previousBlockOwnerValid := true;
     }
   }
@@ -2165,6 +2168,7 @@ action(Receive_ReqDataResp, desc="") {
       assert(tbe.dataBlkValid.isOverlap(in_msg.bitMask) == false);
       tbe.dataBlkValid.orMask(in_msg.bitMask);
       tbe.previousBlockOwner := in_msg.originalResponder;
+      tbe.previousBlockOwnerCacheState := in_msg.originalResponderCacheState;
       tbe.previousBlockOwnerValid := in_msg.originalResponderValid;
       DPRINTF(RubySlicc, "Received %s\n", tbe.oldDataBlk);
       DPRINTF(RubySlicc, "dataBlkValid = %s\n", tbe.dataBlkValid);
@@ -2182,6 +2186,7 @@ action(Receive_ReqDataResp, desc="") {
       assert(tbe.dataBlkValid.isOverlap(in_msg.bitMask) == false);
       tbe.dataBlkValid.orMask(in_msg.bitMask);
       tbe.previousBlockOwner := in_msg.originalResponder;
+      tbe.previousBlockOwnerCacheState := in_msg.originalResponderCacheState;
       tbe.previousBlockOwnerValid := in_msg.originalResponderValid;
     }
   }
@@ -2248,6 +2253,7 @@ action(Receive_SnpDataResp, desc="") {
       assert(tbe.dataBlkValid.isOverlap(in_msg.bitMask) == false);
       tbe.dataBlkValid.orMask(in_msg.bitMask);
       tbe.previousBlockOwner := in_msg.originalResponder;
+      tbe.previousBlockOwnerCacheState := in_msg.originalResponderCacheState;
       tbe.previousBlockOwnerValid := in_msg.originalResponderValid;
     }
   }
@@ -3113,6 +3119,7 @@ action(Send_Data, desc="") {
     out_msg.txnId := tbe.txnId;
 
     out_msg.originalResponder := tbe.previousBlockOwner;
+    out_msg.originalResponderCacheState := tbe.previousBlockOwnerCacheState;
     out_msg.originalResponderValid := tbe.previousBlockOwnerValid;
 
     int offset := tbe.snd_pendBytes.firstBitSet(true);
@@ -3838,11 +3845,10 @@ action(Profile_Fill, desc="") {
     pfProxy.notifyPfFill(tbe.seqReq, tbe.dataBlk, tbe.is_local_pf);
   }
   if (tbe.isSeqReqValid) {
-    int tbe_state_int := Cache_State_to_int(tbe.state);
     dmvProxy.notifyWriteback(
         tbe.seqReq, tbe.requestor, tbe.previousBlockOwner,
         tbe.previousBlockOwnerValid, curTick() - tbe.requestInitiationTick,
-        tbe.dataBlk, tbe_state_int
+        tbe.dataBlk, tbe.previousBlockOwnerCacheState
     );
   }
 }

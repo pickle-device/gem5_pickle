@@ -82,6 +82,9 @@ void RubyDataMovementTracker::regStats() {
               ).c_str()
           );
       stats.dataSenderLatencyHistogramByState[machineID][i]->init(num_bins);
+      stats.dataSenderLatencyHistogramByState[machineID][i]->flags(
+          statistics::nozero
+      );
     }
   }
 }
@@ -95,6 +98,9 @@ void RubyDataMovementTracker::observeWriteback(
     stats.dataSenderLatencyHistogram[info.machineID]->sample(info.latency);
     stats.dataSenderLatencyHistogramByState[info.machineID][info.cache_state]\
         ->sample(info.latency);
+    DPRINTF(
+        RubyDataMovementTrackerDebug, "cache_state %d\n", info.cache_state
+    );
   }
   DPRINTF(RubyDataMovementTrackerDebug, "Observed writeback\n");
 }

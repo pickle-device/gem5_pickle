@@ -620,6 +620,7 @@ machine(MachineType:Memory, "Memory controller interface") :
     enqueue(datOutPort, CHIDataMsg, data_latency) {
       out_msg.addr := tbe.addr;
       out_msg.originalResponder := machineID;
+      out_msg.originalResponderCacheState := 0;
       out_msg.originalResponderValid := true;
       out_msg.txnId := tbe.txnId;
       if (tbe.useDataSepResp) {
