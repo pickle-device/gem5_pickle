@@ -106,6 +106,25 @@ class StateDeclAST(DeclAST):
         )
         self.symtab.newSymbol(func)
 
+        if t.c_ident == "Cache_State":
+            # Add the implicit null state accessor
+            func_id = f"get_{t.c_ident}_null"
+
+            pairs = {"external": "yes"}
+            func = Func(
+                self.symtab,
+                func_id + "_" + t.ident,
+                func_id,
+                self.location,
+                self.symtab.find(t.c_ident, Type),
+                [t],
+                [],
+                "",
+                pairs,
+            )
+            self.symtab.newSymbol(func)
+            print(f"Adding {func_id} to {t.c_ident}")
+
         # Add the State_to_permission method
         func_id = f"{t.c_ident}_to_permission"
 

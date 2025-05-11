@@ -700,7 +700,7 @@ machine(MachineType:Cache, "Cache coherency protocol") :
     NetDest dir_sharers,          desc="Upstream controllers that have the line (includes owner)";
     MachineID dir_owner,          desc="Owner ID";
     MachineID previousBlockOwner, desc="Previous block owner";
-    int previousBlockOwnerCacheState, desc="Previous block owner's cache state";
+    int previousBlockOwnerCacheState, default="get_Cache_State_null()", desc="Previous block owner's cache state";
     bool previousBlockOwnerValid, desc="", default="false";
     bool dir_ownerExists,         desc="Owner ID is valid";
     bool dir_ownerIsExcl,         desc="Owner is UD or UC; SD otherwise";

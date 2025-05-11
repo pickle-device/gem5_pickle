@@ -55,7 +55,7 @@ RubyDataMovementTrackerProxy::notifyHit(
     assert(req);
     RequestPtr req_copy(new Request(*req));
     ppHit->notify(SimpleCacheAccessProbeArg(
-        req_copy, *this, machine_id, true, 0, 0
+        req_copy, *this, machine_id, true, 0, cache_state
     ));
 }
 
@@ -68,7 +68,7 @@ RubyDataMovementTrackerProxy::notifyAccess(
     assert(req);
     RequestPtr req_copy(new Request(*req));
     ppAccess->notify(SimpleCacheAccessProbeArg(
-        req_copy, *this, machine_id, true, 0, 0
+        req_copy, *this, machine_id, true, 0, cache_state
     ));
 }
 

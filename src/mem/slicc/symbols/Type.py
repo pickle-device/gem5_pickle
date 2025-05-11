@@ -245,6 +245,8 @@ class Type(Symbol):
 
 #include "mem/ruby/slicc_interface/RubySlicc_Util.hh"
 
+#include "mem/ruby/protocol/CHI/Cache_State.hh"
+
 """
         )
 
@@ -750,6 +752,15 @@ ${{self.c_ident}} &operator++(${{self.c_ident}} &e);
 """
         )
 
+        # HACK: Add a null state accessor for the Cache_State type
+        if self.c_ident == "Cache_State":
+            code(
+                """
+// Get the null state for the Cache_State type
+${{self.c_ident}} get_${{self.c_ident}}_null();
+                """
+            )
+
         # MachineType hack used to set the base component id for each Machine
         if self.isMachineType:
             code(
@@ -1012,6 +1023,17 @@ int ${{self.c_ident}}_to_int(const ${{self.c_ident}}& obj)
 
 """
         )
+
+        # HACK: Add a null state accessor for the Cache_State type
+        if self.c_ident == "Cache_State":
+            code(
+                """
+${{self.c_ident}} get_${{self.c_ident}}_null()
+{
+    return ${{self.c_ident}}::${{self.c_ident}}_null;
+}
+                """
+            )
 
         # MachineType hack used to set the base level and number of
         # components for each Machine

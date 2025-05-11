@@ -716,7 +716,10 @@ machine(MachineType:Memory, "Memory controller interface") :
   }
 
   action(Profile_Mem, desc="") {
-    dmvProxy.notifyHit(tbe.reqPtr, machineID, tbe.addr, 0);
+    int cache_state_int := 0;
+    dmvProxy.notifyHit(
+      tbe.reqPtr, machineID, tbe.addr, cache_state_int
+    );
   }
 
   ////////////////////////////////////////////////////////////////////////////
