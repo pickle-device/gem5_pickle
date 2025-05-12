@@ -88,6 +88,7 @@ class WorkItem
         bool isDoneWithCurrLevel() const;
         bool isDone() const;
         uint64_t getLevel() const;
+        Tick getWorkItemReceiveTime() const;
 }; // class WorkItem
 
 }; // namespace gem5

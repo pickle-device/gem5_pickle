@@ -116,7 +116,8 @@ PicklePrefetcher::setOwner(PickleDevice* pickle_device)
 void
 PicklePrefetcher::processPrefetcherOutQueue()
 {
-    // TODO: a better scheduling policy?)
+    // TODO: a better scheduling policy?
+    // TODO: add a global pf queue here
     for (auto tracker_array: prefetcher_work_trackers) {
         for (auto tracker: tracker_array) {
             while (tracker->hasOutstandingPrefetch()) {

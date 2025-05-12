@@ -165,7 +165,9 @@ PrefetcherWorkTracker::populateCurrLevelPrefetches(
 )
 {
     for (auto addr: work->getCurrLevelExpectedPrefetches()) {
-        outstanding_prefetches.push(addr);
+        outstanding_prefetches.emplace(
+            addr, work->getWorkItemReceiveTime()
+        );
         if (
             pf_vaddr_to_work_items_map.find(addr) \
                 == pf_vaddr_to_work_items_map.end()
@@ -188,7 +190,7 @@ PrefetcherWorkTracker::hasOutstandingPrefetch() const
     return !(outstanding_prefetches.empty());
 }
 
-Addr
+PrefetchRequest
 PrefetcherWorkTracker::peekNextPrefetch() const
 {
     return outstanding_prefetches.front();

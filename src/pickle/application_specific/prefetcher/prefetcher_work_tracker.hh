@@ -40,6 +40,7 @@
 
 #include "mem/packet.hh"
 #include "pickle/application_specific/pickle_job.hh"
+#include "pickle/application_specific/prefetcher/prefetch_request.hh"
 #include "pickle/application_specific/prefetcher/work_item.hh"
 
 namespace gem5
@@ -67,7 +68,7 @@ class PrefetcherWorkTracker
         // This is a map from work address to its prefetch complete time
         // This is used when the prefetch task is done before the core uses it
         std::unordered_map<Addr, Tick> pf_complete_time;
-        std::queue<Addr> outstanding_prefetches;
+        std::priority_queue<PrefetchRequest> outstanding_prefetches;
         uint64_t software_hint_distance;
         uint64_t hardware_prefetch_distance;
         uint64_t current_core_work_item;
@@ -83,7 +84,7 @@ class PrefetcherWorkTracker
         void processIncomingPrefetch(const Addr pf_vaddr);
         void populateCurrLevelPrefetches(std::shared_ptr<WorkItem> work);
         bool hasOutstandingPrefetch() const;
-        Addr peekNextPrefetch() const;
+        PrefetchRequest peekNextPrefetch() const;
         void popPrefetch();
         void profileWork(std::shared_ptr<WorkItem> work);
         void notifyCoreCurrentWork(const Addr work_id);
