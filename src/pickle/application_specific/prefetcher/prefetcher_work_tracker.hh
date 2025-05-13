@@ -68,7 +68,9 @@ class PrefetcherWorkTracker
         // This is a map from work address to its prefetch complete time
         // This is used when the prefetch task is done before the core uses it
         std::unordered_map<Addr, Tick> pf_complete_time;
-        std::priority_queue<PrefetchRequest> outstanding_prefetches;
+        std::priority_queue<
+            PrefetchRequest, std::vector<PrefetchRequest>, PrefetchRequestOrder
+        > outstanding_prefetches;
         uint64_t software_hint_distance;
         uint64_t hardware_prefetch_distance;
         uint64_t current_core_work_item;

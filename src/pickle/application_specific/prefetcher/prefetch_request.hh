@@ -40,15 +40,22 @@ namespace gem5
 class PrefetchRequest
 {
     private:
-        Addr pf_paddr;
+        Addr pf_vaddr;
         Tick pf_req_time;
     public:
         PrefetchRequest();
-        PrefetchRequest(const Addr pf_paddr, const Tick pf_req_time);
-        Addr getPrefetchPAddr() const;
+        PrefetchRequest(const Addr pf_vaddr, const Tick pf_req_time);
+        Addr getPrefetchVAddr() const;
         Tick getPrefetchReqTime() const;
-        bool operator==(const PrefetchRequest& other) const;
-        bool operator<(const PrefetchRequest& other) const;
+};
+
+
+struct PrefetchRequestOrder
+{
+    bool operator()(PrefetchRequest const& a, PrefetchRequest const& b) const
+    {
+        return a.getPrefetchReqTime() > b.getPrefetchReqTime();
+    }
 };
 
 }; // namespace gem5

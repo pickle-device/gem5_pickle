@@ -35,19 +35,19 @@ namespace gem5
 {
 
 PrefetchRequest::PrefetchRequest()
-    : pf_paddr(-1ULL), pf_req_time(-1ULL)
+    : pf_vaddr(-1ULL), pf_req_time(-1ULL)
 {
 }
 
-PrefetchRequest::PrefetchRequest(const Addr pf_paddr, const Tick pf_req_time)
-    : pf_paddr(pf_paddr), pf_req_time(pf_req_time)
+PrefetchRequest::PrefetchRequest(const Addr pf_vaddr, const Tick pf_req_time)
+    : pf_vaddr(pf_vaddr), pf_req_time(pf_req_time)
 {
 }
 
 Addr
-PrefetchRequest::getPrefetchPAddr() const
+PrefetchRequest::getPrefetchVAddr() const
 {
-    return pf_paddr;
+    return pf_vaddr;
 }
 
 Tick
@@ -56,16 +56,18 @@ PrefetchRequest::getPrefetchReqTime() const
     return pf_req_time;
 }
 
-bool
-PrefetchRequest::operator==(const PrefetchRequest& other) const
-{
-    return pf_paddr == other.pf_paddr;
-}
-
-bool
-PrefetchRequest::operator<(const PrefetchRequest& other) const
-{
-    return pf_req_time < other.pf_req_time;
-}
+//bool
+//PrefetchRequest::operator==(const PrefetchRequest& other) const
+//{
+//    return pf_vaddr == other.pf_vaddr;
+//}
+//
+//bool
+//PrefetchRequest::operator<(const PrefetchRequest& other) const
+//{
+//    // HACK: we want to sort the queue in ascending order
+//    // so we need to reverse the comparison
+//    return pf_req_time >= other.pf_req_time;
+//}
 
 }; // namespace gem5

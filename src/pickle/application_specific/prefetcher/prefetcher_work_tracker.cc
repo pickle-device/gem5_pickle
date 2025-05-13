@@ -193,7 +193,7 @@ PrefetcherWorkTracker::hasOutstandingPrefetch() const
 PrefetchRequest
 PrefetcherWorkTracker::peekNextPrefetch() const
 {
-    return outstanding_prefetches.front();
+    return outstanding_prefetches.top();
 }
 
 void

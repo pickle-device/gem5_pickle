@@ -60,6 +60,10 @@ PicklePrefetcher::PicklePrefetcher(
         [this]{processPrefetcherOutQueue();},
         name() + ".operate_prefetcher_out_queue_event"
     ),
+    processGlobalOutstandingPrefetchQueueEvent(
+        [this]{processGlobalOutstandingPrefetchQueue();},
+        name() + ".operate_global_outstanding_prefetch_queue_event"
+    ),
     ticks_per_cycle(1000),
     num_cores(params.num_cores),
     prefetcher_initialized(false),
@@ -116,41 +120,20 @@ PicklePrefetcher::setOwner(PickleDevice* pickle_device)
 void
 PicklePrefetcher::processPrefetcherOutQueue()
 {
-    // TODO: a better scheduling policy?
-    // TODO: add a global pf queue here
+    // TODO: refactor this to prefetcher scheduling class
     for (auto tracker_array: prefetcher_work_trackers) {
         for (auto tracker: tracker_array) {
             while (tracker->hasOutstandingPrefetch()) {
-                Addr prefetchVAddr = tracker->peekNextPrefetch();
-                if (packet_status.find(prefetchVAddr) != packet_status.end()) {
-                    DPRINTF(
-                        PickleDevicePrefetcherDebug,
-                        "PREFETCH OUT COALESCED ---> vaddr 0x%llx already in "
-                        "queue\n",
-                        prefetchVAddr
-                    );
-                    tracker->popPrefetch();
-                    continue;
-                }
-                bool status = \
-                    owner->request_manager->enqueueLoadRequest(prefetchVAddr);
-                if (status) {
-                    DPRINTF(
-                        PickleDevicePrefetcherDebug,
-                        "PREFETCH OUT ---> vaddr 0x%llx\n",
-                        prefetchVAddr
-                    );
-                    packet_status[prefetchVAddr] = PacketStatus::SENT;
-                    tracker->popPrefetch();
-                } else {
-                    DPRINTF(
-                        PickleDevicePrefetcherDebug, "Warn: outqueue is full\n"
-                    );
-                    scheduleDueToNewOutstandingPrefetchRequests();
-                    break;
-                }
+                PrefetchRequest prefetch_request = tracker->peekNextPrefetch();
+                global_outstanding_prefetch_queue.emplace(
+                    std::move(prefetch_request)
+                );
+                tracker->popPrefetch();
             }
         }
+    }
+    if (!(global_outstanding_prefetch_queue.empty())) {
+        scheduleDueToOutstandingRequestsInGlobalPrefetchQueue();
     }
 }
 
@@ -177,6 +160,45 @@ PicklePrefetcher::processPrefetcherInQueue()
 
     // we don't need to reschedule in queue event because all arrived packets
     // are processed
+}
+
+void
+PicklePrefetcher::processGlobalOutstandingPrefetchQueue()
+{
+    while (!global_outstanding_prefetch_queue.empty()) {
+        PrefetchRequest prefetch_request = \
+            global_outstanding_prefetch_queue.top();
+        Addr prefetchVAddr = prefetch_request.getPrefetchVAddr();
+        if (packet_status.find(prefetchVAddr) != packet_status.end()) {
+            DPRINTF(
+                PickleDevicePrefetcherDebug,
+                "PREFETCH OUT COALESCED ---> vaddr 0x%llx already in "
+                "queue\n",
+                prefetchVAddr
+            );
+            global_outstanding_prefetch_queue.pop();
+            continue;
+        }
+        bool status = \
+            owner->request_manager->enqueueLoadRequest(prefetchVAddr);
+        if (status) {
+            DPRINTF(
+                PickleDevicePrefetcherDebug,
+                "PREFETCH OUT ---> vaddr 0x%llx, priority: %lld\n",
+                prefetchVAddr, prefetch_request.getPrefetchReqTime()
+            );
+            packet_status[prefetchVAddr] = PacketStatus::SENT;
+            global_outstanding_prefetch_queue.pop();
+        } else {
+            DPRINTF(
+                PickleDevicePrefetcherDebug, "Warn: outqueue is full\n"
+            );
+            break;
+        }
+    }
+    if (!(global_outstanding_prefetch_queue.empty())) {
+        scheduleDueToOutstandingRequestsInGlobalPrefetchQueue();
+    }
 }
 
 uint64_t
@@ -282,6 +304,17 @@ PicklePrefetcher::scheduleDueToNewOutstandingPrefetchRequests()
     if (!processOutQueueEvent.scheduled()) {
         schedule(
             processOutQueueEvent, curTick() + ticks_per_cycle
+        );
+    }
+}
+
+void
+PicklePrefetcher::scheduleDueToOutstandingRequestsInGlobalPrefetchQueue()
+{
+    if (!processGlobalOutstandingPrefetchQueueEvent.scheduled()) {
+        schedule(
+            processGlobalOutstandingPrefetchQueueEvent,
+            curTick() + ticks_per_cycle
         );
     }
 }

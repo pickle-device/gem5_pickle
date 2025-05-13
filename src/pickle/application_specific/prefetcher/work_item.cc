@@ -94,6 +94,12 @@ WorkItem::profileCoreUseTime()
 //}
 
 Tick
+WorkItem::getWorkItemReceiveTime() const
+{
+    return work_received_time;
+}
+
+Tick
 WorkItem::getPrefetchLvTime(const uint64_t lv) const
 {
     if (lv == 0) {

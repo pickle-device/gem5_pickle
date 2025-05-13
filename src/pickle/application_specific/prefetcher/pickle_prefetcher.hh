@@ -42,6 +42,7 @@
 #include "params/PicklePrefetcher.hh"
 #include "pickle/application_specific/pickle_job.hh"
 #include "pickle/application_specific/prefetcher/prefetch_generators/all_prefetch_generators.hh"
+#include "pickle/application_specific/prefetcher/prefetch_request.hh"
 #include "pickle/application_specific/prefetcher/prefetcher_work_tracker.hh"
 #include "pickle/application_specific/prefetcher/work_item.hh"
 #include "sim/clocked_object.hh"
@@ -68,6 +69,7 @@ class PicklePrefetcher: public ClockedObject
         PARAMS(PicklePrefetcher);
         EventFunctionWrapper processInQueueEvent;
         EventFunctionWrapper processOutQueueEvent;
+        EventFunctionWrapper processGlobalOutstandingPrefetchQueueEvent;
         uint64_t ticks_per_cycle;
         uint64_t num_cores;
     private:
@@ -77,11 +79,13 @@ class PicklePrefetcher: public ClockedObject
         // there is a work tracker for each prefetch kernel for each core
         std::vector<std::vector<std::shared_ptr<PrefetcherWorkTracker>>> \
             prefetcher_work_trackers;
+        std::priority_queue<
+            PrefetchRequest, std::vector<PrefetchRequest>, PrefetchRequestOrder
+        > global_outstanding_prefetch_queue;
         bool prefetcher_initialized;
-        // check and send prefetch requests for every cycle
         void processPrefetcherOutQueue();
-        // check and receive prefetch requests for every cycle
         void processPrefetcherInQueue();
+        void processGlobalOutstandingPrefetchQueue();
     public:
         PickleDevice* owner;
     public:
@@ -106,6 +110,7 @@ class PicklePrefetcher: public ClockedObject
         );
         void scheduleDueToIncomingPrefetch();
         void scheduleDueToNewOutstandingPrefetchRequests();
+        void scheduleDueToOutstandingRequestsInGlobalPrefetchQueue();
         PacketPtr zeroCycleLoadWithVAddr(const Addr& vaddr, bool& success);
         PacketPtr zeroCycleLoadWithPAddr(const Addr& paddr, bool& success);
     public: // profile functions
