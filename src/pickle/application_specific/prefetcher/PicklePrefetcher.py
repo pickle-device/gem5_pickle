@@ -47,6 +47,10 @@ class PicklePrefetcher(ClockedObject):
         0,
         "Prefetch distance offset from software hint",
     )
+    concurrent_work_item_capacity = Param.Int(
+        0,
+        "Number of wokk items that can be prefetched concurrently",
+    )
     num_cores = Param.Int(
         8,
         "Number of cores connected to the cache that this prefetcher is "

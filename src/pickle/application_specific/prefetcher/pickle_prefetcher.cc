@@ -47,10 +47,13 @@ PicklePrefetcher::PicklePrefetcher(
   : ClockedObject(params),
     software_hint_prefetch_distance(params.software_hint_prefetch_distance),
     prefetch_distance_offset_from_software_hint(
-      params.prefetch_distance_offset_from_software_hint
+        params.prefetch_distance_offset_from_software_hint
+    ),
+    concurrent_work_item_capacity(
+        params.concurrent_work_item_capacity
     ),
     expected_number_of_prefetch_generators(
-      params.expected_number_of_prefetch_generators
+        params.expected_number_of_prefetch_generators
     ),
     processInQueueEvent(
         [this]{processPrefetcherInQueue();},
@@ -76,6 +79,12 @@ PicklePrefetcher::PicklePrefetcher(
             prefetch_distance_offset_from_software_hint,
         "Prefetch distance offset from software hint must not be greater "
         "than the prefetch distance\n"
+    );
+
+    panic_if(
+        concurrent_work_item_capacity < 1,
+        "The prefetcher must be able to handle at least 1 work item at a time"
+        "\n"
     );
 
     for (
