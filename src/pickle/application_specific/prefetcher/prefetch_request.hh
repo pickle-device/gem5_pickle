@@ -42,11 +42,15 @@ class PrefetchRequest
     private:
         Addr pf_vaddr;
         Tick pf_req_time;
+        uint64_t pf_id;
     public:
         PrefetchRequest();
-        PrefetchRequest(const Addr pf_vaddr, const Tick pf_req_time);
+        PrefetchRequest(
+            const Addr pf_vaddr, const Tick pf_req_time, const uint64_t pf_id
+        );
         Addr getPrefetchVAddr() const;
         Tick getPrefetchReqTime() const;
+        uint64_t getPrefetchId() const;
 };
 
 
