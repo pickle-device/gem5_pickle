@@ -73,6 +73,7 @@ PicklePrefetcher::PicklePrefetcher(
     ),
     ticks_per_cycle(1000),
     num_cores(params.num_cores),
+    num_received_jobs(0),
     prefetcher_initialized(false),
     owner(nullptr),
     workCount(0),
@@ -90,6 +91,12 @@ PicklePrefetcher::PicklePrefetcher(
         "The prefetcher must be able to handle at least 1 work item at a time"
         "\n"
     );
+
+    prefetcher_work_tracker_collective =
+        std::shared_ptr<PrefetcherWorkTrackerCollective>(
+            new PrefetcherWorkTrackerCollective(concurrent_work_item_capacity)
+        );
+    prefetcher_work_tracker_collective->setOwner(this);
 
     for (
         int job_id = 0; job_id < expected_number_of_prefetch_generators;
@@ -293,13 +300,11 @@ PicklePrefetcher::switchOff()
 void
 PicklePrefetcher::configure(std::shared_ptr<PickleJobDescriptor> job)
 {
-    prefetcher_work_trackers.push_back(
-        std::vector<std::shared_ptr<PrefetcherWorkTracker>>()
-    );
-    const uint64_t job_id = prefetcher_work_trackers.size() - 1;
-    prefetcher_work_trackers.back().reserve(num_cores);
+    num_received_jobs++;
+    const uint64_t job_id = num_received_jobs - 1;
     for (int core_id = 0; core_id < num_cores; core_id++) {
-        prefetcher_work_trackers.back().push_back(
+        prefetcher_work_tracker_collective->addPrefetcherWorkTracker(
+            job_id, core_id,
             std::shared_ptr<PrefetcherWorkTracker>(
                 new PrefetcherWorkTracker(this, job_id, core_id, job)
             )
@@ -328,7 +333,9 @@ PicklePrefetcher::enqueueWork(
     }
     // For BFS: workData = curr_ptr + sw_prefetch_distance * 4 of the workQueue
     // For PR: workData = node_id + sw_prefetch_distance
-    prefetcher_work_trackers[prefetchKernelId][cpuId]->addWorkItem(workData);
+    prefetcher_work_tracker_collective->getPrefetcherWorkTracker(
+        prefetchKernelId, cpuId
+    )->addWorkItem(workData);
     scheduleDueToNewOutstandingPrefetchRequests();
     DPRINTF(
         PickleDevicePrefetcherDebug,

@@ -33,6 +33,7 @@
 #define __PREFETCHER_WORK_TRACKER_HH__
 
 #include <array>
+#include <list>
 #include <memory>
 #include <queue>
 #include <unordered_map>
@@ -84,20 +85,42 @@ class PrefetcherWorkTracker
         std::shared_ptr<WorkItem> peekNextWorkItem() const;
         void popWorkItem();
         void profileWork(std::shared_ptr<WorkItem> work);
-        //void notifyCoreCurrentWork(const Addr work_id);
+        void notifyCoreCurrentWork(const Addr work_id);
         friend class PrefetchGenerator;
 };  // class PrefetcherWorkTracker
 
 class PrefetcherWorkTrackerCollective
 {
     private:
+        // The maximum number of active work items
+        const uint64_t max_active_work_items;
+        // The prefetcher that owns this work tracker
+        PicklePrefetcher* owner;
+    private:
         // job_id, core_id -> prefetcher_work_tracker
         std::unordered_map<
             std::pair<uint64_t, uint64_t>,
             std::shared_ptr<PrefetcherWorkTracker>
         > trackers;
+        // Active work items
+        std::list<std::shared_ptr<WorkItem>> active_work_items;
+        // Prefetches addr -> work_items map, used when a prefetch comes back
+        std::unordered_map<
+            Addr,
+            std::vector<std::shared_ptr<WorkItem>>
+        > pf_vaddr_to_work_items_map;
+        // Tracking prefetch completion time
+        std::unordered_map<Addr, Tick> pf_complete_time;
+        //std::unordered_map<Addr, std::shared_ptr<WorkItem>> \
+        //    work_id_to_work_items_map;
+        // The prefetches that have not been sent out yet
+        std::priority_queue<
+            PrefetchRequest, std::vector<PrefetchRequest>, PrefetchRequestOrder
+        > outstanding_prefetch_queue;
     public:
         PrefetcherWorkTrackerCollective();
+        PrefetcherWorkTrackerCollective(const uint64_t max_active_work_items);
+        void setOwner(PicklePrefetcher* owner);
         void addPrefetcherWorkTracker(
             const uint64_t job_id, const uint64_t core_id,
             std::shared_ptr<PrefetcherWorkTracker> tracker
@@ -106,7 +129,14 @@ class PrefetcherWorkTrackerCollective
             const uint64_t job_id, const uint64_t core_id
         );
         std::shared_ptr<WorkItem> getAndPopNextWorkItem();
-}
+        void receivePrefetch(const uint64_t vaddr);
+        bool hasOutstandingPrefetch() const;
+        PrefetchRequest peekNextPrefetch() const;
+        void popPrefetch();
+        void processIncomingPrefetch(const Addr pf_vaddr);
+        void populateCurrLevelPrefetches(std::shared_ptr<WorkItem> work);
+        void replaceActiveWorkItemsUponCompletion();
+}; // class PrefetcherWorkTrackerCollective
 
 };  // namespace gem5
 

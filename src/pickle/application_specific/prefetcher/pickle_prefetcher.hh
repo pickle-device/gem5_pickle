@@ -82,13 +82,8 @@ class PicklePrefetcher: public ClockedObject
         // there is a work tracker for each prefetch kernel for each core
         std::shared_ptr<PrefetcherWorkTrackerCollective> \
             prefetcher_work_tracker_collective;
-        std::priority_queue<
-            PrefetchRequest, std::vector<PrefetchRequest>, PrefetchRequestOrder
-        > global_outstanding_prefetch_queue;
-        std::list<std::shared_ptr<WorkItem>> work_items;
-        std::unordered_map<Addr, std::shared_ptr<WorkItem>> \
-            pf_vaddr_to_work_items_map;
         bool prefetcher_initialized;
+        uint64_t num_received_jobs;
         void processPrefetcherOutQueue();
         void processPrefetcherInQueue();
         void processGlobalOutstandingPrefetchQueue();

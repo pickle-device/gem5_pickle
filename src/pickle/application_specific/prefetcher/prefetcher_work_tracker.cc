@@ -124,156 +124,75 @@ PrefetcherWorkTracker::popWorkItem()
     pending_work_items.pop();
 }
 
-//void
-//PrefetcherWorkTracker::processIncomingPrefetch(const Addr pf_vaddr)
-//{
-//    std::vector<std::shared_ptr<WorkItem>>& work_items_induced_pf_vaddr = \
-//        pf_vaddr_to_work_items_map[pf_vaddr];
-//    std::vector<std::shared_ptr<WorkItem>> work_items_have_more_requests;
-//    for (auto &work: work_items_induced_pf_vaddr) {
-//        work->removeExpectedPrefetch(pf_vaddr);
-//        DPRINTF(
-//            PickleDevicePrefetcherWorkTrackerDebug,
-//            "WorkItem 0x%llx receives pf 0x%llx\n",
-//            work->getWorkId(), pf_vaddr
-//        );
-//        if (work->isDoneWithCurrLevel()) {
-//            work->moveToNextLevel();
-//            DPRINTF(
-//                PickleDevicePrefetcherWorkTrackerDebug,
-//                "WorkItem 0x%llx moves to level %lld\n",
-//                work->getWorkId(), work->getLevel()
-//            );
-//            if (work->isDone()) {
-//                // profile the work
-//                profileWork(work);
-//                // if the core has not worked on this work item, we keep
-//                // the Tick when the work item has finished
-//                if (!(work->hasCoreWorkedOnThisWork())) {
-//                    pf_complete_time[work->getWorkId()] = \
-//                        work->getPrefetchCompleteTime();
-//                    assert(work->getPrefetchCompleteTime() != 0);
-//                }
-//                // remove the work
-//                work_id_to_work_items_map.erase(work->getWorkId());
-//                continue;
-//            }
-//            work_items_have_more_requests.push_back(work);
-//        }
-//    }
-//    pf_vaddr_to_work_items_map[pf_vaddr].clear();
-//    for (auto work: work_items_have_more_requests) {
-//        populateCurrLevelPrefetches(work);
-//    }
-//    if (work_items_have_more_requests.size() > 0) {
-//        DPRINTF(
-//            PickleDevicePrefetcherWorkTrackerDebug,
-//            "Scheduled out queue\n"
-//        );
-//        owner->scheduleDueToNewOutstandingPrefetchRequests();
-//    }
-//}
-
-//void
-//PrefetcherWorkTracker::populateCurrLevelPrefetches(
-//    std::shared_ptr<WorkItem> work
-//)
-//{
-//    for (auto addr: work->getCurrLevelExpectedPrefetches()) {
-//        outstanding_prefetches.emplace(
-//            addr, work->getWorkItemReceiveTime(), work->getWorkId()
-//        );
-//        if (
-//            pf_vaddr_to_work_items_map.find(addr) \
-//                == pf_vaddr_to_work_items_map.end()
-//        ) {
-//            pf_vaddr_to_work_items_map[addr] = \
-//                std::vector<std::shared_ptr<WorkItem>>();
-//        }
-//        pf_vaddr_to_work_items_map[addr].push_back(work);
-//        DPRINTF(
-//            PickleDevicePrefetcherWorkTrackerDebug,
-//            "Adding pf_vaddr 0x%llx from WorkItem = 0x%llx\n",
-//            addr, work->getWorkId()
-//        );
-//    }
-//}
-
-//bool
-//PrefetcherWorkTracker::hasOutstandingPrefetch() const
-//{
-//    return !(outstanding_prefetches.empty());
-//}
-
-//PrefetchRequest
-//PrefetcherWorkTracker::peekNextPrefetch() const
-//{
-//    return outstanding_prefetches.top();
-//}
-
-//void
-//PrefetcherWorkTracker::popPrefetch()
-//{
-//    outstanding_prefetches.pop();
-//}
-
 void
 PrefetcherWorkTracker::profileWork(std::shared_ptr<WorkItem> work)
 {
     owner->profileWork(work, job_id, core_id);
 }
 
-//void
-//PrefetcherWorkTracker::notifyCoreCurrentWork(const Addr work_id)
-//{
-//    If the prefetch for this work is complete (timely prefetch), we have the
-//    prefetch complete time in pf_complete_time. It's possible that the core
-//    has already worked on this work item but never sent a prefetch request.
-//    If the prefetch for this work is not done (late prefetch), we profile
-//    the core access time. Note that, it's possible that this work has never
-//    been requested by the core.
-//    auto it = pf_complete_time.find(work_id);
-//    DPRINTF(
-//        PickleDevicePrefetcherWorkTrackerDebug,
-//        "notifyCoreCurrentWork: core_id: %lld, work_id 0x%llx\n",
-//        core_id, work_id
-//    );
-//    if (it != pf_complete_time.end()) {
-//        const Tick complete_time = it->second;
-//        owner->profileTimelyPrefetch(
-//            complete_time, job_id, core_id
-//        );
-//        pf_complete_time.erase(it);
-//        DPRINTF(
-//            PickleDevicePrefetcherWorkTrackerDebug,
-//            "notifyCoreCurrentWork: Found pf_complete_time = %lld\n",
-//            complete_time
-//        );
-//    } else {
-//        if (
-//            work_id_to_work_items_map.find(work_id) != \
-//                work_id_to_work_items_map.end()
-//        ) {
-//            auto work_item = \
-//                work_id_to_work_items_map[work_id];
-//            work_item->notifyCoreIsWorkingOnThisWork();
-//            DPRINTF(
-//                PickleDevicePrefetcherWorkTrackerDebug,
-//                "notifyCoreCurrentWork: Notified work_item\n"
-//            );
-//        }
-//        else
-//        {
-//            DPRINTF(
-//                PickleDevicePrefetcherWorkTrackerDebug,
-//                "notifyCoreCurrentWork: No work item found\n"
-//            );
-//        }
-//    }
-//}
+void
+PrefetcherWorkTracker::notifyCoreCurrentWork(const Addr work_id)
+{
+    // If the prefetch for this work is complete (timely prefetch), we have the
+    // prefetch complete time in pf_complete_time. It's possible that the core
+    // has already worked on this work item but never sent a prefetch request.
+    // If the prefetch for this work is not done (late prefetch), we profile
+    // the core access time. Note that, it's possible that this work has never
+    // been requested by the core.
+    auto it = pf_complete_time.find(work_id);
+    DPRINTF(
+        PickleDevicePrefetcherWorkTrackerDebug,
+        "notifyCoreCurrentWork: core_id: %lld, work_id 0x%llx\n",
+        core_id, work_id
+    );
+    if (it != pf_complete_time.end()) {
+        const Tick complete_time = it->second;
+        owner->profileTimelyPrefetch(
+            complete_time, job_id, core_id
+        );
+        pf_complete_time.erase(it);
+        DPRINTF(
+            PickleDevicePrefetcherWorkTrackerDebug,
+            "notifyCoreCurrentWork: Found pf_complete_time = %lld\n",
+            complete_time
+        );
+    } else {
+        if (
+            work_id_to_work_items_map.find(work_id) != \
+                work_id_to_work_items_map.end()
+        ) {
+            auto work_item = \
+                work_id_to_work_items_map[work_id];
+            work_item->notifyCoreIsWorkingOnThisWork();
+            DPRINTF(
+                PickleDevicePrefetcherWorkTrackerDebug,
+                "notifyCoreCurrentWork: Notified work_item\n"
+            );
+        }
+        else
+        {
+            DPRINTF(
+                PickleDevicePrefetcherWorkTrackerDebug,
+                "notifyCoreCurrentWork: No work item found\n"
+            );
+        }
+    }
+}
 
 PrefetcherWorkTrackerCollective::PrefetcherWorkTrackerCollective()
 {
+}
+
+PrefetcherWorkTrackerCollective::PrefetcherWorkTrackerCollective(
+    const uint64_t _max_active_work_items
+) : max_active_work_items(_max_active_work_items)
+{
+}
+
+void
+PrefetcherWorkTrackerCollective::setOwner(PickleDevice* owner)
+{
+    this->owner = owner;
 }
 
 void
@@ -316,6 +235,137 @@ PrefetcherWorkTrackerCollective::getAndPopNextWorkItem()
     std::shared_ptr<WorkItem> work_item = min_time_tracker->peekNextWorkItem();
     min_time_tracker->popWorkItem();
     return work_item;
+}
+
+void
+PrefetcherWorkTrackerCollective::receivePrefetch(const uint64_t vaddr)
+{
+    for (auto work_item: active_work_items) {
+        work_item->processIncomingPrefetch(vaddr);
+    }
+    // TODO: schedule the prefetcher out queue
+}
+
+
+
+bool
+PrefetcherWorkTrackerCollective::hasOutstandingPrefetch() const
+{
+    return !(outstanding_prefetch_queue.empty());
+}
+
+PrefetchRequest
+PrefetcherWorkTrackerCollective::peekNextPrefetch() const
+{
+    return outstanding_prefetch_queue.top();
+}
+
+void
+PrefetcherWorkTrackerCollective::popPrefetch()
+{
+    outstanding_prefetch_queue.pop();
+}
+
+void
+PrefetcherWorkTrackerCollective::processIncomingPrefetch(const Addr pf_vaddr)
+{
+    std::vector<std::shared_ptr<WorkItem>>& work_items_induced_pf_vaddr = \
+        pf_vaddr_to_work_items_map[pf_vaddr];
+    std::vector<std::shared_ptr<WorkItem>> work_items_have_more_requests;
+    for (auto &work: work_items_induced_pf_vaddr) {
+        work->removeExpectedPrefetch(pf_vaddr);
+        DPRINTF(
+            PickleDevicePrefetcherWorkTrackerDebug,
+            "WorkItem 0x%llx receives pf 0x%llx\n",
+            work->getWorkId(), pf_vaddr
+        );
+        if (work->isDoneWithCurrLevel()) {
+            work->moveToNextLevel();
+            DPRINTF(
+                PickleDevicePrefetcherWorkTrackerDebug,
+                "WorkItem 0x%llx moves to level %lld\n",
+                work->getWorkId(), work->getLevel()
+            );
+            if (work->isDone()) {
+                // profile the work
+                profileWork(work);
+                // if the core has not worked on this work item, we keep
+                // the Tick when the work item has finished
+                if (!(work->hasCoreWorkedOnThisWork())) {
+                    pf_complete_time[work->getWorkId()] = \
+                        work->getPrefetchCompleteTime();
+                    assert(work->getPrefetchCompleteTime() != 0);
+                }
+                // remove the work
+                work_id_to_work_items_map.erase(work->getWorkId());
+                continue;
+            }
+            work_items_have_more_requests.push_back(work);
+        }
+    }
+    pf_vaddr_to_work_items_map[pf_vaddr].clear();
+    for (auto work: work_items_have_more_requests) {
+        populateCurrLevelPrefetches(work);
+    }
+    if (work_items_have_more_requests.size() > 0) {
+        DPRINTF(
+            PickleDevicePrefetcherWorkTrackerDebug,
+            "Scheduled out queue\n"
+        );
+        owner->scheduleDueToNewOutstandingPrefetchRequests();
+    }
+}
+
+void
+PrefetcherWorkTrackerCollective::populateCurrLevelPrefetches(
+    std::shared_ptr<WorkItem> work
+)
+{
+    for (auto addr: work->getCurrLevelExpectedPrefetches()) {
+        outstanding_prefetch_queue.emplace(
+            addr, work->getWorkItemReceiveTime(), work->getWorkId()
+        );
+        if (
+            pf_vaddr_to_work_items_map.find(addr) \
+                == pf_vaddr_to_work_items_map.end()
+        ) {
+            pf_vaddr_to_work_items_map[addr] = \
+                std::vector<std::shared_ptr<WorkItem>>();
+            pf_vaddr_to_work_items_map[addr].reserve(2);
+        }
+        pf_vaddr_to_work_items_map[addr].push_back(work);
+        DPRINTF(
+            PickleDevicePrefetcherWorkTrackerDebug,
+            "Adding pf_vaddr 0x%llx from WorkItem = 0x%llx\n",
+            addr, work->getWorkId()
+        );
+    }
+}
+
+void
+PrefetcherWorkTrackerCollective::replaceActiveWorkItemsUponCompletion()
+{
+    active_work_items.remove_if(
+        [&](std::shared_ptr<WorkItem> item){
+            if (item->isDone()) {
+                DPRINTF(
+                    PickleDevicePrefetcherWorkTrackerDebug,
+                    "replaceActiveWorkItemsUpOnCompletion: remove work_id "
+                    "0x%llx\n",
+                    item->getWorkId()
+                );
+            }
+            return item->isDone();
+        }
+    );
+    while (active_work_items.size() < max_active_work_items) {
+        std::shared_ptr<WorkItem> work_item = getAndPopNextWorkItem();
+        if (work_item == nullptr) {
+            break;
+        }
+        active_work_items.push_back(work_item);
+        populateCurrLevelPrefetches(work_item);
+    }
 }
 
 }; // namespace gem5
