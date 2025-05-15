@@ -32,6 +32,7 @@
 #ifndef __PICKLE_PREFETCHER_HH__
 #define __PICKLE_PREFETCHER_HH__
 
+#include <list>
 #include <queue>
 #include <string>
 #include <unordered_map>
@@ -71,6 +72,7 @@ class PicklePrefetcher: public ClockedObject
         EventFunctionWrapper processInQueueEvent;
         EventFunctionWrapper processOutQueueEvent;
         EventFunctionWrapper processGlobalOutstandingPrefetchQueueEvent;
+        EventFunctionWrapper replaceWorkItemsEvent;
         uint64_t ticks_per_cycle;
         uint64_t num_cores;
     private:
@@ -78,15 +80,22 @@ class PicklePrefetcher: public ClockedObject
         std::unordered_map<Addr, PacketStatus> packet_status;
         std::unordered_set<Addr> received_packets_to_be_processed;
         // there is a work tracker for each prefetch kernel for each core
-        std::vector<std::vector<std::shared_ptr<PrefetcherWorkTracker>>> \
-            prefetcher_work_trackers;
+        std::shared_ptr<PrefetcherWorkTrackerCollective> \
+            prefetcher_work_tracker_collective;
         std::priority_queue<
             PrefetchRequest, std::vector<PrefetchRequest>, PrefetchRequestOrder
         > global_outstanding_prefetch_queue;
+        std::list<std::shared_ptr<WorkItem>> work_items;
+        std::unordered_map<Addr, std::shared_ptr<WorkItem>> \
+            pf_vaddr_to_work_items_map;
         bool prefetcher_initialized;
         void processPrefetcherOutQueue();
         void processPrefetcherInQueue();
         void processGlobalOutstandingPrefetchQueue();
+        void replaceWorkItems();
+        void populatePrefetchesFromWorkItem(
+            std::shared_ptr<WorkItem> work_item
+        );
     public:
         PickleDevice* owner;
     public:
@@ -112,6 +121,7 @@ class PicklePrefetcher: public ClockedObject
         void scheduleDueToIncomingPrefetch();
         void scheduleDueToNewOutstandingPrefetchRequests();
         void scheduleDueToOutstandingRequestsInGlobalPrefetchQueue();
+        void scheduleWorkItemReplacement();
         PacketPtr zeroCycleLoadWithVAddr(const Addr& vaddr, bool& success);
         PacketPtr zeroCycleLoadWithPAddr(const Addr& paddr, bool& success);
     public: // profile functions

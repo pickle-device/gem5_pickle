@@ -35,6 +35,7 @@
 #include <array>
 #include <memory>
 #include <queue>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -62,18 +63,14 @@ class PrefetcherWorkTracker
         // This is a map from work address to its WorkItem
         std::unordered_map<Addr, std::shared_ptr<WorkItem>> \
             work_id_to_work_items_map;
-        // This is a map from prefetch addresses induced by multiple WorkItem
-        std::unordered_map<Addr, std::vector<std::shared_ptr<WorkItem>>> \
-            pf_vaddr_to_work_items_map;
         // This is a map from work address to its prefetch complete time
         // This is used when the prefetch task is done before the core uses it
-        std::unordered_map<Addr, Tick> pf_complete_time;
+        std::unordered_map<Addr, Tick> work_item_complete_time;
         std::priority_queue<
-            PrefetchRequest, std::vector<PrefetchRequest>, PrefetchRequestOrder
-        > outstanding_prefetches;
+            WorkItem, std::vector<WorkItem>, WorkItemOrder
+        > pending_work_items;
         uint64_t software_hint_distance;
         uint64_t hardware_prefetch_distance;
-        uint64_t current_core_work_item;
         std::shared_ptr<PrefetchGenerator> prefetch_generator;
     public:
         PrefetcherWorkTracker();
@@ -83,15 +80,33 @@ class PrefetcherWorkTracker
             std::shared_ptr<PickleJobDescriptor> job_descriptor
         );
         void addWorkItem(Addr vaddr);
-        void processIncomingPrefetch(const Addr pf_vaddr);
-        void populateCurrLevelPrefetches(std::shared_ptr<WorkItem> work);
-        bool hasOutstandingPrefetch() const;
-        PrefetchRequest peekNextPrefetch() const;
-        void popPrefetch();
+        bool hasPendingWorkItem() const;
+        std::shared_ptr<WorkItem> peekNextWorkItem() const;
+        void popWorkItem();
         void profileWork(std::shared_ptr<WorkItem> work);
-        void notifyCoreCurrentWork(const Addr work_id);
+        //void notifyCoreCurrentWork(const Addr work_id);
         friend class PrefetchGenerator;
 };  // class PrefetcherWorkTracker
+
+class PrefetcherWorkTrackerCollective
+{
+    private:
+        // job_id, core_id -> prefetcher_work_tracker
+        std::unordered_map<
+            std::pair<uint64_t, uint64_t>,
+            std::shared_ptr<PrefetcherWorkTracker>
+        > trackers;
+    public:
+        PrefetcherWorkTrackerCollective();
+        void addPrefetcherWorkTracker(
+            const uint64_t job_id, const uint64_t core_id,
+            std::shared_ptr<PrefetcherWorkTracker> tracker
+        );
+        std::shared_ptr<PrefetcherWorkTracker> getPrefetcherWorkTracker(
+            const uint64_t job_id, const uint64_t core_id
+        );
+        std::shared_ptr<WorkItem> getAndPopNextWorkItem();
+}
 
 };  // namespace gem5
 

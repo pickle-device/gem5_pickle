@@ -91,6 +91,14 @@ class WorkItem
         Tick getWorkItemReceiveTime() const;
 }; // class WorkItem
 
+struct WorkItemOrder
+{
+    bool operator()(WorkItem const& a, WorkItem const& b) const
+    {
+        return a.getWorkItemReceiveTime() > b.getWorkItemReceiveTime();
+    }
+};
+
 }; // namespace gem5
 
 #endif // __PREFETCHER_WORK_ITEM_HH__

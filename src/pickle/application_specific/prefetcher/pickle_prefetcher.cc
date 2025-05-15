@@ -67,6 +67,10 @@ PicklePrefetcher::PicklePrefetcher(
         [this]{processGlobalOutstandingPrefetchQueue();},
         name() + ".operate_global_outstanding_prefetch_queue_event"
     ),
+    replaceWorkItemsEvent(
+        [this]{replaceWorkItem();},
+        name() + ".replace_work_items_event"
+    ),
     ticks_per_cycle(1000),
     num_cores(params.num_cores),
     prefetcher_initialized(false),
@@ -210,6 +214,60 @@ PicklePrefetcher::processGlobalOutstandingPrefetchQueue()
     }
 }
 
+void
+PicklePrefetcher::replaceWorkItem()
+{
+    work_items.remove_if(
+        [&](std::shared_ptr<WorkItem> item){
+            if (item->isDone()) {
+                DPRINTF(
+                    PickleDevicePrefetcherWorkTrackerDebug,
+                    "replaceWorkItem: remove work_id 0x%llx\n",
+                    item->getWorkId()
+                );
+            }
+            return item->isDone();
+        }
+    );
+    while (work_items.size() < concurrent_work_item_capacity) {
+        std::shared_ptr<WorkItem> work_item = \
+            prefetcher_work_tracker_collective->getAndPopNextWorkItem();
+        if (work_item == nullptr) {
+            break;
+        }
+        work_items.push_back(work_item);
+        populatePrefetchesFromWorkItem(work_item);
+    }
+    // When prefetches are populated, the prefetcher will schedule the
+    // prefetch sending event.
+}
+
+void
+PicklePrefetcher::populatePrefetchesFromWorkItem(
+    std::shared_ptr<WorkItem> work_item
+))
+{
+    for (auto addr: work_item->getCurrLevelExpectedPrefetches()) {
+        global_outstanding_prefetch_queue.emplace(
+            addr, work_item->getWorkItemReceiveTime(), work_item->getWorkId()
+        );
+        if (pf_vaddr_to_work_items_map.find(addr) == \
+            pf_vaddr_to_work_items_map.end()) {
+            pf_vaddr_to_work_items_map[addr] = \
+                std::vector<std::shared_ptr<WorkItem>>();
+        }
+        pf_vaddr_to_work_items_map[addr].push_back(work_item);
+        DPRINTF(
+            PickleDevicePrefetcherDebug,
+            "Adding pf_vaddr 0x%llx from WorkItem = 0x%llx\n",
+            addr, work_item->getWorkId()
+        );
+    }
+    if (!(global_outstanding_prefetch_queue.empty())) {
+        scheduleDueToOutstandingRequestsInGlobalPrefetchQueue();
+    }
+}
+
 uint64_t
 PicklePrefetcher::getSoftwareHintPrefetchDistance() const
 {
@@ -324,6 +382,16 @@ PicklePrefetcher::scheduleDueToOutstandingRequestsInGlobalPrefetchQueue()
         schedule(
             processGlobalOutstandingPrefetchQueueEvent,
             curTick() + ticks_per_cycle
+        );
+    }
+}
+
+void
+PicklePrefetcher::scheduleWorkItemReplacement()
+{
+    if (!replaceWorkItemsEvent.scheduled()) {
+        schedule(
+            replaceWorkItemsEvent, curTick() + ticks_per_cycle
         );
     }
 }
