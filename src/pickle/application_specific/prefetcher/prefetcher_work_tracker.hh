@@ -68,7 +68,9 @@ class PrefetcherWorkTracker
         // This is used when the prefetch task is done before the core uses it
         std::unordered_map<Addr, Tick> work_item_complete_time;
         std::priority_queue<
-            WorkItem, std::vector<WorkItem>, WorkItemOrder
+            std::shared_ptr<WorkItem>,
+            std::vector<std::shared_ptr<WorkItem>>,
+            WorkItemPointerOrder
         > pending_work_items;
         uint64_t software_hint_distance;
         uint64_t hardware_prefetch_distance;
@@ -130,9 +132,9 @@ class PrefetcherWorkTrackerCollective
         );
         std::shared_ptr<WorkItem> getAndPopNextWorkItem();
         void receivePrefetch(const uint64_t vaddr);
-        bool hasOutstandingPrefetch() const;
-        PrefetchRequest peekNextPrefetch() const;
-        void popPrefetch();
+        bool hasOutstandingPrefetchRequest() const;
+        PrefetchRequest peekNextPrefetchRequest() const;
+        void popPrefetchRequest();
         void processIncomingPrefetch(const Addr pf_vaddr);
         void populateCurrLevelPrefetches(std::shared_ptr<WorkItem> work);
         void replaceActiveWorkItemsUponCompletion();

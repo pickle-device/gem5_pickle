@@ -91,6 +91,16 @@ class WorkItem
         Tick getWorkItemReceiveTime() const;
 }; // class WorkItem
 
+struct WorkItemPointerOrder
+{
+    bool operator()(
+        std::shared_ptr<WorkItem> const& a, std::shared_ptr<WorkItem> const& b
+    ) const
+    {
+        return a->getWorkItemReceiveTime() > b->getWorkItemReceiveTime();
+    }
+};
+
 struct WorkItemOrder
 {
     bool operator()(WorkItem const& a, WorkItem const& b) const

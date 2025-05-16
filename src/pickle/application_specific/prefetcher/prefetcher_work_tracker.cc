@@ -35,6 +35,7 @@
 #include "debug/PickleDevicePrefetcherWorkTrackerDebug.hh"
 #include "debug/PickleDevicePrefetcherWorkTrackerStatsDebug.hh"
 #include "pickle/device/pickle_device.hh"
+#include "pickle/device/pickle_prefetcher.hh"
 
 namespace gem5
 {
@@ -190,7 +191,7 @@ PrefetcherWorkTrackerCollective::PrefetcherWorkTrackerCollective(
 }
 
 void
-PrefetcherWorkTrackerCollective::setOwner(PickleDevice* owner)
+PrefetcherWorkTrackerCollective::setOwner(PicklePrefetcher* owner)
 {
     this->owner = owner;
 }
@@ -249,19 +250,19 @@ PrefetcherWorkTrackerCollective::receivePrefetch(const uint64_t vaddr)
 
 
 bool
-PrefetcherWorkTrackerCollective::hasOutstandingPrefetch() const
+PrefetcherWorkTrackerCollective::hasOutstandingPrefetchRequest() const
 {
     return !(outstanding_prefetch_queue.empty());
 }
 
 PrefetchRequest
-PrefetcherWorkTrackerCollective::peekNextPrefetch() const
+PrefetcherWorkTrackerCollective::peekNextPrefetchRequest() const
 {
     return outstanding_prefetch_queue.top();
 }
 
 void
-PrefetcherWorkTrackerCollective::popPrefetch()
+PrefetcherWorkTrackerCollective::popPrefetchRequest()
 {
     outstanding_prefetch_queue.pop();
 }

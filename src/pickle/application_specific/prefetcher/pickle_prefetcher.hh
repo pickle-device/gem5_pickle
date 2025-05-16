@@ -70,8 +70,7 @@ class PicklePrefetcher: public ClockedObject
         uint64_t expected_number_of_prefetch_generators;
         PARAMS(PicklePrefetcher);
         EventFunctionWrapper processInQueueEvent;
-        EventFunctionWrapper processOutQueueEvent;
-        EventFunctionWrapper processGlobalOutstandingPrefetchQueueEvent;
+        EventFunctionWrapper processOutgoingPrefetchRequestQueueEvent;
         EventFunctionWrapper replaceWorkItemsEvent;
         uint64_t ticks_per_cycle;
         uint64_t num_cores;
@@ -84,13 +83,8 @@ class PicklePrefetcher: public ClockedObject
             prefetcher_work_tracker_collective;
         bool prefetcher_initialized;
         uint64_t num_received_jobs;
-        void processPrefetcherOutQueue();
         void processPrefetcherInQueue();
-        void processGlobalOutstandingPrefetchQueue();
-        void replaceWorkItems();
-        void populatePrefetchesFromWorkItem(
-            std::shared_ptr<WorkItem> work_item
-        );
+        void processOutgoingPrefetchRequestQueue();
     public:
         PickleDevice* owner;
     public:
@@ -114,8 +108,7 @@ class PicklePrefetcher: public ClockedObject
             const uint64_t vaddr, std::unique_ptr<uint8_t[]> p
         );
         void scheduleDueToIncomingPrefetch();
-        void scheduleDueToNewOutstandingPrefetchRequests();
-        void scheduleDueToOutstandingRequestsInGlobalPrefetchQueue();
+        void scheduleDueToOutstandingPrefetchRequests();
         void scheduleWorkItemReplacement();
         PacketPtr zeroCycleLoadWithVAddr(const Addr& vaddr, bool& success);
         PacketPtr zeroCycleLoadWithPAddr(const Addr& paddr, bool& success);

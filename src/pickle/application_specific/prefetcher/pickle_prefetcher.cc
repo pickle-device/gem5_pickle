@@ -59,13 +59,9 @@ PicklePrefetcher::PicklePrefetcher(
         [this]{processPrefetcherInQueue();},
         name() + ".operate_prefetcher_in_queue_event"
     ),
-    processOutQueueEvent(
-        [this]{processPrefetcherOutQueue();},
-        name() + ".operate_prefetcher_out_queue_event"
-    ),
-    processGlobalOutstandingPrefetchQueueEvent(
-        [this]{processGlobalOutstandingPrefetchQueue();},
-        name() + ".operate_global_outstanding_prefetch_queue_event"
+    processOutgoingPrefetchRequestQueueEvent(
+        [this]{processOutgoingPrefetchRequestQueue();},
+        name() + ".process_outstanding_prefetch_requests_event"
     ),
     replaceWorkItemsEvent(
         [this]{replaceWorkItem();},
@@ -138,26 +134,6 @@ PicklePrefetcher::setOwner(PickleDevice* pickle_device)
 }
 
 void
-PicklePrefetcher::processPrefetcherOutQueue()
-{
-    // TODO: refactor this to prefetcher scheduling class
-    for (auto tracker_array: prefetcher_work_trackers) {
-        for (auto tracker: tracker_array) {
-            while (tracker->hasOutstandingPrefetch()) {
-                PrefetchRequest prefetch_request = tracker->peekNextPrefetch();
-                global_outstanding_prefetch_queue.emplace(
-                    std::move(prefetch_request)
-                );
-                tracker->popPrefetch();
-            }
-        }
-    }
-    if (!(global_outstanding_prefetch_queue.empty())) {
-        scheduleDueToOutstandingRequestsInGlobalPrefetchQueue();
-    }
-}
-
-void
 PicklePrefetcher::processPrefetcherInQueue()
 {
     for (auto vaddr: received_packets_to_be_processed) {
@@ -166,28 +142,22 @@ PicklePrefetcher::processPrefetcherInQueue()
             "PREFETCH IN <--- vaddr 0x%llx\n", vaddr
         );
         assert(packet_status[vaddr] == PacketStatus::ARRIVED);
-        for (auto tracker_array: prefetcher_work_trackers) {
-            for (auto tracker: tracker_array) {
-                tracker->processIncomingPrefetch(vaddr);
-            }
-        }
+        prefetcher_work_tracker_collective->processIncomingPrefetch(vaddr);
     }
     for (auto vaddr: received_packets_to_be_processed) {
         packet_data.erase(vaddr);
         packet_status.erase(vaddr);
     }
     received_packets_to_be_processed.clear();
-
-    // we don't need to reschedule in queue event because all arrived packets
-    // are processed
 }
 
 void
-PicklePrefetcher::processGlobalOutstandingPrefetchQueue()
+PicklePrefetcher::processOutgoingPrefetchRequestQueue()
 {
-    while (!global_outstanding_prefetch_queue.empty()) {
+    while (prefetcher_work_tracker_collective->hasOutstandingPrefetchRequest())
+    {
         PrefetchRequest prefetch_request = \
-            global_outstanding_prefetch_queue.top();
+            prefetcher_work_tracker_collective->peekNextPrefetchRequest();
         Addr prefetchVAddr = prefetch_request.getPrefetchVAddr();
         if (packet_status.find(prefetchVAddr) != packet_status.end()) {
             DPRINTF(
@@ -196,7 +166,7 @@ PicklePrefetcher::processGlobalOutstandingPrefetchQueue()
                 "queue\n",
                 prefetchVAddr
             );
-            global_outstanding_prefetch_queue.pop();
+            prefetcher_work_tracker_collective->popPrefetchRequest();
             continue;
         }
         bool status = \
@@ -208,7 +178,7 @@ PicklePrefetcher::processGlobalOutstandingPrefetchQueue()
                 prefetchVAddr, prefetch_request.getPrefetchReqTime()
             );
             packet_status[prefetchVAddr] = PacketStatus::SENT;
-            global_outstanding_prefetch_queue.pop();
+            prefetcher_work_tracker_collective->popPrefetchRequest();
         } else {
             DPRINTF(
                 PickleDevicePrefetcherDebug, "Warn: outqueue is full\n"
@@ -216,62 +186,8 @@ PicklePrefetcher::processGlobalOutstandingPrefetchQueue()
             break;
         }
     }
-    if (!(global_outstanding_prefetch_queue.empty())) {
-        scheduleDueToOutstandingRequestsInGlobalPrefetchQueue();
-    }
-}
-
-void
-PicklePrefetcher::replaceWorkItem()
-{
-    work_items.remove_if(
-        [&](std::shared_ptr<WorkItem> item){
-            if (item->isDone()) {
-                DPRINTF(
-                    PickleDevicePrefetcherWorkTrackerDebug,
-                    "replaceWorkItem: remove work_id 0x%llx\n",
-                    item->getWorkId()
-                );
-            }
-            return item->isDone();
-        }
-    );
-    while (work_items.size() < concurrent_work_item_capacity) {
-        std::shared_ptr<WorkItem> work_item = \
-            prefetcher_work_tracker_collective->getAndPopNextWorkItem();
-        if (work_item == nullptr) {
-            break;
-        }
-        work_items.push_back(work_item);
-        populatePrefetchesFromWorkItem(work_item);
-    }
-    // When prefetches are populated, the prefetcher will schedule the
-    // prefetch sending event.
-}
-
-void
-PicklePrefetcher::populatePrefetchesFromWorkItem(
-    std::shared_ptr<WorkItem> work_item
-))
-{
-    for (auto addr: work_item->getCurrLevelExpectedPrefetches()) {
-        global_outstanding_prefetch_queue.emplace(
-            addr, work_item->getWorkItemReceiveTime(), work_item->getWorkId()
-        );
-        if (pf_vaddr_to_work_items_map.find(addr) == \
-            pf_vaddr_to_work_items_map.end()) {
-            pf_vaddr_to_work_items_map[addr] = \
-                std::vector<std::shared_ptr<WorkItem>>();
-        }
-        pf_vaddr_to_work_items_map[addr].push_back(work_item);
-        DPRINTF(
-            PickleDevicePrefetcherDebug,
-            "Adding pf_vaddr 0x%llx from WorkItem = 0x%llx\n",
-            addr, work_item->getWorkId()
-        );
-    }
-    if (!(global_outstanding_prefetch_queue.empty())) {
-        scheduleDueToOutstandingRequestsInGlobalPrefetchQueue();
+    if (prefetcher_work_tracker_collective->hasOutstandingPrefetchRequest()) {
+        scheduleDueToOutstandingPrefetchRequests();
     }
 }
 
@@ -336,7 +252,7 @@ PicklePrefetcher::enqueueWork(
     prefetcher_work_tracker_collective->getPrefetcherWorkTracker(
         prefetchKernelId, cpuId
     )->addWorkItem(workData);
-    scheduleDueToNewOutstandingPrefetchRequests();
+    scheduleDueToOutstandingPrefetchRequests();
     DPRINTF(
         PickleDevicePrefetcherDebug,
         "NEW WORK: data = 0x%llx\n", workData
@@ -373,21 +289,11 @@ PicklePrefetcher::scheduleDueToIncomingPrefetch()
 }
 
 void
-PicklePrefetcher::scheduleDueToNewOutstandingPrefetchRequests()
+PicklePrefetcher::scheduleDueToOutstandingPrefetchRequests()
 {
-    if (!processOutQueueEvent.scheduled()) {
+    if (!processOutgoingPrefetchRequestQueueEvent.scheduled()) {
         schedule(
-            processOutQueueEvent, curTick() + ticks_per_cycle
-        );
-    }
-}
-
-void
-PicklePrefetcher::scheduleDueToOutstandingRequestsInGlobalPrefetchQueue()
-{
-    if (!processGlobalOutstandingPrefetchQueueEvent.scheduled()) {
-        schedule(
-            processGlobalOutstandingPrefetchQueueEvent,
+            processOutgoingPrefetchRequestQueueEvent,
             curTick() + ticks_per_cycle
         );
     }
