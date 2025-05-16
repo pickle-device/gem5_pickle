@@ -63,14 +63,10 @@ PicklePrefetcher::PicklePrefetcher(
         [this]{processOutgoingPrefetchRequestQueue();},
         name() + ".process_outstanding_prefetch_requests_event"
     ),
-    replaceWorkItemsEvent(
-        [this]{replaceWorkItem();},
-        name() + ".replace_work_items_event"
-    ),
     ticks_per_cycle(1000),
     num_cores(params.num_cores),
-    num_received_jobs(0),
     prefetcher_initialized(false),
+    num_received_jobs(0),
     owner(nullptr),
     workCount(0),
     prefetcherStats(this)
@@ -295,16 +291,6 @@ PicklePrefetcher::scheduleDueToOutstandingPrefetchRequests()
         schedule(
             processOutgoingPrefetchRequestQueueEvent,
             curTick() + ticks_per_cycle
-        );
-    }
-}
-
-void
-PicklePrefetcher::scheduleWorkItemReplacement()
-{
-    if (!replaceWorkItemsEvent.scheduled()) {
-        schedule(
-            replaceWorkItemsEvent, curTick() + ticks_per_cycle
         );
     }
 }

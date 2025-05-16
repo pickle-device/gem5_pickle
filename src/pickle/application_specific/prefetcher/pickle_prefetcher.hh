@@ -71,7 +71,6 @@ class PicklePrefetcher: public ClockedObject
         PARAMS(PicklePrefetcher);
         EventFunctionWrapper processInQueueEvent;
         EventFunctionWrapper processOutgoingPrefetchRequestQueueEvent;
-        EventFunctionWrapper replaceWorkItemsEvent;
         uint64_t ticks_per_cycle;
         uint64_t num_cores;
     private:
@@ -109,7 +108,6 @@ class PicklePrefetcher: public ClockedObject
         );
         void scheduleDueToIncomingPrefetch();
         void scheduleDueToOutstandingPrefetchRequests();
-        void scheduleWorkItemReplacement();
         PacketPtr zeroCycleLoadWithVAddr(const Addr& vaddr, bool& success);
         PacketPtr zeroCycleLoadWithPAddr(const Addr& paddr, bool& success);
     public: // profile functions

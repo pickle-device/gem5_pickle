@@ -34,8 +34,8 @@
 #include "debug/PickleDevicePrefetcherTrace.hh"
 #include "debug/PickleDevicePrefetcherWorkTrackerDebug.hh"
 #include "debug/PickleDevicePrefetcherWorkTrackerStatsDebug.hh"
+#include "pickle/application_specific/prefetcher/pickle_prefetcher.hh"
 #include "pickle/device/pickle_device.hh"
-#include "pickle/device/pickle_prefetcher.hh"
 
 namespace gem5
 {
@@ -181,12 +181,15 @@ PrefetcherWorkTracker::notifyCoreCurrentWork(const Addr work_id)
 }
 
 PrefetcherWorkTrackerCollective::PrefetcherWorkTrackerCollective()
+  : max_active_work_items(0),
+    owner(nullptr)
 {
 }
 
 PrefetcherWorkTrackerCollective::PrefetcherWorkTrackerCollective(
     const uint64_t _max_active_work_items
-) : max_active_work_items(_max_active_work_items)
+) : max_active_work_items(_max_active_work_items),
+    owner(nullptr)
 {
 }
 
@@ -210,14 +213,13 @@ PrefetcherWorkTrackerCollective::getPrefetcherWorkTracker(
     const uint64_t job_id, const uint64_t core_id
 )
 {
-    return trackers[std::make_pair(job_id, core_id)]
+    return trackers[std::make_pair(job_id, core_id)];
 }
 
 std::shared_ptr<WorkItem>
 PrefetcherWorkTrackerCollective::getAndPopNextWorkItem()
 {
     Tick min_time = -1ULL;
-    uint64_t min_time_tracker_id = -1ULL;
     std::shared_ptr<PrefetcherWorkTracker> min_time_tracker = nullptr;
     for (auto tracker: trackers) {
         std::shared_ptr<PrefetcherWorkTracker> tracker_ptr = tracker.second;
@@ -237,17 +239,6 @@ PrefetcherWorkTrackerCollective::getAndPopNextWorkItem()
     min_time_tracker->popWorkItem();
     return work_item;
 }
-
-void
-PrefetcherWorkTrackerCollective::receivePrefetch(const uint64_t vaddr)
-{
-    for (auto work_item: active_work_items) {
-        work_item->processIncomingPrefetch(vaddr);
-    }
-    // TODO: schedule the prefetcher out queue
-}
-
-
 
 bool
 PrefetcherWorkTrackerCollective::hasOutstandingPrefetchRequest() const
@@ -313,7 +304,7 @@ PrefetcherWorkTrackerCollective::processIncomingPrefetch(const Addr pf_vaddr)
             PickleDevicePrefetcherWorkTrackerDebug,
             "Scheduled out queue\n"
         );
-        owner->scheduleDueToNewOutstandingPrefetchRequests();
+        owner->scheduleDueToOutstandingPrefetchRequests();
     }
 }
 

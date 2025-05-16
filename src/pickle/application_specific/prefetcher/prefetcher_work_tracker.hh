@@ -75,6 +75,8 @@ class PrefetcherWorkTracker
         uint64_t software_hint_distance;
         uint64_t hardware_prefetch_distance;
         std::shared_ptr<PrefetchGenerator> prefetch_generator;
+        // Tracking prefetch completion time
+        std::unordered_map<Addr, Tick> pf_complete_time;
     public:
         PrefetcherWorkTracker();
         PrefetcherWorkTracker(
@@ -91,18 +93,27 @@ class PrefetcherWorkTracker
         friend class PrefetchGenerator;
 };  // class PrefetcherWorkTracker
 
+struct PairHasher
+{
+    std::uint64_t operator()(const std::pair<uint64_t, uint64_t>& p) const {
+        return std::hash<uint64_t>{}(p.first) | \
+            (std::hash<uint64_t>{}(p.second) << 16);
+    }
+};
+
 class PrefetcherWorkTrackerCollective
 {
     private:
         // The maximum number of active work items
-        const uint64_t max_active_work_items;
+        uint64_t max_active_work_items;
         // The prefetcher that owns this work tracker
         PicklePrefetcher* owner;
     private:
         // job_id, core_id -> prefetcher_work_tracker
         std::unordered_map<
             std::pair<uint64_t, uint64_t>,
-            std::shared_ptr<PrefetcherWorkTracker>
+            std::shared_ptr<PrefetcherWorkTracker>,
+            PairHasher
         > trackers;
         // Active work items
         std::list<std::shared_ptr<WorkItem>> active_work_items;
@@ -111,10 +122,6 @@ class PrefetcherWorkTrackerCollective
             Addr,
             std::vector<std::shared_ptr<WorkItem>>
         > pf_vaddr_to_work_items_map;
-        // Tracking prefetch completion time
-        std::unordered_map<Addr, Tick> pf_complete_time;
-        //std::unordered_map<Addr, std::shared_ptr<WorkItem>> \
-        //    work_id_to_work_items_map;
         // The prefetches that have not been sent out yet
         std::priority_queue<
             PrefetchRequest, std::vector<PrefetchRequest>, PrefetchRequestOrder
@@ -131,7 +138,6 @@ class PrefetcherWorkTrackerCollective
             const uint64_t job_id, const uint64_t core_id
         );
         std::shared_ptr<WorkItem> getAndPopNextWorkItem();
-        void receivePrefetch(const uint64_t vaddr);
         bool hasOutstandingPrefetchRequest() const;
         PrefetchRequest peekNextPrefetchRequest() const;
         void popPrefetchRequest();
