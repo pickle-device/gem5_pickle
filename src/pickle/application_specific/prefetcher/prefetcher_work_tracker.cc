@@ -94,6 +94,7 @@ PrefetcherWorkTracker::addWorkItem(Addr work_id)
     }
     auto workItem = prefetch_generator->generateWorkItem(work_id);
     workItem->setJobId(job_id);
+    workItem->setCoreId(core_id);
     work_id_to_work_items_map[work_id] = workItem;
     pending_work_items.push(workItem);
     if (job_descriptor->kernel_name == "bfs_kernel") {
@@ -129,6 +130,14 @@ void
 PrefetcherWorkTracker::profileWork(std::shared_ptr<WorkItem> work)
 {
     owner->profileWork(work, job_id, core_id);
+}
+
+void
+PrefetcherWorkTracker::profilePrefetchCompleteTime(
+    const Addr pf_vaddr, const Tick complete_time
+)
+{
+    pf_complete_time[pf_vaddr] = complete_time;
 }
 
 void
@@ -177,6 +186,20 @@ PrefetcherWorkTracker::notifyCoreCurrentWork(const Addr work_id)
                 "notifyCoreCurrentWork: No work item found\n"
             );
         }
+    }
+}
+
+void
+PrefetcherWorkTracker::stopTrackingWork(const Addr work_id)
+{
+    auto it = work_id_to_work_items_map.find(work_id);
+    if (it != work_id_to_work_items_map.end()) {
+        work_id_to_work_items_map.erase(it);
+    } else {
+        DPRINTF(
+            PickleDevicePrefetcherWorkTrackerDebug,
+            "stopTrackingWork: No work item found\n"
+        );
     }
 }
 
@@ -280,16 +303,24 @@ PrefetcherWorkTrackerCollective::processIncomingPrefetch(const Addr pf_vaddr)
             );
             if (work->isDone()) {
                 // profile the work
-                profileWork(work);
+                owner->profileWork(work, work->getJobId(), work->getCoreId());
                 // if the core has not worked on this work item, we keep
                 // the Tick when the work item has finished
                 if (!(work->hasCoreWorkedOnThisWork())) {
-                    pf_complete_time[work->getWorkId()] = \
-                        work->getPrefetchCompleteTime();
+                    std::shared_ptr<PrefetcherWorkTracker> curr_tracker = \
+                        getPrefetcherWorkTracker(
+                            work->getJobId(), work->getCoreId()
+                        );
+                        curr_tracker->profilePrefetchCompleteTime(
+                            pf_vaddr, work->getPrefetchCompleteTime()
+                        );
                     assert(work->getPrefetchCompleteTime() != 0);
                 }
                 // remove the work
-                work_id_to_work_items_map.erase(work->getWorkId());
+                //work_id_to_work_items_map.erase(work->getWorkId());
+                getPrefetcherWorkTracker(
+                    work->getJobId(), work->getCoreId()
+                )->stopTrackingWork(work->getWorkId());
                 continue;
             }
             work_items_have_more_requests.push_back(work);

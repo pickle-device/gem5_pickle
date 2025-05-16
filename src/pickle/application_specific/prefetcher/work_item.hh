@@ -45,6 +45,7 @@ class WorkItem
 {
     private:
         uint64_t job_id; // which prefetch generator generated this work
+        uint64_t core_id; // which core is working on this work
         Addr work_id; // used to identify work from the core
         std::array<std::unordered_set<Addr>, 4> expected_prefetches;
         uint64_t curr_level;
@@ -73,6 +74,7 @@ class WorkItem
         WorkItem();
         WorkItem(const Addr _work_id);
         void setJobId(const uint64_t _job_id);
+        void setCoreId(const uint64_t _core_id);
         //Tick getQueueTime() const;
         Tick getPrefetchLvTime(const uint64_t lv) const;
         Tick getTotalPrefetchTime() const;
@@ -80,6 +82,8 @@ class WorkItem
         void notifyCoreIsWorkingOnThisWork();
         bool hasCoreWorkedOnThisWork() const;
         Tick getPrefetchCompleteTime() const;
+        uint64_t getJobId() const;
+        uint64_t getCoreId() const;
         Addr getWorkId() const;
         void addExpectedPrefetch(Addr pf_vaddr, const uint64_t level);
         void removeExpectedPrefetch(Addr pf_vaddr);

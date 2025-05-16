@@ -84,12 +84,18 @@ class PrefetcherWorkTracker
             const uint64_t job_id, const uint64_t core_id,
             std::shared_ptr<PickleJobDescriptor> job_descriptor
         );
+        uint64_t getJobId() const { return job_id; }
+        uint64_t getCoreId() const { return core_id; }
         void addWorkItem(Addr vaddr);
         bool hasPendingWorkItem() const;
         std::shared_ptr<WorkItem> peekNextWorkItem() const;
         void popWorkItem();
         void profileWork(std::shared_ptr<WorkItem> work);
         void notifyCoreCurrentWork(const Addr work_id);
+        void profilePrefetchCompleteTime(
+            const Addr pf_vaddr, const Tick complete_time
+        );
+        void stopTrackingWork(const Addr work_id);
         friend class PrefetchGenerator;
 };  // class PrefetcherWorkTracker
 

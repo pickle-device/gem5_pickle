@@ -35,7 +35,7 @@ namespace gem5
 {
 
 WorkItem::WorkItem()
-  : job_id(-1ULL),
+  : job_id(-1ULL), core_id(-1ULL),
     curr_level(0), num_indirection_levels(0), work_received_time(0),
     work_completed_time(0), core_use_time(0)
 {
@@ -43,7 +43,7 @@ WorkItem::WorkItem()
 }
 
 WorkItem::WorkItem(const Addr _work_id)
-  : job_id(-1ULL),
+  : job_id(-1ULL), core_id(-1ULL),
     work_id(_work_id), curr_level(0), num_indirection_levels(0),
     work_received_time(0), work_completed_time(0), core_use_time(0)
 {
@@ -55,6 +55,12 @@ void
 WorkItem::setJobId(const uint64_t _job_id)
 {
     job_id = _job_id;
+}
+
+void
+WorkItem::setCoreId(const uint64_t _core_id)
+{
+    core_id = _core_id;
 }
 
 void
@@ -147,6 +153,18 @@ Addr
 WorkItem::getWorkId() const
 {
     return work_id;
+}
+
+uint64_t
+WorkItem::getJobId() const
+{
+    return job_id;
+}
+
+uint64_t
+WorkItem::getCoreId() const
+{
+    return core_id;
 }
 
 void
