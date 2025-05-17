@@ -284,9 +284,12 @@ PrefetcherWorkTrackerCollective::popPrefetchRequest()
 void
 PrefetcherWorkTrackerCollective::processIncomingPrefetch(const Addr pf_vaddr)
 {
+    // if the work is in the pf_vaddr_to_work_items_map, it should be in the
+    // active work items list
     std::vector<std::shared_ptr<WorkItem>>& work_items_induced_pf_vaddr = \
         pf_vaddr_to_work_items_map[pf_vaddr];
     std::vector<std::shared_ptr<WorkItem>> work_items_have_more_requests;
+    bool there_is_a_work_item_done = false;
     for (auto &work: work_items_induced_pf_vaddr) {
         work->removeExpectedPrefetch(pf_vaddr);
         DPRINTF(
@@ -304,6 +307,7 @@ PrefetcherWorkTrackerCollective::processIncomingPrefetch(const Addr pf_vaddr)
             if (work->isDone()) {
                 // profile the work
                 owner->profileWork(work, work->getJobId(), work->getCoreId());
+                there_is_a_work_item_done = true;
                 // if the core has not worked on this work item, we keep
                 // the Tick when the work item has finished
                 if (!(work->hasCoreWorkedOnThisWork())) {
@@ -311,13 +315,12 @@ PrefetcherWorkTrackerCollective::processIncomingPrefetch(const Addr pf_vaddr)
                         getPrefetcherWorkTracker(
                             work->getJobId(), work->getCoreId()
                         );
-                        curr_tracker->profilePrefetchCompleteTime(
-                            pf_vaddr, work->getPrefetchCompleteTime()
-                        );
+                    curr_tracker->profilePrefetchCompleteTime(
+                        pf_vaddr, work->getPrefetchCompleteTime()
+                    );
                     assert(work->getPrefetchCompleteTime() != 0);
                 }
                 // remove the work
-                //work_id_to_work_items_map.erase(work->getWorkId());
                 getPrefetcherWorkTracker(
                     work->getJobId(), work->getCoreId()
                 )->stopTrackingWork(work->getWorkId());
@@ -329,6 +332,9 @@ PrefetcherWorkTrackerCollective::processIncomingPrefetch(const Addr pf_vaddr)
     pf_vaddr_to_work_items_map[pf_vaddr].clear();
     for (auto work: work_items_have_more_requests) {
         populateCurrLevelPrefetches(work);
+    }
+    if (there_is_a_work_item_done) {
+        replaceActiveWorkItemsUponCompletion();
     }
     if (work_items_have_more_requests.size() > 0) {
         DPRINTF(
@@ -363,6 +369,7 @@ PrefetcherWorkTrackerCollective::populateCurrLevelPrefetches(
             addr, work->getWorkId()
         );
     }
+    owner->scheduleDueToOutstandingPrefetchRequests();
 }
 
 void
@@ -373,7 +380,7 @@ PrefetcherWorkTrackerCollective::replaceActiveWorkItemsUponCompletion()
             if (item->isDone()) {
                 DPRINTF(
                     PickleDevicePrefetcherWorkTrackerDebug,
-                    "replaceActiveWorkItemsUpOnCompletion: remove work_id "
+                    "replaceActiveWorkItemUponCompletion: remove work_id "
                     "0x%llx\n",
                     item->getWorkId()
                 );

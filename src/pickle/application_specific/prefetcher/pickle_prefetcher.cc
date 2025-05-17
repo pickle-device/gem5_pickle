@@ -248,7 +248,9 @@ PicklePrefetcher::enqueueWork(
     prefetcher_work_tracker_collective->getPrefetcherWorkTracker(
         prefetchKernelId, cpuId
     )->addWorkItem(workData);
-    scheduleDueToOutstandingPrefetchRequests();
+    // Check if there is an empty slot for the new work item
+    prefetcher_work_tracker_collective->replaceActiveWorkItemsUponCompletion();
+    //scheduleDueToOutstandingPrefetchRequests();
     DPRINTF(
         PickleDevicePrefetcherDebug,
         "NEW WORK: data = 0x%llx\n", workData
