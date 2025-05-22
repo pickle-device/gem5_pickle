@@ -31,6 +31,7 @@
 
 #include "pickle/application_specific/prefetcher/prefetcher_work_tracker.hh"
 
+#include "base/logging.hh"
 #include "debug/PickleDevicePrefetcherTrace.hh"
 #include "debug/PickleDevicePrefetcherWorkTrackerDebug.hh"
 #include "debug/PickleDevicePrefetcherWorkTrackerStatsDebug.hh"
@@ -45,6 +46,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker()
     core_id(-1ULL),
     is_activated(false),
     owner(nullptr),
+    collective(nullptr),
     job_descriptor(nullptr),
     software_hint_distance(0),
     hardware_prefetch_distance(0)
@@ -53,12 +55,14 @@ PrefetcherWorkTracker::PrefetcherWorkTracker()
 
 PrefetcherWorkTracker::PrefetcherWorkTracker(
     PicklePrefetcher* owner,
+    std::shared_ptr<PrefetcherWorkTrackerCollective> _collective,
     const uint64_t _job_id, const uint64_t _core_id,
     std::shared_ptr<PickleJobDescriptor> _job_descriptor
 ) : job_id(_job_id),
     core_id(_core_id),
     is_activated(true),
     owner(owner),
+    collective(_collective),
     job_descriptor(_job_descriptor)
 {
     software_hint_distance = owner->getSoftwareHintPrefetchDistance();
@@ -96,11 +100,22 @@ PrefetcherWorkTracker::addWorkItem(Addr work_id)
     workItem->setJobId(job_id);
     workItem->setCoreId(core_id);
     work_id_to_work_items_map[work_id] = workItem;
+    DPRINTF(
+        PickleDevicePrefetcherWorkTrackerDebug,
+        "addWorkItem: job_id: %lld, core_id: %lld, work_id 0x%llx\n",
+        job_id, core_id, workItem->getWorkId()
+    );
     pending_work_items.push(workItem);
     if (job_descriptor->kernel_name == "bfs_kernel") {
-        notifyCoreCurrentWork(work_id - software_hint_distance * 4);
+        collective->notifyCoreCurrentWork(
+            job_id,
+            work_id - software_hint_distance * 4
+        );
     } else if (job_descriptor->kernel_name == "pr_kernel") {
-        notifyCoreCurrentWork(work_id - software_hint_distance);
+        collective->notifyCoreCurrentWork(
+            job_id,
+            work_id - software_hint_distance
+        );
     } else {
         panic(
             "Unknown prefetch generator mode: %s\n",
@@ -133,57 +148,48 @@ PrefetcherWorkTracker::profileWork(std::shared_ptr<WorkItem> work)
 }
 
 void
-PrefetcherWorkTracker::profilePrefetchCompleteTime(
-    const Addr pf_vaddr, const Tick complete_time
-)
-{
-    pf_complete_time[pf_vaddr] = complete_time;
-}
-
-void
-PrefetcherWorkTracker::notifyCoreCurrentWork(const Addr work_id)
+PrefetcherWorkTracker::tryNotifyCoreCurrentWork(const Addr work_id)
 {
     // If the prefetch for this work is complete (timely prefetch), we have the
-    // prefetch complete time in pf_complete_time. It's possible that the core
-    // has already worked on this work item but never sent a prefetch request.
+    // prefetch complete time in pf_complete_time_map. It's possible that the
+    // core has already worked on this work item but never sent a prefetch
+    // request.
     // If the prefetch for this work is not done (late prefetch), we profile
     // the core access time. Note that, it's possible that this work has never
     // been requested by the core.
-    auto it = pf_complete_time.find(work_id);
+    auto it = collective->pf_complete_time_map[job_id].find(work_id);
     DPRINTF(
         PickleDevicePrefetcherWorkTrackerDebug,
-        "notifyCoreCurrentWork: core_id: %lld, work_id 0x%llx\n",
-        core_id, work_id
+        "tryNotifyCoreCurrentWork: core_id: %lld, job_id: %lld, "
+        "work_id 0x%llx\n",
+        core_id, job_id, work_id
     );
-    if (it != pf_complete_time.end()) {
+    if (it != collective->pf_complete_time_map[job_id].end()) {
         const Tick complete_time = it->second;
         owner->profileTimelyPrefetch(
             complete_time, job_id, core_id
         );
-        pf_complete_time.erase(it);
+        collective->pf_complete_time_map[job_id].erase(it);
         DPRINTF(
             PickleDevicePrefetcherWorkTrackerDebug,
-            "notifyCoreCurrentWork: Found pf_complete_time = %lld\n",
+            "tryNotifyCoreCurrentWork: Found pf_complete_time_map = %lld\n",
             complete_time
         );
     } else {
-        if (
-            work_id_to_work_items_map.find(work_id) != \
-                work_id_to_work_items_map.end()
-        ) {
-            auto work_item = \
-                work_id_to_work_items_map[work_id];
+        auto it = work_id_to_work_items_map.find(work_id);
+        if (it != work_id_to_work_items_map.end()) {
+            std::shared_ptr<WorkItem> work_item = it->second;
             work_item->notifyCoreIsWorkingOnThisWork();
             DPRINTF(
                 PickleDevicePrefetcherWorkTrackerDebug,
-                "notifyCoreCurrentWork: Notified work_item\n"
+                "tryNotifyCoreCurrentWork: Notified work_item\n"
             );
         }
         else
         {
             DPRINTF(
                 PickleDevicePrefetcherWorkTrackerDebug,
-                "notifyCoreCurrentWork: No work item found\n"
+                "tryNotifyCoreCurrentWork: No work item found\n"
             );
         }
     }
@@ -228,6 +234,9 @@ PrefetcherWorkTrackerCollective::addPrefetcherWorkTracker(
     std::shared_ptr<PrefetcherWorkTracker> tracker
 )
 {
+    if (pf_complete_time_map.find(job_id) == pf_complete_time_map.end()) {
+        pf_complete_time_map[job_id] = std::unordered_map<uint64_t, Tick>();
+    }
     trackers[std::make_pair(job_id, core_id)] = tracker;
 }
 
@@ -311,12 +320,15 @@ PrefetcherWorkTrackerCollective::processIncomingPrefetch(const Addr pf_vaddr)
                 // if the core has not worked on this work item, we keep
                 // the Tick when the work item has finished
                 if (!(work->hasCoreWorkedOnThisWork())) {
-                    std::shared_ptr<PrefetcherWorkTracker> curr_tracker = \
-                        getPrefetcherWorkTracker(
-                            work->getJobId(), work->getCoreId()
-                        );
-                    curr_tracker->profilePrefetchCompleteTime(
-                        pf_vaddr, work->getPrefetchCompleteTime()
+                    profilePrefetchCompleteTime(
+                        work->getJobId(), work->getWorkId(),
+                        work->getPrefetchCompleteTime()
+                    );
+                    DPRINTF(
+                        PickleDevicePrefetcherWorkTrackerDebug,
+                        "WorkItem 0x%llx (job_id %lld) has been added to "
+                        "pf_complete_time_map \n",
+                        work->getWorkId(), work->getJobId()
                     );
                     assert(work->getPrefetchCompleteTime() != 0);
                 }
@@ -380,7 +392,7 @@ PrefetcherWorkTrackerCollective::replaceActiveWorkItemsUponCompletion()
             if (item->isDone()) {
                 DPRINTF(
                     PickleDevicePrefetcherWorkTrackerDebug,
-                    "replaceActiveWorkItemUponCompletion: remove work_id "
+                    "replaceActiveWorkItemUponCompletion: removing work_id "
                     "0x%llx\n",
                     item->getWorkId()
                 );
@@ -393,8 +405,39 @@ PrefetcherWorkTrackerCollective::replaceActiveWorkItemsUponCompletion()
         if (work_item == nullptr) {
             break;
         }
+        DPRINTF(
+            PickleDevicePrefetcherWorkTrackerDebug,
+            "replaceActiveWorkItemUponCompletion: adding work_id 0x%llx\n",
+            work_item->getWorkId()
+        );
         active_work_items.push_back(work_item);
         populateCurrLevelPrefetches(work_item);
+    }
+}
+
+void
+PrefetcherWorkTrackerCollective::profilePrefetchCompleteTime(
+    const uint64_t job_id, const Addr pf_vaddr, const Tick complete_time
+)
+{
+    pf_complete_time_map[job_id][pf_vaddr] = complete_time;
+    DPRINTF(
+        PickleDevicePrefetcherWorkTrackerDebug,
+        "profilePrefetchCompleteTime: job_id: %lld, work_id 0x%llx\n",
+        job_id, pf_vaddr
+    );
+}
+
+void
+PrefetcherWorkTrackerCollective::notifyCoreCurrentWork(
+    const uint64_t job_id, const Addr work_id
+)
+{
+    for (auto tracker: trackers) {
+        std::shared_ptr<PrefetcherWorkTracker> tracker_ptr = tracker.second;
+        if (tracker_ptr->getJobId() == job_id) {
+            tracker_ptr->tryNotifyCoreCurrentWork(work_id);
+        }
     }
 }
 

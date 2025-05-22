@@ -36,7 +36,8 @@ namespace gem5
 
 WorkItem::WorkItem()
   : job_id(-1ULL), core_id(-1ULL),
-    curr_level(0), num_indirection_levels(0), work_received_time(0),
+    curr_level(0), core_worked_on_this_work(false),
+    num_indirection_levels(0), work_received_time(0),
     work_completed_time(0), core_use_time(0)
 {
     prefetch_received_time.fill(0);
@@ -44,8 +45,9 @@ WorkItem::WorkItem()
 
 WorkItem::WorkItem(const Addr _work_id)
   : job_id(-1ULL), core_id(-1ULL),
-    work_id(_work_id), curr_level(0), num_indirection_levels(0),
-    work_received_time(0), work_completed_time(0), core_use_time(0)
+    work_id(_work_id), curr_level(0), core_worked_on_this_work(false),
+    num_indirection_levels(0), work_received_time(0), work_completed_time(0),
+    core_use_time(0)
 {
   profileWorkItemReceivedTime();
   prefetch_received_time.fill(0);

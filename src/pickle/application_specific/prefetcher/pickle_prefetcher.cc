@@ -218,7 +218,10 @@ PicklePrefetcher::configure(std::shared_ptr<PickleJobDescriptor> job)
         prefetcher_work_tracker_collective->addPrefetcherWorkTracker(
             job_id, core_id,
             std::shared_ptr<PrefetcherWorkTracker>(
-                new PrefetcherWorkTracker(this, job_id, core_id, job)
+                new PrefetcherWorkTracker(
+                    this, prefetcher_work_tracker_collective,
+                    job_id, core_id, job
+                )
             )
         );
     }
@@ -401,6 +404,21 @@ PicklePrefetcher::TaskStats::TaskStats(
         latePrefetchesDistance,
         statistics::units::Tick::get(),
         "Time from core consumption to prefetch complete for late prefetches"
+    ),
+    ADD_STAT(
+        coreStartedBeforePrefetchStarted,
+        statistics::units::Tick::get(),
+        "Time from samples that the core started before the prefetch started"
+    ),
+    ADD_STAT(
+        coreStartedBeforePrefetchComplete,
+        statistics::units::Tick::get(),
+        "Time from samples that the core started before the prefetch complete"
+    ),
+    ADD_STAT(
+        prefetchCompleteBeforeCoreStarted,
+        statistics::units::Tick::get(),
+        "Time from samples that the prefetch complete before the core started"
     )
 {
     //queuedTime
@@ -425,6 +443,15 @@ PicklePrefetcher::TaskStats::TaskStats(
       .init(16)
       .flags(statistics::pdf);
     latePrefetchesDistance
+      .init(16)
+      .flags(statistics::pdf);
+    coreStartedBeforePrefetchStarted
+      .init(16)
+      .flags(statistics::pdf);
+    coreStartedBeforePrefetchComplete
+      .init(16)
+      .flags(statistics::pdf);
+    prefetchCompleteBeforeCoreStarted
       .init(16)
       .flags(statistics::pdf);
 }

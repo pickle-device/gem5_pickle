@@ -50,6 +50,7 @@ namespace gem5
 
 class PicklePrefetcher;
 class PrefetchGenerator;
+class PrefetcherWorkTrackerCollective;
 
 class PrefetcherWorkTracker
 {
@@ -59,6 +60,7 @@ class PrefetcherWorkTracker
         bool is_activated;
     public:
         PicklePrefetcher* owner;
+        std::shared_ptr<PrefetcherWorkTrackerCollective> collective;
         std::shared_ptr<PickleJobDescriptor> job_descriptor;
     private:
         // This is a map from work address to its WorkItem
@@ -75,12 +77,11 @@ class PrefetcherWorkTracker
         uint64_t software_hint_distance;
         uint64_t hardware_prefetch_distance;
         std::shared_ptr<PrefetchGenerator> prefetch_generator;
-        // Tracking prefetch completion time
-        std::unordered_map<Addr, Tick> pf_complete_time;
     public:
         PrefetcherWorkTracker();
         PrefetcherWorkTracker(
             PicklePrefetcher* owner,
+            std::shared_ptr<PrefetcherWorkTrackerCollective> collective,
             const uint64_t job_id, const uint64_t core_id,
             std::shared_ptr<PickleJobDescriptor> job_descriptor
         );
@@ -91,10 +92,7 @@ class PrefetcherWorkTracker
         std::shared_ptr<WorkItem> peekNextWorkItem() const;
         void popWorkItem();
         void profileWork(std::shared_ptr<WorkItem> work);
-        void notifyCoreCurrentWork(const Addr work_id);
-        void profilePrefetchCompleteTime(
-            const Addr pf_vaddr, const Tick complete_time
-        );
+        void tryNotifyCoreCurrentWork(const Addr work_id);
         void stopTrackingWork(const Addr work_id);
         friend class PrefetchGenerator;
 };  // class PrefetcherWorkTracker
@@ -132,6 +130,13 @@ class PrefetcherWorkTrackerCollective
         std::priority_queue<
             PrefetchRequest, std::vector<PrefetchRequest>, PrefetchRequestOrder
         > outstanding_prefetch_queue;
+    protected: // this structure should be only available to ProfileWorkTracker
+        // Tracking prefetch completion time
+        // job_id, work_id -> prefetch complete time
+        std::unordered_map<
+            uint64_t,
+            std::unordered_map<uint64_t, Tick>
+        > pf_complete_time_map;
     public:
         PrefetcherWorkTrackerCollective();
         PrefetcherWorkTrackerCollective(const uint64_t max_active_work_items);
@@ -150,6 +155,12 @@ class PrefetcherWorkTrackerCollective
         void processIncomingPrefetch(const Addr pf_vaddr);
         void populateCurrLevelPrefetches(std::shared_ptr<WorkItem> work);
         void replaceActiveWorkItemsUponCompletion();
+        void profilePrefetchCompleteTime(
+            const uint64_t job_id, const Addr pf_vaddr,
+            const Tick complete_time
+        );
+        void notifyCoreCurrentWork(const uint64_t job_id, const Addr work_id);
+        friend class PrefetcherWorkTracker;
 }; // class PrefetcherWorkTrackerCollective
 
 };  // namespace gem5

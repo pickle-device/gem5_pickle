@@ -141,6 +141,9 @@ class PicklePrefetcher: public ClockedObject
             statistics::Histogram totalPrefetchTime;
             statistics::Histogram timelyPrefetchesDistance;
             statistics::Histogram latePrefetchesDistance;
+            statistics::Histogram coreStartedBeforePrefetchStarted;
+            statistics::Histogram coreStartedBeforePrefetchComplete;
+            statistics::Histogram prefetchCompleteBeforeCoreStarted;
         };
         std::vector<std::vector<std::shared_ptr<TaskStats>>> taskStats;
         void profileWork(
