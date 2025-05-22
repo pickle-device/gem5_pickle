@@ -159,7 +159,6 @@ class PrefetcherWorkTrackerCollective
             const uint64_t job_id, const Addr pf_vaddr,
             const Tick complete_time
         );
-        void notifyCoreCurrentWork(const uint64_t job_id, const Addr work_id);
         friend class PrefetcherWorkTracker;
 }; // class PrefetcherWorkTrackerCollective
 

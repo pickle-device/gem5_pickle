@@ -107,15 +107,9 @@ PrefetcherWorkTracker::addWorkItem(Addr work_id)
     );
     pending_work_items.push(workItem);
     if (job_descriptor->kernel_name == "bfs_kernel") {
-        collective->notifyCoreCurrentWork(
-            job_id,
-            work_id - software_hint_distance * 4
-        );
+        tryNotifyCoreCurrentWork(work_id - software_hint_distance * 4);
     } else if (job_descriptor->kernel_name == "pr_kernel") {
-        collective->notifyCoreCurrentWork(
-            job_id,
-            work_id - software_hint_distance
-        );
+        tryNotifyCoreCurrentWork(work_id - software_hint_distance);
     } else {
         panic(
             "Unknown prefetch generator mode: %s\n",
@@ -426,19 +420,6 @@ PrefetcherWorkTrackerCollective::profilePrefetchCompleteTime(
         "profilePrefetchCompleteTime: job_id: %lld, work_id 0x%llx\n",
         job_id, pf_vaddr
     );
-}
-
-void
-PrefetcherWorkTrackerCollective::notifyCoreCurrentWork(
-    const uint64_t job_id, const Addr work_id
-)
-{
-    for (auto tracker: trackers) {
-        std::shared_ptr<PrefetcherWorkTracker> tracker_ptr = tracker.second;
-        if (tracker_ptr->getJobId() == job_id) {
-            tracker_ptr->tryNotifyCoreCurrentWork(work_id);
-        }
-    }
 }
 
 }; // namespace gem5
