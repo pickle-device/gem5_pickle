@@ -44,17 +44,25 @@ namespace gem5
 
 PRPrefetchGenerator::PRPrefetchGenerator(
     std::string _name,
+    const uint64_t _software_hint_distance,
     const uint64_t _prefetch_distance_offset_from_software_hint,
     PrefetcherWorkTracker* _work_tracker
 ) : PrefetchGenerator(
-        _name, _prefetch_distance_offset_from_software_hint, _work_tracker
+        _name,
+        _software_hint_distance, _prefetch_distance_offset_from_software_hint,
+        _work_tracker
     )
 {
 }
 
 std::shared_ptr<WorkItem>
-PRPrefetchGenerator::generateWorkItem(Addr node_id)
+PRPrefetchGenerator::generateWorkItem(Addr work_data)
 {
+    // work_data is the address of the node that the core is working on
+
+    const uint64_t node_id = work_data \
+        + software_hint_distance - prefetch_distance_offset_from_software_hint;
+
     std::shared_ptr<WorkItem> workItem(new WorkItem(node_id));
 
     constexpr Addr BLOCK_SHIFT = 6;
