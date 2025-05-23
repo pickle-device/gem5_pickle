@@ -87,7 +87,7 @@ class PrefetcherWorkTracker
         );
         uint64_t getJobId() const { return job_id; }
         uint64_t getCoreId() const { return core_id; }
-        void addWorkItem(Addr vaddr);
+        void addWorkItem(Addr work_data);
         bool hasPendingWorkItem() const;
         std::shared_ptr<WorkItem> peekNextWorkItem() const;
         void popWorkItem();
@@ -137,6 +137,11 @@ class PrefetcherWorkTrackerCollective
             uint64_t,
             std::unordered_map<uint64_t, Tick>
         > pf_complete_time_map;
+        // Tracker core time
+        std::unordered_map<
+            uint64_t,
+            std::unordered_map<uint64_t, Tick>
+        > core_start_time_map;
     public:
         PrefetcherWorkTrackerCollective();
         PrefetcherWorkTrackerCollective(const uint64_t max_active_work_items);
@@ -158,6 +163,13 @@ class PrefetcherWorkTrackerCollective
         void profilePrefetchCompleteTime(
             const uint64_t job_id, const Addr pf_vaddr,
             const Tick complete_time
+        );
+        Tick getCoreStartTime(const uint64_t job_id, const Addr pf_vaddr);
+        bool hasCoreWorkedOnThisWork(
+            const uint64_t job_id, const Addr pf_vaddr
+        );
+        void setCoreStartTime(
+            const uint64_t job_id, const Addr pf_vaddr, const Tick start_time
         );
         friend class PrefetcherWorkTracker;
 }; // class PrefetcherWorkTrackerCollective

@@ -73,12 +73,14 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
     if (job_descriptor->kernel_name == "bfs_kernel") {
         prefetch_generator = std::make_shared<BFSPrefetchGenerator>(
             "BFSPrefetchGenerator",
+            owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             this
         );
     } else if (job_descriptor->kernel_name == "pr_kernel") {
         prefetch_generator = std::make_shared<PRPrefetchGenerator>(
             "PRPrefetchGenerator",
+            owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             this
         );
@@ -91,31 +93,25 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
 }
 
 void
-PrefetcherWorkTracker::addWorkItem(Addr work_id)
+PrefetcherWorkTracker::addWorkItem(Addr work_data)
 {
     if (!is_activated) {
         return;
     }
-    auto workItem = prefetch_generator->generateWorkItem(work_id);
-    workItem->setJobId(job_id);
-    workItem->setCoreId(core_id);
-    work_id_to_work_items_map[work_id] = workItem;
+    // work_data is the current node that the core is working on.
+    // The prefetcher generator will need to figure out the next node to
+    // prefetch.
+    auto work_item = prefetch_generator->generateWorkItem(work_data);
+    work_item->setJobId(job_id);
+    work_item->setCoreId(core_id);
+    work_id_to_work_items_map[work_item->getWorkId()] = work_item;
     DPRINTF(
         PickleDevicePrefetcherWorkTrackerDebug,
         "addWorkItem: job_id: %lld, core_id: %lld, work_id 0x%llx\n",
-        job_id, core_id, workItem->getWorkId()
+        job_id, core_id, work_item->getWorkId()
     );
-    pending_work_items.push(workItem);
-    if (job_descriptor->kernel_name == "bfs_kernel") {
-        tryNotifyCoreCurrentWork(work_id - software_hint_distance * 4);
-    } else if (job_descriptor->kernel_name == "pr_kernel") {
-        tryNotifyCoreCurrentWork(work_id - software_hint_distance);
-    } else {
-        panic(
-            "Unknown prefetch generator mode: %s\n",
-            job_descriptor->kernel_name
-        );
-    }
+    pending_work_items.push(work_item);
+    tryNotifyCoreCurrentWork(work_data);
 }
 
 bool
@@ -170,22 +166,28 @@ PrefetcherWorkTracker::tryNotifyCoreCurrentWork(const Addr work_id)
             complete_time
         );
     } else {
-        auto it = work_id_to_work_items_map.find(work_id);
-        if (it != work_id_to_work_items_map.end()) {
-            std::shared_ptr<WorkItem> work_item = it->second;
-            work_item->notifyCoreIsWorkingOnThisWork();
-            DPRINTF(
-                PickleDevicePrefetcherWorkTrackerDebug,
-                "tryNotifyCoreCurrentWork: Notified work_item\n"
-            );
-        }
-        else
-        {
-            DPRINTF(
-                PickleDevicePrefetcherWorkTrackerDebug,
-                "tryNotifyCoreCurrentWork: No work item found\n"
-            );
-        }
+        //collective->core_start_time_map[job_id][work_id] = curTick();
+        collective->setCoreStartTime(job_id, work_id, curTick());
+        DPRINTF(
+            PickleDevicePrefetcherWorkTrackerDebug,
+            "tryNotifyCoreCurrentWork: Added to core_start_time_map\n"
+        );
+        //auto it = work_id_to_work_items_map.find(work_id);
+        //if (it != work_id_to_work_items_map.end()) {
+        //    std::shared_ptr<WorkItem> work_item = it->second;
+        //    work_item->notifyCoreIsWorkingOnThisWork();
+        //    DPRINTF(
+        //        PickleDevicePrefetcherWorkTrackerDebug,
+        //        "tryNotifyCoreCurrentWork: Notified work_item\n"
+        //    );
+        //}
+        //else
+        //{
+        //    DPRINTF(
+        //        PickleDevicePrefetcherWorkTrackerDebug,
+        //        "tryNotifyCoreCurrentWork: No work item found\n"
+        //    );
+        //}
     }
 }
 
@@ -230,6 +232,9 @@ PrefetcherWorkTrackerCollective::addPrefetcherWorkTracker(
 {
     if (pf_complete_time_map.find(job_id) == pf_complete_time_map.end()) {
         pf_complete_time_map[job_id] = std::unordered_map<uint64_t, Tick>();
+    }
+    if (core_start_time_map.find(job_id) == core_start_time_map.end()) {
+        core_start_time_map[job_id] = std::unordered_map<uint64_t, Tick>();
     }
     trackers[std::make_pair(job_id, core_id)] = tracker;
 }
@@ -313,7 +318,9 @@ PrefetcherWorkTrackerCollective::processIncomingPrefetch(const Addr pf_vaddr)
                 there_is_a_work_item_done = true;
                 // if the core has not worked on this work item, we keep
                 // the Tick when the work item has finished
-                if (!(work->hasCoreWorkedOnThisWork())) {
+                if (!hasCoreWorkedOnThisWork(
+                    work->getJobId(), work->getWorkId()
+                )) {
                     profilePrefetchCompleteTime(
                         work->getJobId(), work->getWorkId(),
                         work->getPrefetchCompleteTime()
@@ -420,6 +427,31 @@ PrefetcherWorkTrackerCollective::profilePrefetchCompleteTime(
         "profilePrefetchCompleteTime: job_id: %lld, work_id 0x%llx\n",
         job_id, pf_vaddr
     );
+}
+
+Tick
+PrefetcherWorkTrackerCollective::getCoreStartTime(
+    const uint64_t job_id, const Addr work_id
+)
+{
+    return core_start_time_map[job_id][work_id];
+}
+
+bool
+PrefetcherWorkTrackerCollective::hasCoreWorkedOnThisWork(
+    const uint64_t job_id, const Addr work_id
+)
+{
+    return core_start_time_map[job_id].find(work_id) != \
+        core_start_time_map[job_id].end();
+}
+
+void
+PrefetcherWorkTrackerCollective::setCoreStartTime(
+    const uint64_t job_id, const Addr work_id, const Tick start_time
+)
+{
+    core_start_time_map[job_id][work_id] = start_time;
 }
 
 }; // namespace gem5

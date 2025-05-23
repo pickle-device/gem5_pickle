@@ -479,15 +479,20 @@ PicklePrefetcher::profileWork(
     task_stat->prefetchLv2Time.sample(work->getPrefetchLvTime(2));
     task_stat->prefetchLv3Time.sample(work->getPrefetchLvTime(3));
     task_stat->totalPrefetchTime.sample(work->getTotalPrefetchTime());
-    if (work->hasCoreWorkedOnThisWork()) { // late prefetch
+    // late prefetch?
+    if (prefetcher_work_tracker_collective->hasCoreWorkedOnThisWork(
+        job_id, work->getWorkId()
+    )) {
+        const Tick core_use_time = prefetcher_work_tracker_collective
+                ->getCoreStartTime(job_id, work->getWorkId());
         DPRINTF(
             PickleDevicePrefetcherWorkTrackerDebug,
             "profileWork: late pf, complete time: %lld, core use: %lld\n",
-            work->getPrefetchCompleteTime(), work->getCoreUseTime()
+            work->getPrefetchCompleteTime(), core_use_time
         );
         task_stat->latePrefetchesDistance
             .sample(
-                work->getPrefetchCompleteTime() - work->getCoreUseTime()
+                work->getPrefetchCompleteTime() - core_use_time
             );
     } else { // timely prefetch
         // nothing to do here as the core has not worked on this work item

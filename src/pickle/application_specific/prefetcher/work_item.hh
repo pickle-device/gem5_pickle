@@ -62,7 +62,7 @@ class WorkItem
         // when did the prefetcher finish prefetch all four levels
         Tick work_completed_time;
         // when did the core use this work
-        Tick core_use_time;
+        //Tick core_use_time;
     private:
         void profileWorkItemReceivedTime();
         void profilePrefetchReceivedTime(const uint64_t level);
@@ -78,8 +78,8 @@ class WorkItem
         //Tick getQueueTime() const;
         Tick getPrefetchLvTime(const uint64_t lv) const;
         Tick getTotalPrefetchTime() const;
-        Tick getCoreUseTime() const;
-        void notifyCoreIsWorkingOnThisWork();
+        //Tick getCoreUseTime() const;
+        //void notifyCoreIsWorkingOnThisWork();
         bool hasCoreWorkedOnThisWork() const;
         Tick getPrefetchCompleteTime() const;
         uint64_t getJobId() const;
