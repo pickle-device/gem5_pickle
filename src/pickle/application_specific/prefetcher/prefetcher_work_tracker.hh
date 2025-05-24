@@ -161,15 +161,15 @@ class PrefetcherWorkTrackerCollective
         void populateCurrLevelPrefetches(std::shared_ptr<WorkItem> work);
         void replaceActiveWorkItemsUponCompletion();
         void profilePrefetchCompleteTime(
-            const uint64_t job_id, const Addr pf_vaddr,
+            const uint64_t job_id, const Addr work_id,
             const Tick complete_time
         );
-        Tick getCoreStartTime(const uint64_t job_id, const Addr pf_vaddr);
+        Tick getCoreStartTime(const uint64_t job_id, const Addr work_id);
         bool hasCoreWorkedOnThisWork(
-            const uint64_t job_id, const Addr pf_vaddr
+            const uint64_t job_id, const Addr work_id
         );
         void setCoreStartTime(
-            const uint64_t job_id, const Addr pf_vaddr, const Tick start_time
+            const uint64_t job_id, const Addr work_id, const Tick start_time
         );
         friend class PrefetcherWorkTracker;
 }; // class PrefetcherWorkTrackerCollective

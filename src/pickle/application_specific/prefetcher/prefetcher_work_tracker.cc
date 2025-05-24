@@ -166,28 +166,11 @@ PrefetcherWorkTracker::tryNotifyCoreCurrentWork(const Addr work_id)
             complete_time
         );
     } else {
-        //collective->core_start_time_map[job_id][work_id] = curTick();
         collective->setCoreStartTime(job_id, work_id, curTick());
         DPRINTF(
             PickleDevicePrefetcherWorkTrackerDebug,
             "tryNotifyCoreCurrentWork: Added to core_start_time_map\n"
         );
-        //auto it = work_id_to_work_items_map.find(work_id);
-        //if (it != work_id_to_work_items_map.end()) {
-        //    std::shared_ptr<WorkItem> work_item = it->second;
-        //    work_item->notifyCoreIsWorkingOnThisWork();
-        //    DPRINTF(
-        //        PickleDevicePrefetcherWorkTrackerDebug,
-        //        "tryNotifyCoreCurrentWork: Notified work_item\n"
-        //    );
-        //}
-        //else
-        //{
-        //    DPRINTF(
-        //        PickleDevicePrefetcherWorkTrackerDebug,
-        //        "tryNotifyCoreCurrentWork: No work item found\n"
-        //    );
-        //}
     }
 }
 
@@ -418,14 +401,14 @@ PrefetcherWorkTrackerCollective::replaceActiveWorkItemsUponCompletion()
 
 void
 PrefetcherWorkTrackerCollective::profilePrefetchCompleteTime(
-    const uint64_t job_id, const Addr pf_vaddr, const Tick complete_time
+    const uint64_t job_id, const Addr work_id, const Tick complete_time
 )
 {
-    pf_complete_time_map[job_id][pf_vaddr] = complete_time;
+    pf_complete_time_map[job_id][work_id] = complete_time;
     DPRINTF(
         PickleDevicePrefetcherWorkTrackerDebug,
         "profilePrefetchCompleteTime: job_id: %lld, work_id 0x%llx\n",
-        job_id, pf_vaddr
+        job_id, work_id
     );
 }
 
