@@ -151,7 +151,7 @@ class PicklePrefetcher: public ClockedObject
             const uint64_t job_id, const uint64_t core_id
         );
         void profileTimelyPrefetch(
-            const Tick pf_complete_time,
+            const Tick pf_complete_time, const Tick core_start_time,
             const uint64_t job_id, const uint64_t core_id
         );
 };

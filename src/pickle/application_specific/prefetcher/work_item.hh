@@ -55,6 +55,8 @@ class WorkItem
         // statistics
         // when did this work item was received by prefetcher
         Tick work_received_time;
+        // when did the work item was activated
+        Tick work_activation_time;
         // when did the prefetcher send the first prefetch
         Tick prefetch_sent_time;
         // when did the prefetcher receive all prefetches for a certain level
@@ -75,12 +77,16 @@ class WorkItem
         WorkItem(const Addr _work_id);
         void setJobId(const uint64_t _job_id);
         void setCoreId(const uint64_t _core_id);
+        bool isActivated() const;
+        void profileWorkActivationTime();
         //Tick getQueueTime() const;
+        Tick getWorkItemReceiveTime() const;
+        Tick getWorkActivationTime() const;
         Tick getPrefetchLvTime(const uint64_t lv) const;
         Tick getTotalPrefetchTime() const;
         //Tick getCoreUseTime() const;
         //void notifyCoreIsWorkingOnThisWork();
-        bool hasCoreWorkedOnThisWork() const;
+        //bool hasCoreWorkedOnThisWork() const;
         Tick getPrefetchCompleteTime() const;
         uint64_t getJobId() const;
         uint64_t getCoreId() const;
@@ -92,7 +98,6 @@ class WorkItem
         bool isDoneWithCurrLevel() const;
         bool isDone() const;
         uint64_t getLevel() const;
-        Tick getWorkItemReceiveTime() const;
 }; // class WorkItem
 
 struct WorkItemPointerOrder

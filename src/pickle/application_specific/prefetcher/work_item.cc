@@ -37,7 +37,7 @@ namespace gem5
 WorkItem::WorkItem()
   : job_id(-1ULL), core_id(-1ULL),
     curr_level(0),
-    num_indirection_levels(0), work_received_time(0),
+    num_indirection_levels(0), work_received_time(0), work_activation_time(0),
     work_completed_time(0)
 {
     prefetch_received_time.fill(0);
@@ -46,7 +46,8 @@ WorkItem::WorkItem()
 WorkItem::WorkItem(const Addr _work_id)
   : job_id(-1ULL), core_id(-1ULL),
     work_id(_work_id), curr_level(0),
-    num_indirection_levels(0), work_received_time(0), work_completed_time(0)
+    num_indirection_levels(0), work_received_time(0), work_activation_time(0),
+    work_completed_time(0)
 {
   profileWorkItemReceivedTime();
   prefetch_received_time.fill(0);
@@ -64,10 +65,22 @@ WorkItem::setCoreId(const uint64_t _core_id)
     core_id = _core_id;
 }
 
+bool
+WorkItem::isActivated() const
+{
+    return work_activation_time != 0;
+}
+
 void
 WorkItem::profileWorkItemReceivedTime()
 {
     work_received_time = curTick();
+}
+
+void
+WorkItem::profileWorkActivationTime()
+{
+    work_activation_time = curTick();
 }
 
 void
@@ -104,6 +117,12 @@ Tick
 WorkItem::getWorkItemReceiveTime() const
 {
     return work_received_time;
+}
+
+Tick
+WorkItem::getWorkActivationTime() const
+{
+    return work_activation_time;
 }
 
 Tick

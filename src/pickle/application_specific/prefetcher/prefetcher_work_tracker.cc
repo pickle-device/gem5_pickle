@@ -157,7 +157,7 @@ PrefetcherWorkTracker::tryNotifyCoreCurrentWork(const Addr work_id)
     if (it != collective->pf_complete_time_map[job_id].end()) {
         const Tick complete_time = it->second;
         owner->profileTimelyPrefetch(
-            complete_time, job_id, core_id
+            complete_time, curTick(), job_id, core_id
         );
         collective->pf_complete_time_map[job_id].erase(it);
         DPRINTF(
@@ -389,6 +389,7 @@ PrefetcherWorkTrackerCollective::replaceActiveWorkItemsUponCompletion()
         if (work_item == nullptr) {
             break;
         }
+        work_item->profileWorkActivationTime();
         DPRINTF(
             PickleDevicePrefetcherWorkTrackerDebug,
             "replaceActiveWorkItemUponCompletion: adding work_id 0x%llx\n",

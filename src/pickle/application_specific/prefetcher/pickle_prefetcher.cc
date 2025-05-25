@@ -393,7 +393,7 @@ PicklePrefetcher::TaskStats::TaskStats(
     ),
     ADD_STAT(
         totalPrefetchTime, statistics::units::Tick::get(),
-        "From first prefetch to final prefetch"
+        "From the first prefetch to final prefetch"
     ),
     ADD_STAT(
         timelyPrefetchesDistance,
@@ -413,7 +413,8 @@ PicklePrefetcher::TaskStats::TaskStats(
     ADD_STAT(
         coreStartedBeforePrefetchComplete,
         statistics::units::Tick::get(),
-        "Time from samples that the core started before the prefetch complete"
+        "Time from samples that the core started after the prefetch started"
+        "and before the prefetch complete"
     ),
     ADD_STAT(
         prefetchCompleteBeforeCoreStarted,
@@ -490,10 +491,18 @@ PicklePrefetcher::profileWork(
             "profileWork: late pf, complete time: %lld, core use: %lld\n",
             work->getPrefetchCompleteTime(), core_use_time
         );
-        task_stat->latePrefetchesDistance
-            .sample(
+        task_stat->latePrefetchesDistance.sample(
                 work->getPrefetchCompleteTime() - core_use_time
             );
+        if (core_use_time < work->getWorkActivationTime()) {
+            task_stat->coreStartedBeforePrefetchStarted.sample(
+                work->getWorkActivationTime() - core_use_time
+            );
+        } else if (core_use_time < work->getPrefetchCompleteTime()) {
+            task_stat->coreStartedBeforePrefetchComplete.sample(
+                work->getPrefetchCompleteTime() - core_use_time
+            );
+        }
     } else { // timely prefetch
         // nothing to do here as the core has not worked on this work item
         DPRINTF(
@@ -505,14 +514,16 @@ PicklePrefetcher::profileWork(
 
 void
 PicklePrefetcher::profileTimelyPrefetch(
-    const Tick pf_complete_time,
+    const Tick pf_complete_time, const Tick core_start_time,
     const uint64_t job_id, const uint64_t core_id
 )
 {
-    taskStats[job_id][core_id]->timelyPrefetchesDistance
-        .sample(
-            curTick() - pf_complete_time
-        );
+    taskStats[job_id][core_id]->timelyPrefetchesDistance.sample(
+        core_start_time - pf_complete_time
+    );
+    taskStats[job_id][core_id]->prefetchCompleteBeforeCoreStarted.sample(
+        core_start_time - pf_complete_time
+    );
 }
 
 }; // namespace gem5
