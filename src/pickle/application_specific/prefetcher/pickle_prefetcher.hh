@@ -68,6 +68,7 @@ class PicklePrefetcher: public ClockedObject
         int64_t prefetch_distance_offset_from_software_hint;
         uint64_t concurrent_work_item_capacity;
         uint64_t expected_number_of_prefetch_generators;
+        uint64_t prefetch_dropping_distance;
         PARAMS(PicklePrefetcher);
         EventFunctionWrapper processInQueueEvent;
         EventFunctionWrapper processOutgoingPrefetchRequestQueueEvent;

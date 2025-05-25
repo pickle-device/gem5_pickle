@@ -62,3 +62,10 @@ class PicklePrefetcher(ClockedObject):
         "How many prefetch generators will be used. Helps determining how "
         "many sets of task-related stats to allocate.",
     )
+
+    # Optimization parameters
+    prefetch_dropping_distance = Param.Int(
+        0,
+        "Distance at which prefetches are dropped. "
+        "If set to 0, prefetches are never dropped.",
+    )

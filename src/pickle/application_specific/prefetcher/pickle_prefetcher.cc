@@ -55,6 +55,9 @@ PicklePrefetcher::PicklePrefetcher(
     expected_number_of_prefetch_generators(
         params.expected_number_of_prefetch_generators
     ),
+    prefetch_dropping_distance(
+        params.prefetch_dropping_distance
+    ),
     processInQueueEvent(
         [this]{processPrefetcherInQueue();},
         name() + ".operate_prefetcher_in_queue_event"
