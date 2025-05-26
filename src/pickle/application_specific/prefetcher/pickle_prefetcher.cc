@@ -335,6 +335,10 @@ PicklePrefetcher::PrefetcherStats::PrefetcherStats(
         "Number of work sent from software"
     ),
     ADD_STAT(
+        numActivatedWork, statistics::units::Count::get(),
+        "Number of work activated by the prefetcher"
+    ),
+    ADD_STAT(
         numPrefetches, statistics::units::Count::get(),
         "Number of prefetch requests generated"
     ),

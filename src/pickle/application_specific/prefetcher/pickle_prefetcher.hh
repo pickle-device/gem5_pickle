@@ -121,6 +121,8 @@ class PicklePrefetcher: public ClockedObject
             PrefetcherStats(statistics::Group *parent);
             void regStats() override;
             statistics::Scalar numReceivedWork;
+            statistics::Scalar numActivatedWork;
+            statistics::Scalar numWorkedDroppedDueToCoreFinished;
             statistics::Scalar numPrefetches;
             statistics::Scalar numUnknownPrefetches;
             statistics::Histogram histInQueueLength;
