@@ -58,6 +58,9 @@ class PrefetcherWorkTracker
         uint64_t job_id;
         uint64_t core_id;
         bool is_activated;
+        // When we drop a prefetch request
+        bool enable_dropping_prefetches;
+        uint64_t prefetch_dropping_distance;
     public:
         PicklePrefetcher* owner;
         std::shared_ptr<PrefetcherWorkTrackerCollective> collective;
@@ -77,13 +80,16 @@ class PrefetcherWorkTracker
         uint64_t software_hint_distance;
         uint64_t hardware_prefetch_distance;
         std::shared_ptr<PrefetchGenerator> prefetch_generator;
+        Addr core_latest_work_id;
+        void updateWorkItemQueue();
     public:
         PrefetcherWorkTracker();
         PrefetcherWorkTracker(
             PicklePrefetcher* owner,
             std::shared_ptr<PrefetcherWorkTrackerCollective> collective,
             const uint64_t job_id, const uint64_t core_id,
-            std::shared_ptr<PickleJobDescriptor> job_descriptor
+            std::shared_ptr<PickleJobDescriptor> job_descriptor,
+            const uint64_t prefetch_dropping_distance
         );
         uint64_t getJobId() const { return job_id; }
         uint64_t getCoreId() const { return core_id; }
@@ -94,6 +100,8 @@ class PrefetcherWorkTracker
         void profileWork(std::shared_ptr<WorkItem> work);
         void tryNotifyCoreCurrentWork(const Addr work_id);
         void stopTrackingWork(const Addr work_id);
+        void setCoreLatestWorkId(const Addr work_id);
+        Addr getCoreLatestWorkId() const;
         friend class PrefetchGenerator;
 };  // class PrefetcherWorkTracker
 
@@ -110,6 +118,9 @@ class PrefetcherWorkTrackerCollective
     private:
         // The maximum number of active work items
         uint64_t max_active_work_items;
+        // When we drop a prefetch request
+        bool enable_dropping_prefetches;
+        uint64_t prefetch_dropping_distance;
         // The prefetcher that owns this work tracker
         PicklePrefetcher* owner;
     private:
@@ -170,6 +181,9 @@ class PrefetcherWorkTrackerCollective
         );
         void setCoreStartTime(
             const uint64_t job_id, const Addr work_id, const Tick start_time
+        );
+        void untrackCoreStartTime(
+            const uint64_t job_id, const Addr work_id
         );
         friend class PrefetcherWorkTracker;
 }; // class PrefetcherWorkTrackerCollective

@@ -45,6 +45,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker()
   : job_id(-1ULL),
     core_id(-1ULL),
     is_activated(false),
+    prefetch_dropping_distance(0),
     owner(nullptr),
     collective(nullptr),
     job_descriptor(nullptr),
@@ -57,10 +58,13 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
     PicklePrefetcher* owner,
     std::shared_ptr<PrefetcherWorkTrackerCollective> _collective,
     const uint64_t _job_id, const uint64_t _core_id,
-    std::shared_ptr<PickleJobDescriptor> _job_descriptor
+    std::shared_ptr<PickleJobDescriptor> _job_descriptor,
+    const uint64_t _prefetch_dropping_distance
 ) : job_id(_job_id),
     core_id(_core_id),
     is_activated(true),
+    enable_dropping_prefetches(_prefetch_dropping_distance > 0),
+    prefetch_dropping_distance(_prefetch_dropping_distance),
     owner(owner),
     collective(_collective),
     job_descriptor(_job_descriptor)
@@ -172,6 +176,12 @@ PrefetcherWorkTracker::tryNotifyCoreCurrentWork(const Addr work_id)
             "tryNotifyCoreCurrentWork: Added to core_start_time_map\n"
         );
     }
+    setCoreLatestWorkId(work_id);
+    DPRINTF(
+        PickleDevicePrefetcherWorkTrackerDebug,
+        "tryNotifyCoreCurrentWork: core_latest_work_id = 0x%llx\n",
+        getCoreLatestWorkId()
+    );
 }
 
 void
@@ -185,6 +195,43 @@ PrefetcherWorkTracker::stopTrackingWork(const Addr work_id)
             PickleDevicePrefetcherWorkTrackerDebug,
             "stopTrackingWork: No work item found\n"
         );
+    }
+}
+
+void
+PrefetcherWorkTracker::setCoreLatestWorkId(const Addr work_id)
+{
+    core_latest_work_id = work_id;
+}
+
+Addr
+PrefetcherWorkTracker::getCoreLatestWorkId() const
+{
+    return core_latest_work_id;
+}
+
+void
+PrefetcherWorkTracker::updateWorkItemQueue()
+{
+    // dropping prefetches that were worked on by the core
+    if (enable_dropping_prefetches) {
+        while (hasPendingWorkItem()) {
+            std::shared_ptr<WorkItem> work_item = peekNextWorkItem();
+            const uint64_t job_id = work_item->getJobId();
+            const uint64_t work_id = work_item->getWorkId();
+            if (collective->hasCoreWorkedOnThisWork(job_id, work_id)) {
+                DPRINTF(
+                    PickleDevicePrefetcherWorkTrackerDebug,
+                    "Dropping work item 0x%llx, already worked on by the "
+                    "core\n",
+                    work_id
+                );
+                popWorkItem();
+                collective->untrackCoreStartTime(job_id, work_id);
+            } else {
+                break;
+            }
+        }
     }
 }
 
@@ -233,6 +280,7 @@ PrefetcherWorkTrackerCollective::getPrefetcherWorkTracker(
 std::shared_ptr<WorkItem>
 PrefetcherWorkTrackerCollective::getAndPopNextWorkItem()
 {
+    // TODO: replace this with a replacement policy object
     Tick min_time = -1ULL;
     std::shared_ptr<PrefetcherWorkTracker> min_time_tracker = nullptr;
     for (auto tracker: trackers) {
@@ -436,6 +484,14 @@ PrefetcherWorkTrackerCollective::setCoreStartTime(
 )
 {
     core_start_time_map[job_id][work_id] = start_time;
+}
+
+void
+PrefetcherWorkTrackerCollective::untrackCoreStartTime(
+    const uint64_t job_id, const Addr work_id
+)
+{
+    core_start_time_map[job_id].erase(work_id);
 }
 
 }; // namespace gem5

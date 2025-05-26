@@ -223,7 +223,7 @@ PicklePrefetcher::configure(std::shared_ptr<PickleJobDescriptor> job)
             std::shared_ptr<PrefetcherWorkTracker>(
                 new PrefetcherWorkTracker(
                     this, prefetcher_work_tracker_collective,
-                    job_id, core_id, job
+                    job_id, core_id, job, prefetch_dropping_distance
                 )
             )
         );
@@ -477,6 +477,7 @@ PicklePrefetcher::profileWork(
         job_id, core_id, work->getWorkId()
     );
     std::shared_ptr<TaskStats> task_stat = taskStats[job_id][core_id];
+    uint64_t work_id = work->getWorkId();
     task_stat->taskCount++;;
     task_stat->prefetchLv0Time.sample(work->getPrefetchLvTime(0));
     task_stat->prefetchLv1Time.sample(work->getPrefetchLvTime(1));
@@ -488,7 +489,7 @@ PicklePrefetcher::profileWork(
         job_id, work->getWorkId()
     )) {
         const Tick core_use_time = prefetcher_work_tracker_collective
-                ->getCoreStartTime(job_id, work->getWorkId());
+                ->getCoreStartTime(job_id, work_id);
         DPRINTF(
             PickleDevicePrefetcherWorkTrackerDebug,
             "profileWork: late pf, complete time: %lld, core use: %lld\n",
@@ -506,6 +507,9 @@ PicklePrefetcher::profileWork(
                 work->getPrefetchCompleteTime() - core_use_time
             );
         }
+        prefetcher_work_tracker_collective->untrackCoreStartTime(
+            job_id, work_id
+        );
     } else { // timely prefetch
         // nothing to do here as the core has not worked on this work item
         DPRINTF(
