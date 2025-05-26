@@ -94,7 +94,7 @@ class PrefetcherWorkTracker
         uint64_t getJobId() const { return job_id; }
         uint64_t getCoreId() const { return core_id; }
         void addWorkItem(Addr work_data);
-        bool hasPendingWorkItem() const;
+        bool hasPendingWorkItem();
         std::shared_ptr<WorkItem> peekNextWorkItem() const;
         void popWorkItem();
         void profileWork(std::shared_ptr<WorkItem> work);

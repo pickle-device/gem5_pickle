@@ -119,8 +119,9 @@ PrefetcherWorkTracker::addWorkItem(Addr work_data)
 }
 
 bool
-PrefetcherWorkTracker::hasPendingWorkItem() const
+PrefetcherWorkTracker::hasPendingWorkItem()
 {
+    updateWorkItemQueue();
     return !(pending_work_items.empty());
 }
 
@@ -215,7 +216,8 @@ PrefetcherWorkTracker::updateWorkItemQueue()
 {
     // dropping prefetches that were worked on by the core
     if (enable_dropping_prefetches) {
-        while (hasPendingWorkItem()) {
+        //while (hasPendingWorkItem()) {
+        while (!pending_work_items.empty()) {
             std::shared_ptr<WorkItem> work_item = peekNextWorkItem();
             const uint64_t job_id = work_item->getJobId();
             const uint64_t work_id = work_item->getWorkId();
@@ -227,6 +229,7 @@ PrefetcherWorkTracker::updateWorkItemQueue()
                     work_id
                 );
                 popWorkItem();
+                owner->prefetcherStats.numWorkedDroppedDueToCoreFinished++;
                 collective->untrackCoreStartTime(job_id, work_id);
             } else {
                 break;
@@ -438,6 +441,7 @@ PrefetcherWorkTrackerCollective::replaceActiveWorkItemsUponCompletion()
             break;
         }
         work_item->profileWorkActivationTime();
+        owner->prefetcherStats.numActivatedWork++;
         DPRINTF(
             PickleDevicePrefetcherWorkTrackerDebug,
             "replaceActiveWorkItemUponCompletion: adding work_id 0x%llx\n",
