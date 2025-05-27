@@ -236,6 +236,41 @@ PrefetcherWorkTracker::updateWorkItemQueue()
             }
         }
     }
+
+    // now we drop prefetches that are too close to the core's current work
+    if (enable_dropping_prefetches) {
+        while (!pending_work_items.empty()) {
+            std::shared_ptr<WorkItem> work_item = peekNextWorkItem();
+            const uint64_t job_id = work_item->getJobId();
+            const uint64_t work_id = work_item->getWorkId();
+            bool too_close = false;
+            if (job_descriptor->kernel_name == "bfs_kernel") {
+                too_close = getCoreLatestWorkId() \
+                            + prefetch_dropping_distance * 4 > work_id;
+            } else if (job_descriptor->kernel_name == "pr_kernel") {
+                too_close = getCoreLatestWorkId() \
+                            + prefetch_dropping_distance > work_id;
+            } else {
+                panic("Unknown prefetch generator mode: %s\n",
+                      job_descriptor->kernel_name);
+            }
+            if (too_close) {
+                DPRINTF(
+                    PickleDevicePrefetcherWorkTrackerDebug,
+                    "updateWorkItemQueue: work_id 0x%llx, "
+                    "work_item_receive_time %lld, core_latest_work_id 0x%llx, "
+                    "prefetch_dropping_distance %lld\n",
+                    work_id, work_item->getWorkItemReceiveTime(),
+                    getCoreLatestWorkId(), prefetch_dropping_distance
+                );
+                popWorkItem();
+                owner->prefetcherStats.numWorkedDroppedDueToCoreTooClose++;
+                collective->untrackCoreStartTime(job_id, work_id);
+            } else {
+                break;
+            }
+        }
+    }
 }
 
 PrefetcherWorkTrackerCollective::PrefetcherWorkTrackerCollective()

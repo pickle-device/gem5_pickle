@@ -339,6 +339,16 @@ PicklePrefetcher::PrefetcherStats::PrefetcherStats(
         "Number of work activated by the prefetcher"
     ),
     ADD_STAT(
+        numWorkedDroppedDueToCoreFinished, statistics::units::Count::get(),
+        "Number of work items dropped because the core has already worked on "
+        "them"
+    ),
+    ADD_STAT(
+        numWorkedDroppedDueToCoreTooClose, statistics::units::Count::get(),
+        "Number of work items dropped because the core is too close to the "
+        "prefetch distance even though the core has not worked on them yet"
+    ),
+    ADD_STAT(
         numPrefetches, statistics::units::Count::get(),
         "Number of prefetch requests generated"
     ),

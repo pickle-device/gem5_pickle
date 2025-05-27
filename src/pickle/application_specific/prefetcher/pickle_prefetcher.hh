@@ -123,6 +123,7 @@ class PicklePrefetcher: public ClockedObject
             statistics::Scalar numReceivedWork;
             statistics::Scalar numActivatedWork;
             statistics::Scalar numWorkedDroppedDueToCoreFinished;
+            statistics::Scalar numWorkedDroppedDueToCoreTooClose;
             statistics::Scalar numPrefetches;
             statistics::Scalar numUnknownPrefetches;
             statistics::Histogram histInQueueLength;
