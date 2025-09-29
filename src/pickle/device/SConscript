@@ -42,3 +42,4 @@ DebugFlag('PickleDeviceZeroCycleAddressTranslation')
 
 Source('device_thread_context.cc')
 Source('pickle_device.cc')
+Source('thread_monitor.cc')
