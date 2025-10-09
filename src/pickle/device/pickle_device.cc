@@ -267,6 +267,7 @@ PickleDevice::PickleDeviceStats::preDumpStats()
     statistics::Group::preDumpStats();
     std::unordered_map<uint64_t, std::vector<Tick>> per_thread_ticks = \
         thread_monitor->getThreadRunDuration();
+    totalVCPUTicks = 0;
     for (auto &[thread_id, tick_vector]: per_thread_ticks) {
         uint64_t thread_total = 0;
         for (const auto tick: tick_vector) {
