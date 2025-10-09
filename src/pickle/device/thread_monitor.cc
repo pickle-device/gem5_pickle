@@ -51,11 +51,14 @@ std::unordered_map<uint64_t, std::vector<Tick>>
 ThreadMonitor::getThreadRunDuration() {
   std::unordered_map<uint64_t, std::vector<Tick>> thread_run_durations;
   for (const auto& [thread_id, start_ticks] : thread_start_ticks) {
-    const std::vector<Tick>& end_ticks = thread_end_ticks[thread_id];
-    assert(start_ticks.size() == end_ticks.size());
+    const std::vector<Tick>& completion_ticks = \
+        thread_completion_ticks[thread_id];
+    assert(start_ticks.size() == completion_ticks.size());
     for (size_t i = 0; i < start_ticks.size(); ++i) {
-      assert(end_ticks[i] >= start_ticks[i]);
-      thread_run_durations[thread_id].push_back(end_ticks[i] - start_ticks[i]);
+      assert(completion_ticks[i] >= start_ticks[i]);
+      thread_run_durations[thread_id].push_back(
+        completion_ticks[i] - start_ticks[i]
+      );
     }
   }
   return thread_run_durations;
@@ -65,8 +68,10 @@ void ThreadMonitor::recordThreadStart(uint64_t thread_id, Tick start_tick) {
   thread_start_ticks[thread_id].push_back(start_tick);
 }
 
-void ThreadMonitor::recordThreadEnd(uint64_t thread_id, Tick end_tick) {
-  thread_end_ticks[thread_id].push_back(end_tick);
+void ThreadMonitor::recordThreadCompletion(
+  uint64_t thread_id, Tick completion_tick
+) {
+  thread_completion_ticks[thread_id].push_back(completion_tick);
 }
 
 };  // namespace pickle

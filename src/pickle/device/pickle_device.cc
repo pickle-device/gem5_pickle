@@ -42,6 +42,7 @@
 #include "mem/request.hh"
 #include "mem/ruby/system/RubySystem.hh"
 #include "pickle/application_specific/pickle_job.hh"
+#include "pickle/device/thread_monitor.hh"
 #include "pickle/request_manager/manager.hh"
 
 namespace gem5
@@ -360,6 +361,13 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
             );
             std::string action = (data % 2 == 0) ? "starts" : "ends";
             uint64_t thread_id = data >> 1;
+            if (data % 2 == 0) {
+              owner->thread_monitor.recordThreadStart(thread_id, curTick());
+            } else {
+              owner->thread_monitor.recordThreadCompletion(
+                thread_id, curTick()
+              );
+            }
             DPRINTF(
                 PickleDeviceUncacheableForwarding,
                 "Received perf data: thread %lld %s\n",
@@ -476,6 +484,13 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvAtomic(PacketPtr pkt)
             );
             std::string action = (data % 2 == 0) ? "starts" : "ends";
             uint64_t thread_id = data >> 1;
+            if (data % 2 == 0) {
+              owner->thread_monitor.recordThreadStart(thread_id, curTick());
+            } else {
+              owner->thread_monitor.recordThreadCompletion(
+                thread_id, curTick()
+              );
+            }
             DPRINTF(
                 PickleDeviceUncacheableForwarding,
                 "Received perf data [atomic]: thread %lld %s\n",
@@ -573,6 +588,13 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvFunctional(PacketPtr pkt)
             );
             std::string action = (data % 2 == 0) ? "starts" : "ends";
             uint64_t thread_id = data >> 1;
+            if (data % 2 == 0) {
+              owner->thread_monitor.recordThreadStart(thread_id, curTick());
+            } else {
+              owner->thread_monitor.recordThreadCompletion(
+                thread_id, curTick()
+              );
+            }
             DPRINTF(
                 PickleDeviceUncacheableForwarding,
                 "Received perf data [functional]: thread %lld %s\n",

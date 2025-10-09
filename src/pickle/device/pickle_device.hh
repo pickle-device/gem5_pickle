@@ -52,6 +52,7 @@
 #include "params/PickleDevice.hh"
 #include "pickle/application_specific/prefetcher/pickle_prefetcher.hh"
 #include "pickle/device/device_thread_context.hh"
+#include "pickle/device/thread_monitor.hh"
 #include "pickle/gadgets/traffic_snooper.hh"
 #include "sim/clocked_object.hh"
 #include "sim/eventq.hh"
@@ -213,6 +214,7 @@ class PickleDevice: public ClockedObject
         std::shared_ptr<PickleJobDescriptor> getJobDescriptor(
             const uint64_t job_id
         ) const;
+        pickle::ThreadMonitor thread_monitor;
     public:
         struct PickleDeviceStats : public statistics::Group
         {
