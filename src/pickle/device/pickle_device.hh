@@ -228,6 +228,7 @@ class PickleDevice: public ClockedObject
             void preDumpStats() override;
             statistics::Scalar numTranslationFaults;
             statistics::Vector ticksPerThread;
+            statistics::Scalar totalVCPUTicks;
         } device_stats;
         void regStats() override;
 }; // class PickleDevice

@@ -245,7 +245,11 @@ PickleDevice::PickleDeviceStats::PickleDeviceStats(
     ),
     ADD_STAT(
       ticksPerThread, statistics::units::Tick::get(),
-      "How many ticks the program spent on a thread"
+      "How many ticks the program spent on each ROI thread"
+    ),
+    ADD_STAT(
+      totalVCPUTicks, statistics::units::Tick::get(),
+      "How many ticks the program spent on all ROIs"
     )
 {
 }
@@ -264,11 +268,12 @@ PickleDevice::PickleDeviceStats::preDumpStats()
     std::unordered_map<uint64_t, std::vector<Tick>> per_thread_ticks = \
         thread_monitor->getThreadRunDuration();
     for (auto &[thread_id, tick_vector]: per_thread_ticks) {
-        uint64_t total = 0;
+        uint64_t thread_total = 0;
         for (const auto tick: tick_vector) {
-            total += tick;
+            thread_total += tick;
         }
-        ticksPerThread[thread_id] = total;
+        ticksPerThread[thread_id] = thread_total;
+        totalVCPUTicks += thread_total;
     }
 }
 
