@@ -554,6 +554,35 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvFunctional(PacketPtr pkt)
                 "Sent to paddr: 0x%llx, size: %ld, data: 0x%ld\n",
                 paddr, pkt->req->getSize(), data
             );
+        }
+         // type 2 communication (for performance monitoring)
+        else if (
+            pkt->req->hasPaddr()
+                && (pkt->req->getPaddr() >= 0x10120000
+                    && pkt->req->getPaddr() < 0x10130000)
+        ) {
+            // We should receive a store containing information about the
+            // software performance
+            const uint64_t* ptr = pkt->getConstPtr<uint64_t>();
+            uint64_t data = ptr[0];
+            DPRINTF(
+                PickleDeviceUncacheableForwarding,
+                "Received perf data [functional]: addr = 0x%llx, "
+                "data = 0x%x\n",
+                pkt->req->getPaddr(), data
+            );
+            std::string action = (data % 2 == 0) ? "starts" : "ends";
+            uint64_t thread_id = data >> 1;
+            DPRINTF(
+                PickleDeviceUncacheableForwarding,
+                "Received perf data [functional]: thread %lld %s\n",
+                thread_id, action
+            );
+            if (pkt->needsResponse()) {
+                pkt->makeResponse();
+                bool success = owner->enqueueResponse(pkt, internal_id);
+                assert(success);
+            }
         } else {
             owner->trySetThreadContextFromCore(internal_id);
             bool isLoad = pkt->isRead();
