@@ -83,7 +83,8 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
     coalesce_requests(params.coalesce_requests),
     coalesce_address_translations(params.coalesce_address_translations),
     pickle_prefetcher(params.prefetcher),
-    device_stats(this)
+    thread_monitor(),
+    device_stats(this, num_cores, &thread_monitor)
 {
     if (params.is_on) {
         changeToState(PickleDeviceState::IDLE);
@@ -232,25 +233,49 @@ PickleDevice::getPort(const std::string &if_name, PortID idx)
     return request_port;
 }
 
-PickleDevice::PickleDeviceStats::PickleDeviceStats(statistics::Group *parent)
-    : statistics::Group(parent),
-      ADD_STAT(
-        numTranslationFaults,
-        "The number of faults produced by address translations"
-      )
+PickleDevice::PickleDeviceStats::PickleDeviceStats(
+  statistics::Group *parent, uint64_t num_cores,
+  pickle::ThreadMonitor *thread_monitor
+) : statistics::Group(parent),
+    num_cores(num_cores),
+    thread_monitor(thread_monitor),
+    ADD_STAT(
+      numTranslationFaults, statistics::units::Count::get(),
+      "The number of faults produced by address translations"
+    ),
+    ADD_STAT(
+      ticksPerThread, statistics::units::Tick::get(),
+      "How many ticks the program spent on a thread"
+    )
 {
 }
 
 void
 PickleDevice::PickleDeviceStats::regStats()
 {
+    statistics::Group::regStats();
+    ticksPerThread.init(num_cores);
+}
+
+void
+PickleDevice::PickleDeviceStats::preDumpStats()
+{
+    statistics::Group::preDumpStats();
+    std::unordered_map<uint64_t, std::vector<Tick>> per_thread_ticks = \
+        thread_monitor->getThreadRunDuration();
+    for (auto &[thread_id, tick_vector]: per_thread_ticks) {
+        uint64_t total = 0;
+        for (const auto tick: tick_vector) {
+            total += tick;
+        }
+        ticksPerThread[thread_id] = total;
+    }
 }
 
 void
 PickleDevice::regStats()
 {
     ClockedObject::regStats();
-    device_stats.regStats();
 }
 
 bool

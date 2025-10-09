@@ -218,9 +218,16 @@ class PickleDevice: public ClockedObject
     public:
         struct PickleDeviceStats : public statistics::Group
         {
-            PickleDeviceStats(statistics::Group *parent);
+            PickleDeviceStats(
+                statistics::Group *parent, uint64_t num_cores,
+                pickle::ThreadMonitor *thread_monitor
+            );
+            uint64_t num_cores;
+            pickle::ThreadMonitor *thread_monitor;
             void regStats() override;
+            void preDumpStats() override;
             statistics::Scalar numTranslationFaults;
+            statistics::Vector ticksPerThread;
         } device_stats;
         void regStats() override;
 }; // class PickleDevice
