@@ -36,40 +36,12 @@ from m5.SimObject import (
 )
 
 
-class PicklePrefetcher(ClockedObject):
-    type = "PicklePrefetcher"
-    cxx_header = "pickle/application_specific/prefetcher/pickle_prefetcher.hh"
-    cxx_class = "gem5::PicklePrefetcher"
+class LLCPrefetchAgent(ClockedObject):
+    type = "LLCPrefetchAgent"
+    cxx_header = "pickle/application_specific/prefetcher/llc_prefetch_agent.hh"
+    cxx_class = "gem5::LLCPrefetchAgent"
     cxx_exports = [PyBindMethod("switchOn"), PyBindMethod("switchOff")]
 
-    software_hint_prefetch_distance = Param.Int(1, "Prefetch distance")
-    prefetch_distance_offset_from_software_hint = Param.Int(
-        0,
-        "Prefetch distance offset from software hint",
-    )
-    concurrent_work_item_capacity = Param.Int(
-        0,
-        "Number of wokk items that can be prefetched concurrently",
-    )
-    num_cores = Param.Int(
-        8,
-        "Number of cores connected to the cache that this prefetcher is "
-        "servicing. In the case of the LLC prefetcher, this is the number of "
-        "core in the same CCD.",
-    )
-    expected_number_of_prefetch_generators = Param.Int(
-        1,
-        "How many prefetch generators will be used. Helps determining how "
-        "many sets of task-related stats to allocate.",
-    )
-
-    llc_prefetch_agents = VectorParam.LLCPrefetchAgent(
-        "The LLC prefetch agent(s) that this prefetcher sends prefetches to.",
-    )
-
-    # Optimization parameters
-    prefetch_dropping_distance = Param.Int(
-        0,
-        "Distance at which prefetches are dropped. "
-        "If set to 0, prefetches are never dropped.",
+    llc_controller = Param.CHI_Cache_Controller(
+        "The LLC controller that this prefetch agent is associated with",
     )

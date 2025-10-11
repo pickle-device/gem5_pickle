@@ -42,6 +42,7 @@
 #include "base/statistics.hh"
 #include "params/PicklePrefetcher.hh"
 #include "pickle/application_specific/pickle_job.hh"
+#include "pickle/application_specific/prefetcher/llc_prefetch_agent.hh"
 #include "pickle/application_specific/prefetcher/prefetch_generators/all_prefetch_generators.hh"
 #include "pickle/application_specific/prefetcher/prefetch_request.hh"
 #include "pickle/application_specific/prefetcher/prefetcher_work_tracker.hh"
@@ -74,6 +75,7 @@ class PicklePrefetcher: public ClockedObject
         EventFunctionWrapper processOutgoingPrefetchRequestQueueEvent;
         uint64_t ticks_per_cycle;
         uint64_t num_cores;
+        std::vector<LLCPrefetchAgent*> llc_prefetch_agents;
     private:
         std::unordered_map<Addr, std::unique_ptr<uint8_t[]>> packet_data;
         std::unordered_map<Addr, PacketStatus> packet_status;

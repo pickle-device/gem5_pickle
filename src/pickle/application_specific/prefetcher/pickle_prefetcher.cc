@@ -68,6 +68,7 @@ PicklePrefetcher::PicklePrefetcher(
     ),
     ticks_per_cycle(1000),
     num_cores(params.num_cores),
+    llc_prefetch_agents(params.llc_prefetch_agents),
     prefetcher_initialized(false),
     num_received_jobs(0),
     owner(nullptr),
@@ -118,6 +119,9 @@ PicklePrefetcher::~PicklePrefetcher()
 void
 PicklePrefetcher::startup()
 {
+    for (auto agent: llc_prefetch_agents) {
+        agent->setPicklePrefetcher(this);
+    }
 }
 
 void

@@ -31,6 +31,7 @@
 
 Import('*')
 
+SimObject('LLCPrefetchAgent.py', sim_objects=['LLCPrefetchAgent'])
 SimObject('PicklePrefetcher.py', sim_objects=['PicklePrefetcher'])
 
 DebugFlag('PickleDevicePrefetcherDebug')
@@ -40,6 +41,7 @@ DebugFlag('PickleDevicePrefetcherProgressTracker')
 DebugFlag('PickleDevicePrefetcherWorkTrackerDebug')
 DebugFlag('PickleDevicePrefetcherWorkTrackerStatsDebug')
 
+Source('llc_prefetch_agent.cc')
 Source('pickle_prefetcher.cc')
 Source('prefetch_request.cc')
 Source('prefetcher_work_tracker.cc')
