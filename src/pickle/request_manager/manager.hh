@@ -75,6 +75,7 @@ class PickleDeviceRequestManager : public SimObject
         PickleDevice* owner;
         BaseMMU* mmu;
         RequestorID requestor_id;
+        uint64_t ticks_per_cycle;
         void handleTranslationCompletion(
             std::shared_ptr<RequestBookkeeper> request_bookkeeper
         );

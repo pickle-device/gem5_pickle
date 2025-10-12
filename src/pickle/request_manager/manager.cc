@@ -42,6 +42,7 @@ PickleDeviceRequestManager::PickleDeviceRequestManager(
     is_activated(false),
     owner(nullptr),
     mmu(nullptr),
+    ticks_per_cycle(250), // running at the CPU frequency
     retry_handle_translation_completion_event(
         [this]{retryHandleTranslationCompletion();}, name() + ".retry_event"
     ),
@@ -189,7 +190,7 @@ PickleDeviceRequestManager::addRetryHandleTranslationCompletion(
     if (!retry_handle_translation_completion_event.scheduled()) {
         schedule(
             retry_handle_translation_completion_event,
-            curTick() + 1000
+            curTick() + ticks_per_cycle
         );
         DPRINTF(PickleDeviceRequestManagerDebug,
             "Scheduled retrying translation completion for vaddr 0x%llx\n",
