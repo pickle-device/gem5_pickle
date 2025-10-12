@@ -32,6 +32,7 @@
 #include "pickle/application_specific/prefetcher/llc_prefetch_agent.hh"
 
 #include <cassert>
+#include <utility>
 
 namespace gem5
 {
@@ -52,6 +53,12 @@ void LLCPrefetchAgent::setPicklePrefetcher(PicklePrefetcher* prefetcher)
 {
     assert(prefetcher != nullptr);
     this->prefetcher = prefetcher;
+}
+
+void LLCPrefetchAgent::enqueueRequestWithPAddr(PrefetchRequest request)
+{
+    assert(request.hasPAddr());
+    prefetch_request_queue.push(std::move(request));
 }
 
 }; // namespace gem5

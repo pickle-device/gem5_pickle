@@ -32,12 +32,14 @@
 #ifndef __LLC_PREFETCH_AGENT_HH__
 #define __LLC_PREFETCH_AGENT_HH__
 
+#include <queue>
 #include <vector>
 
 #include "base/addr_range.hh"
 #include "mem/ruby/protocol/CHI/Cache_Controller.hh"
 #include "params/LLCPrefetchAgent.hh"
 #include "pickle/application_specific/prefetcher/pickle_prefetcher.hh"
+#include "pickle/application_specific/prefetcher/prefetch_request.hh"
 #include "sim/clocked_object.hh"
 #include "sim/eventq.hh"
 #include "sim/sim_object.hh"
@@ -53,10 +55,17 @@ class LLCPrefetchAgent: public ClockedObject
         PicklePrefetcher* prefetcher;
         ruby::CHI::Cache_Controller* llc_controller;
         std::vector<AddrRange> addr_ranges;
+        std::priority_queue<
+            PrefetchRequest, std::vector<PrefetchRequest>, PrefetchRequestOrder
+        > prefetch_request_queue;
     public:
         LLCPrefetchAgent(const LLCPrefetchAgentParams &params);
         ~LLCPrefetchAgent();
         void setPicklePrefetcher(PicklePrefetcher* prefetcher);
+        // Enqueue a prefetch request with a physical address.
+        // We do not allow enqueuing a request with a virtual address, because
+        // the LLC prefetch agent should only work with physical addresses.
+        void enqueueRequestWithPAddr(PrefetchRequest request);
 };
 
 }; // namespace gem5
