@@ -41,6 +41,7 @@ class LLCPrefetchAgent(ClockedObject):
     cxx_header = "pickle/application_specific/prefetcher/llc_prefetch_agent.hh"
     cxx_class = "gem5::LLCPrefetchAgent"
 
+    system = Param.System(Parent.any, "system object")
     llc_controller = Param.CHI_Cache_Controller(
         "The LLC controller that this prefetch agent is associated with",
     )

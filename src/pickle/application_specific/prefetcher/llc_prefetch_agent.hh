@@ -43,6 +43,7 @@
 #include "sim/clocked_object.hh"
 #include "sim/eventq.hh"
 #include "sim/sim_object.hh"
+#include "sim/system.hh"
 
 namespace gem5
 {
@@ -52,12 +53,16 @@ class LLCPrefetchAgent: public ClockedObject
     private:
         PARAMS(LLCPrefetchAgent);
     private:
+        System * system;
         PicklePrefetcher* prefetcher;
         ruby::CHI::Cache_Controller* llc_controller;
         std::vector<AddrRange> addr_ranges;
+        RequestorID requestor_id;
         std::priority_queue<
             PrefetchRequest, std::vector<PrefetchRequest>, PrefetchRequestOrder
         > prefetch_request_queue;
+        uint64_t ticks_per_cycle;
+        EventFunctionWrapper processOutgoingRequestQueueEvent;
     public:
         LLCPrefetchAgent(const LLCPrefetchAgentParams &params);
         ~LLCPrefetchAgent();
@@ -66,6 +71,12 @@ class LLCPrefetchAgent: public ClockedObject
         // We do not allow enqueuing a request with a virtual address, because
         // the LLC prefetch agent should only work with physical addresses.
         void enqueueRequestWithPAddr(PrefetchRequest request);
+        // Check if an address is in the address ranges this agent monitors
+        bool isAddressInMonitoredRanges(Addr addr) const;
+        // Send out requests in the outgoing request queue
+        void processOutgoingRequestQueue();
+    private:
+        PacketPtr createPrefetchPacket(const PrefetchRequest& request) const;
     public:
         // A request port to send prefetch requests to the LLC controller
         class LLCPrefetchAgentRequestPort: public RequestPort

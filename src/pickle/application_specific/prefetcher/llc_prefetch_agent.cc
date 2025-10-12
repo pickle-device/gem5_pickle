@@ -32,15 +32,28 @@
 #include "pickle/application_specific/prefetcher/llc_prefetch_agent.hh"
 
 #include <cassert>
+#include <memory>
 #include <utility>
+
+#include "base/trace.hh"
+#include "debug/LLCPrefetchAgentDebug.hh"
+#include "mem/request.hh"
 
 namespace gem5
 {
 
 LLCPrefetchAgent::LLCPrefetchAgent(const LLCPrefetchAgentParams &params)
     : ClockedObject(params),
+      system(params.system),
+      prefetcher(nullptr),
       llc_controller(params.llc_controller),
       addr_ranges(params.addr_ranges),
+      requestor_id(system->getRequestorId(this)),
+      ticks_per_cycle(250), // running at the LLC frequency
+      processOutgoingRequestQueueEvent(
+        [this]() { processOutgoingRequestQueue(); },
+        name() + ".process_outgoing_request_queue_event"
+    ),
       mem_side_port(name() + ".mem_side_port", this),
       agent_stats(this)
 {
@@ -57,14 +70,105 @@ void LLCPrefetchAgent::setPicklePrefetcher(PicklePrefetcher* prefetcher)
     this->prefetcher = prefetcher;
 }
 
-void LLCPrefetchAgent::enqueueRequestWithPAddr(PrefetchRequest request)
+void LLCPrefetchAgent::enqueueRequestWithPAddr(PrefetchRequest pf_request)
 {
-    assert(request.hasPAddr());
+    assert(pf_request.hasPAddr());
     agent_stats.prefetch_request_count++;
-    prefetch_request_queue.push(std::move(request));
+    prefetch_request_queue.push(std::move(pf_request));
     agent_stats.prefetch_request_queue_length.sample(
         prefetch_request_queue.size()
     );
+    // Schedule the processing event if not already scheduled
+    if (!processOutgoingRequestQueueEvent.scheduled()) {
+        schedule(
+            processOutgoingRequestQueueEvent,
+            //clockEdge(0)
+            curTick() + ticks_per_cycle
+        );
+    }
+}
+
+bool LLCPrefetchAgent::isAddressInMonitoredRanges(Addr addr) const
+{
+    for (const auto& range : addr_ranges) {
+        if (range.contains(addr)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void LLCPrefetchAgent::processOutgoingRequestQueue()
+{
+    // Try to send as many requests as possible in the queue
+    while (!prefetch_request_queue.empty()) {
+        // Peek at the front request
+        const PrefetchRequest& pf_request = prefetch_request_queue.top();
+        const Addr paddr = pf_request.getPrefetchPAddr();
+        // Check if the cache line is already present in the cache by
+        // consulting the LLC directory
+        if (llc_controller->getDirEntry(paddr) != nullptr) {
+            // Cache line is already present, drop the request
+            agent_stats.prefetch_request_dropped_due_to_cache_line_presence++;
+            prefetch_request_queue.pop();
+            agent_stats.prefetch_request_queue_length.sample(
+                prefetch_request_queue.size()
+            );
+            DPRINTF(LLCPrefetchAgentDebug,
+                "Dropped prefetch request for paddr 0x%llx as it is "
+                "already present in the cache\n", paddr
+            );
+            continue;
+        }
+        // Try to send it out
+        PacketPtr pkt = createPrefetchPacket(pf_request);
+        bool success = mem_side_port.sendTimingReq(pkt);
+        // If sent, pop it from the queue
+        // If not sent, stop processing further requests
+        if (success) {
+            prefetch_request_queue.pop();
+            agent_stats.prefetch_request_sent++;
+            agent_stats.prefetch_request_queue_length.sample(
+                prefetch_request_queue.size()
+            );
+            DPRINTF(LLCPrefetchAgentDebug,
+                "Sent prefetch request for paddr 0x%llx\n", paddr
+            );
+        } else {
+            // Failed to send, will retry later
+            delete pkt;
+            DPRINTF(LLCPrefetchAgentDebug,
+                "Failed to send prefetch request for paddr 0x%llx, "
+                "will retry later\n", paddr
+            );
+            break;
+        }
+    }
+
+    // If there are still requests in the queue, we already tried to send
+    // the front one but failed because the outgoing port is busy.
+    // We'll wait till the port calls back recvReqRetry() to try again, so
+    // we do not need to schedule the event again here.
+}
+
+PacketPtr LLCPrefetchAgent::createPrefetchPacket(
+    const PrefetchRequest& pf_request) const
+{
+    const uint64_t cache_line_size = system->cacheLineSize();
+    assert(pf_request.hasPAddr());
+    Addr paddr = pf_request.getPrefetchPAddr();
+    // Create a read prefetch packet
+    Request::Flags flags = 0;
+    RequestPtr req = std::make_shared<Request>(
+        paddr, // physical address
+        cache_line_size, // size
+        flags,
+        requestor_id
+    );
+    PacketPtr pkt = Packet::createRead(req);
+    // Allocate a data buffer for the packet
+    pkt->dataDynamic(new uint8_t[cache_line_size]);
+    return pkt;
 }
 
 LLCPrefetchAgent::LLCPrefetchAgentRequestPort::LLCPrefetchAgentRequestPort(
@@ -88,8 +192,8 @@ LLCPrefetchAgent::LLCPrefetchAgentRequestPort::recvTimingResp(PacketPtr pkt)
 
 void LLCPrefetchAgent::LLCPrefetchAgentRequestPort::recvReqRetry()
 {
-    // TODO: trigger the sent event
-    panic("LLCPrefetchAgentRequestPort::recvReqRetry not implemented yet");
+    // Try to send the next request in the queue if any
+    owner->processOutgoingRequestQueue();
 }
 
 Port& LLCPrefetchAgent::getPort(const std::string &if_name, PortID idx)
