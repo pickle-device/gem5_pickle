@@ -424,7 +424,7 @@ class $c_ident : public AbstractController
     bool isPossible(${ident}_State state, ${ident}_Event event);
     uint64_t getTransitionCount(${ident}_State state, ${ident}_Event event);
 
-private:
+public:
 """
         )
 
