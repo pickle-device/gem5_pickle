@@ -40,7 +40,8 @@ namespace gem5
 LLCPrefetchAgent::LLCPrefetchAgent(const LLCPrefetchAgentParams &params)
     : ClockedObject(params),
       llc_controller(params.llc_controller),
-      addr_ranges(params.addr_ranges)
+      addr_ranges(params.addr_ranges),
+      agent_stats(this)
 {
     assert(llc_controller != nullptr);
 }
@@ -58,7 +59,35 @@ void LLCPrefetchAgent::setPicklePrefetcher(PicklePrefetcher* prefetcher)
 void LLCPrefetchAgent::enqueueRequestWithPAddr(PrefetchRequest request)
 {
     assert(request.hasPAddr());
+    agent_stats.prefetch_request_count++;
     prefetch_request_queue.push(std::move(request));
+    agent_stats.prefetch_request_queue_length.sample(
+        prefetch_request_queue.size()
+    );
+}
+
+LLCPrefetchAgent::LLCPrefetchAgentStats::LLCPrefetchAgentStats(
+    statistics::Group *parent)
+    : statistics::Group(parent, "llc_prefetch_agent"),
+      ADD_STAT(prefetch_request_count, statistics::units::Count::get(),
+               "Number of prefetch requests received by the prefetcher"),
+      ADD_STAT(prefetch_request_dropped_due_to_cache_line_presence,
+               statistics::units::Count::get(),
+               "Number of prefetch requests dropped due to the cache line "
+               "already being present in the cache"),
+      ADD_STAT(prefetch_request_sent, statistics::units::Count::get(),
+               "Number of prefetch requests sent to the memory system"),
+      ADD_STAT(prefetch_request_queue_length, statistics::units::Count::get(),
+                "Histogram of the prefetch request queue length over time")
+{
+}
+
+void LLCPrefetchAgent::LLCPrefetchAgentStats::regStats()
+{
+    statistics::Group::regStats();
+    prefetch_request_queue_length
+        .init(16)
+        .flags(statistics::pdf);
 }
 
 }; // namespace gem5

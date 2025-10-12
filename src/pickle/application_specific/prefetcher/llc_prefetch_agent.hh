@@ -66,6 +66,17 @@ class LLCPrefetchAgent: public ClockedObject
         // We do not allow enqueuing a request with a virtual address, because
         // the LLC prefetch agent should only work with physical addresses.
         void enqueueRequestWithPAddr(PrefetchRequest request);
+    public:
+        struct LLCPrefetchAgentStats : public statistics::Group
+        {
+            LLCPrefetchAgentStats(statistics::Group *parent);
+            void regStats() override;
+            statistics::Scalar prefetch_request_count;
+            statistics::Scalar \
+                prefetch_request_dropped_due_to_cache_line_presence;
+            statistics::Scalar prefetch_request_sent;
+            statistics::Histogram prefetch_request_queue_length;
+        } agent_stats;
 };
 
 }; // namespace gem5
