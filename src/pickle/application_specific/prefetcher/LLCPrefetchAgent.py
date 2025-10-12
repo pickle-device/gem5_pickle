@@ -49,3 +49,4 @@ class LLCPrefetchAgent(ClockedObject):
         "The address range that this prefetch agent is responsible for. If empty, "
         "the prefetch agent will be responsible for no addresses.",
     )
+    mem_side_port = RequestPort("Port to communicate with memory side")

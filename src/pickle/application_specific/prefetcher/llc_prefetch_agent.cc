@@ -41,6 +41,7 @@ LLCPrefetchAgent::LLCPrefetchAgent(const LLCPrefetchAgentParams &params)
     : ClockedObject(params),
       llc_controller(params.llc_controller),
       addr_ranges(params.addr_ranges),
+      mem_side_port(name() + ".mem_side_port", this),
       agent_stats(this)
 {
     assert(llc_controller != nullptr);
@@ -66,6 +67,38 @@ void LLCPrefetchAgent::enqueueRequestWithPAddr(PrefetchRequest request)
     );
 }
 
+LLCPrefetchAgent::LLCPrefetchAgentRequestPort::LLCPrefetchAgentRequestPort(
+    const std::string& name, LLCPrefetchAgent* owner
+) : RequestPort(name)
+{
+    this->owner = owner;
+}
+
+LLCPrefetchAgent::LLCPrefetchAgentRequestPort::~LLCPrefetchAgentRequestPort()
+{
+}
+
+bool
+LLCPrefetchAgent::LLCPrefetchAgentRequestPort::recvTimingResp(PacketPtr pkt)
+{
+    // Do nothing with the response packet as the prefetcher does not read data
+    delete pkt;
+    return true;
+}
+
+void LLCPrefetchAgent::LLCPrefetchAgentRequestPort::recvReqRetry()
+{
+    // TODO: trigger the sent event
+    panic("LLCPrefetchAgentRequestPort::recvReqRetry not implemented yet");
+}
+
+Port& LLCPrefetchAgent::getPort(const std::string &if_name, PortID idx)
+{
+    if (if_name == "mem_side_port") {
+        return mem_side_port;
+    }
+    return ClockedObject::getPort(if_name, idx);
+}
 LLCPrefetchAgent::LLCPrefetchAgentStats::LLCPrefetchAgentStats(
     statistics::Group *parent)
     : statistics::Group(parent, "llc_prefetch_agent"),
@@ -77,6 +110,11 @@ LLCPrefetchAgent::LLCPrefetchAgentStats::LLCPrefetchAgentStats(
                "already being present in the cache"),
       ADD_STAT(prefetch_request_sent, statistics::units::Count::get(),
                "Number of prefetch requests sent to the memory system"),
+      ADD_STAT(prefetch_request_not_sent, statistics::units::Count::get(),
+               "Number of prefetch requests not sent to the memory system "
+               "due to our errors. Should be 0.",
+               prefetch_request_count - prefetch_request_sent - \
+                prefetch_request_dropped_due_to_cache_line_presence),
       ADD_STAT(prefetch_request_queue_length, statistics::units::Count::get(),
                 "Histogram of the prefetch request queue length over time")
 {

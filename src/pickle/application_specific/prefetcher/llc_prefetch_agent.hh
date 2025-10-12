@@ -67,6 +67,22 @@ class LLCPrefetchAgent: public ClockedObject
         // the LLC prefetch agent should only work with physical addresses.
         void enqueueRequestWithPAddr(PrefetchRequest request);
     public:
+        // A request port to send prefetch requests to the LLC controller
+        class LLCPrefetchAgentRequestPort: public RequestPort
+        {
+            private:
+                LLCPrefetchAgent* owner;
+            public:
+                LLCPrefetchAgentRequestPort(
+                    const std::string& name, LLCPrefetchAgent* owner
+                );
+                ~LLCPrefetchAgentRequestPort();
+                bool recvTimingResp(PacketPtr pkt) override;
+                void recvReqRetry() override;
+        };
+        LLCPrefetchAgentRequestPort mem_side_port;
+        Port& getPort(const std::string &if_name, PortID idx) override;
+    public:
         struct LLCPrefetchAgentStats : public statistics::Group
         {
             LLCPrefetchAgentStats(statistics::Group *parent);
@@ -75,6 +91,7 @@ class LLCPrefetchAgent: public ClockedObject
             statistics::Scalar \
                 prefetch_request_dropped_due_to_cache_line_presence;
             statistics::Scalar prefetch_request_sent;
+            statistics::Formula prefetch_request_not_sent;
             statistics::Histogram prefetch_request_queue_length;
         } agent_stats;
 };
