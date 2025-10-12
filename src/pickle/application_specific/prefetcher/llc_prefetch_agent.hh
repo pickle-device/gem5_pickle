@@ -50,7 +50,6 @@ class LLCPrefetchAgent: public ClockedObject
     private:
         PARAMS(LLCPrefetchAgent);
     private:
-        bool isActivated;
         PicklePrefetcher* prefetcher;
         ruby::CHI::Cache_Controller* llc_controller;
         std::vector<AddrRange> addr_ranges;
@@ -58,8 +57,6 @@ class LLCPrefetchAgent: public ClockedObject
         LLCPrefetchAgent(const LLCPrefetchAgentParams &params);
         ~LLCPrefetchAgent();
         void setPicklePrefetcher(PicklePrefetcher* prefetcher);
-        void switchOn();
-        void switchOff();
 };
 
 }; // namespace gem5

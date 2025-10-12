@@ -37,7 +37,7 @@ namespace gem5
 {
 
 LLCPrefetchAgent::LLCPrefetchAgent(const LLCPrefetchAgentParams &params)
-    : ClockedObject(params), isActivated(false),
+    : ClockedObject(params),
       llc_controller(params.llc_controller),
       addr_ranges(params.addr_ranges)
 {
@@ -52,18 +52,6 @@ void LLCPrefetchAgent::setPicklePrefetcher(PicklePrefetcher* prefetcher)
 {
     assert(prefetcher != nullptr);
     this->prefetcher = prefetcher;
-}
-
-void LLCPrefetchAgent::switchOn()
-{
-    assert(!isActivated);
-    isActivated = true;
-}
-
-void LLCPrefetchAgent::switchOff()
-{
-    assert(isActivated);
-    isActivated = false;
 }
 
 }; // namespace gem5
