@@ -433,8 +433,10 @@ PrefetcherWorkTrackerCollective::populateCurrLevelPrefetches(
 )
 {
     for (auto addr: work->getCurrLevelExpectedPrefetches()) {
-        outstanding_prefetch_queue.emplace(
-            addr, work->getWorkItemReceiveTime(), work->getWorkId()
+        outstanding_prefetch_queue.push(
+            PrefetchRequest::createWithVAddr(
+                addr, work->getWorkItemReceiveTime(), work->getWorkId()
+            )
         );
         if (
             pf_vaddr_to_work_items_map.find(addr) \

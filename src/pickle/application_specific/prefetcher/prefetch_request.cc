@@ -31,25 +31,64 @@
 
 #include "pickle/application_specific/prefetcher/prefetch_request.hh"
 
+#include <cassert>
+
 namespace gem5
 {
 
 PrefetchRequest::PrefetchRequest()
-    : pf_vaddr(-1ULL), pf_req_time(-1ULL), pf_id(-1ULL)
+    : pf_vaddr(-1ULL), pf_req_time(-1ULL), pf_id(-1ULL), has_paddr(false)
 {
 }
 
-PrefetchRequest::PrefetchRequest(
-    const Addr pf_vaddr, const Tick pf_req_time, const uint64_t pf_id
-)
-    : pf_vaddr(pf_vaddr), pf_req_time(pf_req_time), pf_id(pf_id)
+PrefetchRequest
+PrefetchRequest::createWithVAddr(const Addr pf_vaddr, const Tick pf_req_time,
+                                const uint64_t pf_id)
 {
+    PrefetchRequest request;
+    request.pf_vaddr = pf_vaddr;
+    request.pf_req_time = pf_req_time;
+    request.pf_id = pf_id;
+    request.has_paddr = false;
+    return request;
+}
+
+PrefetchRequest
+PrefetchRequest::createWithPAddr(const Addr pf_paddr, const Tick pf_req_time,
+                                const uint64_t pf_id)
+{
+    PrefetchRequest request;
+    request.pf_paddr = pf_paddr;
+    request.pf_req_time = pf_req_time;
+    request.pf_id = pf_id;
+    request.has_paddr = true;
+    return request;
 }
 
 Addr
 PrefetchRequest::getPrefetchVAddr() const
 {
     return pf_vaddr;
+}
+
+Addr
+PrefetchRequest::getPrefetchPAddr() const
+{
+    assert(has_paddr);
+    return pf_paddr;
+}
+
+void
+PrefetchRequest::setPrefetchPAddr(const Addr pf_paddr)
+{
+    this->pf_paddr = pf_paddr;
+    this->has_paddr = true;
+}
+
+bool
+PrefetchRequest::hasPAddr() const
+{
+    return has_paddr;
 }
 
 Tick

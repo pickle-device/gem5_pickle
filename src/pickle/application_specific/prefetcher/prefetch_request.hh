@@ -41,14 +41,20 @@ class PrefetchRequest
 {
     private:
         Addr pf_vaddr;
+        Addr pf_paddr;
         Tick pf_req_time;
         uint64_t pf_id;
+        bool has_paddr;
     public:
         PrefetchRequest();
-        PrefetchRequest(
-            const Addr pf_vaddr, const Tick pf_req_time, const uint64_t pf_id
-        );
+        static PrefetchRequest createWithVAddr(
+            const Addr pf_vaddr, const Tick pf_req_time, const uint64_t pf_id);
+        static PrefetchRequest createWithPAddr(
+            const Addr pf_paddr, const Tick pf_req_time, const uint64_t pf_id);
         Addr getPrefetchVAddr() const;
+        Addr getPrefetchPAddr() const;
+        void setPrefetchPAddr(const Addr pf_paddr);
+        bool hasPAddr() const;
         Tick getPrefetchReqTime() const;
         uint64_t getPrefetchId() const;
 };
