@@ -38,7 +38,8 @@ namespace gem5
 
 LLCPrefetchAgent::LLCPrefetchAgent(const LLCPrefetchAgentParams &params)
     : ClockedObject(params), isActivated(false),
-      llc_controller(params.llc_controller)
+      llc_controller(params.llc_controller),
+      addr_ranges(params.addr_ranges)
 {
     assert(llc_controller != nullptr);
 }

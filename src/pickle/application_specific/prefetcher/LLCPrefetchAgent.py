@@ -45,3 +45,8 @@ class LLCPrefetchAgent(ClockedObject):
     llc_controller = Param.CHI_Cache_Controller(
         "The LLC controller that this prefetch agent is associated with",
     )
+    addr_ranges = VectorParam.AddrRange(
+        [],
+        "The address range that this prefetch agent is responsible for. If empty, "
+        "the prefetch agent will be responsible for no addresses.",
+    )

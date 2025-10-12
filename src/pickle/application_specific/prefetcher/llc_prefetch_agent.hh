@@ -32,6 +32,9 @@
 #ifndef __LLC_PREFETCH_AGENT_HH__
 #define __LLC_PREFETCH_AGENT_HH__
 
+#include <vector>
+
+#include "base/addr_range.hh"
 #include "mem/ruby/protocol/CHI/Cache_Controller.hh"
 #include "params/LLCPrefetchAgent.hh"
 #include "pickle/application_specific/prefetcher/pickle_prefetcher.hh"
@@ -50,6 +53,7 @@ class LLCPrefetchAgent: public ClockedObject
         bool isActivated;
         PicklePrefetcher* prefetcher;
         ruby::CHI::Cache_Controller* llc_controller;
+        std::vector<AddrRange> addr_ranges;
     public:
         LLCPrefetchAgent(const LLCPrefetchAgentParams &params);
         ~LLCPrefetchAgent();
