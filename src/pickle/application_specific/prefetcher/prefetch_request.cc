@@ -54,11 +54,12 @@ PrefetchRequest::createWithVAddr(const Addr pf_vaddr, const Tick pf_req_time,
 }
 
 PrefetchRequest
-PrefetchRequest::createWithPAddr(const Addr pf_paddr, const Tick pf_req_time,
-                                const uint64_t pf_id)
+PrefetchRequest::createWithPAddr(const Addr pf_paddr, const Addr pf_vaddr,
+                                 const Tick pf_req_time, const uint64_t pf_id)
 {
     PrefetchRequest request;
     request.pf_paddr = pf_paddr;
+    request.pf_vaddr = pf_vaddr;
     request.pf_req_time = pf_req_time;
     request.pf_id = pf_id;
     request.has_paddr = true;

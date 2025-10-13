@@ -50,7 +50,8 @@ class PrefetchRequest
         static PrefetchRequest createWithVAddr(
             const Addr pf_vaddr, const Tick pf_req_time, const uint64_t pf_id);
         static PrefetchRequest createWithPAddr(
-            const Addr pf_paddr, const Tick pf_req_time, const uint64_t pf_id);
+            const Addr pf_paddr, const Addr pf_vaddr, const Tick pf_req_time,
+            const uint64_t pf_id);
         Addr getPrefetchVAddr() const;
         Addr getPrefetchPAddr() const;
         void setPrefetchPAddr(const Addr pf_paddr);
