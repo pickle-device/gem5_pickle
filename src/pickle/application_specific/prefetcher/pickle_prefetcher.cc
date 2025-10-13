@@ -69,6 +69,9 @@ PicklePrefetcher::PicklePrefetcher(
     ticks_per_cycle(1000),
     num_cores(params.num_cores),
     llc_prefetch_agents(params.llc_prefetch_agents),
+    delegate_last_layer_prefetches_to_llc_agents(
+        params.delegate_last_layer_prefetches_to_llc_agents
+    ),
     prefetcher_initialized(false),
     num_received_jobs(0),
     owner(nullptr),
@@ -284,6 +287,34 @@ PicklePrefetcher::receivePrefetch(
     received_packets_to_be_processed.insert(vaddr);
     // Trigger In Queue Processing
     scheduleDueToIncomingPrefetch();
+}
+
+bool
+PicklePrefetcher::delegatePrefetchToLLCAgent(const PrefetchRequest& pf_request)
+{
+    const Addr pf_paddr = pf_request.getPrefetchPAddr();
+    for (auto &agent: llc_prefetch_agents) {
+        if (agent->isAddressInMonitoredRanges(pf_paddr)) {
+            agent->enqueueRequestWithPAddr(pf_request);
+                DPRINTF(
+                    PickleDevicePrefetcherDebug,
+                    "delegate to LLC: data = 0x%llx\n",
+                    pf_request.getPrefetchVAddr()
+                );
+            return true;
+        }
+    }
+    return false;
+}
+
+void
+PicklePrefetcher::agentCompletePrefetchRequest(
+    const PrefetchRequest& pf_request
+)
+{
+    prefetcher_work_tracker_collective->processIncomingPrefetch(
+        pf_request.getPrefetchVAddr()
+    );
 }
 
 void

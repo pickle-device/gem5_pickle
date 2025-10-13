@@ -67,6 +67,13 @@ class PicklePrefetcher(ClockedObject):
         "The LLC prefetch agent(s) that this prefetcher sends prefetches to.",
     )
 
+    delegate_last_layer_prefetches_to_llc_agents = Param.Bool(
+        False,
+        "If true, the prefetcher will delegate the last layer prefetches to "
+        "LLC agents. Otherwise, the PicklePrefetcher will issue the last layer "
+        "prefetches itself.",
+    )
+
     # Optimization parameters
     prefetch_dropping_distance = Param.Int(
         0,

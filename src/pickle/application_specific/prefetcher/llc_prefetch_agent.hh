@@ -33,6 +33,7 @@
 #define __LLC_PREFETCH_AGENT_HH__
 
 #include <queue>
+#include <unordered_map>
 #include <vector>
 
 #include "base/addr_range.hh"
@@ -61,6 +62,8 @@ class LLCPrefetchAgent: public ClockedObject
         std::priority_queue<
             PrefetchRequest, std::vector<PrefetchRequest>, PrefetchRequestOrder
         > prefetch_request_queue;
+        std::unordered_map<Addr, PrefetchRequest>
+            pf_paddr_to_outstanding_requests;
         uint64_t ticks_per_cycle;
         EventFunctionWrapper processOutgoingRequestQueueEvent;
     public:
@@ -70,7 +73,9 @@ class LLCPrefetchAgent: public ClockedObject
         // Enqueue a prefetch request with a physical address.
         // We do not allow enqueuing a request with a virtual address, because
         // the LLC prefetch agent should only work with physical addresses.
-        void enqueueRequestWithPAddr(PrefetchRequest request);
+        void enqueueRequestWithPAddr(const PrefetchRequest& request);
+        // Notify the prefetch agent that a request has been completed
+        void completeRequest(Addr paddr);
         // Check if an address is in the address ranges this agent monitors
         bool isAddressInMonitoredRanges(Addr addr) const;
         // Send out requests in the outgoing request queue

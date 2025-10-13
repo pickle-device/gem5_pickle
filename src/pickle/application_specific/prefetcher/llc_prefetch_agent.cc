@@ -76,14 +76,19 @@ void LLCPrefetchAgent::setPicklePrefetcher(PicklePrefetcher* prefetcher)
     this->prefetcher = prefetcher;
 }
 
-void LLCPrefetchAgent::enqueueRequestWithPAddr(PrefetchRequest pf_request)
+void
+LLCPrefetchAgent::enqueueRequestWithPAddr(const PrefetchRequest& pf_request)
 {
     assert(pf_request.hasPAddr());
     agent_stats.prefetch_request_count++;
-    prefetch_request_queue.push(std::move(pf_request));
+    prefetch_request_queue.push(pf_request);
     agent_stats.prefetch_request_queue_length.sample(
         prefetch_request_queue.size()
     );
+    // Add to the map of outstanding requests
+    pf_paddr_to_outstanding_requests[
+        pf_request.getPrefetchPAddr()
+    ] = pf_request;
     // Schedule the processing event if not already scheduled
     if (!processOutgoingRequestQueueEvent.scheduled()) {
         schedule(
@@ -94,7 +99,28 @@ void LLCPrefetchAgent::enqueueRequestWithPAddr(PrefetchRequest pf_request)
     }
 }
 
-bool LLCPrefetchAgent::isAddressInMonitoredRanges(Addr addr) const
+void
+LLCPrefetchAgent::completeRequest(Addr paddr)
+{
+    auto it = pf_paddr_to_outstanding_requests.find(paddr);
+    if (it != pf_paddr_to_outstanding_requests.end()) {
+        PrefetchRequest pf_request = it->second;
+        // Notify the prefetcher that this prefetch request is completed
+        prefetcher->agentCompletePrefetchRequest(pf_request);
+        // Remove from the map of outstanding requests
+        pf_paddr_to_outstanding_requests.erase(it);
+        DPRINTF(LLCPrefetchAgentDebug,
+            "Completed prefetch request for paddr 0x%llx\n", paddr
+        );
+    } else {
+        DPRINTF(LLCPrefetchAgentDebug,
+            "Received completion for unknown paddr 0x%llx\n", paddr
+        );
+    }
+}
+
+bool
+LLCPrefetchAgent::isAddressInMonitoredRanges(Addr addr) const
 {
     for (const auto& range : addr_ranges) {
         if (range.contains(addr)) {
@@ -104,7 +130,8 @@ bool LLCPrefetchAgent::isAddressInMonitoredRanges(Addr addr) const
     return false;
 }
 
-void LLCPrefetchAgent::processOutgoingRequestQueue()
+void
+LLCPrefetchAgent::processOutgoingRequestQueue()
 {
     // Try to send as many requests as possible in the queue
     while (!prefetch_request_queue.empty()) {
@@ -123,6 +150,8 @@ void LLCPrefetchAgent::processOutgoingRequestQueue()
             agent_stats.prefetch_request_queue_length.sample(
                 prefetch_request_queue.size()
             );
+            // Notify the prefetcher that this prefetch request is "completed"
+            completeRequest(paddr);
             DPRINTF(LLCPrefetchAgentDebug,
                 "Dropped prefetch request for paddr 0x%llx as it is "
                 "already present in the cache\n", paddr
@@ -147,8 +176,7 @@ void LLCPrefetchAgent::processOutgoingRequestQueue()
             // Failed to send, will retry later
             delete pkt;
             DPRINTF(LLCPrefetchAgentDebug,
-                "Failed to send prefetch request for paddr 0x%llx, "
-                "will retry later\n", paddr
+                "Failed to send prefetch request for paddr 0x%llx\n", paddr
             );
             break;
         }
@@ -180,7 +208,7 @@ void LLCPrefetchAgent::triggerTests()
     for (const auto& paddr : test_paddrs) {
         if (isAddressInMonitoredRanges(paddr)) {
             PrefetchRequest pf_request = PrefetchRequest::createWithPAddr(
-                paddr, curTick(), (paddr - 0x110000000) / 64
+                paddr, 0x0, curTick(), (paddr - 0x110000000) / 64
             );
             enqueueRequestWithPAddr(std::move(pf_request));
             DPRINTF(LLCPrefetchAgentDebug,
@@ -229,6 +257,9 @@ LLCPrefetchAgent::LLCPrefetchAgentRequestPort::~LLCPrefetchAgentRequestPort()
 bool
 LLCPrefetchAgent::LLCPrefetchAgentRequestPort::recvTimingResp(PacketPtr pkt)
 {
+    // Notify the prefetcher that this prefetch request is "completed"
+    const Addr paddr = pkt->req->getPaddr();
+    owner->completeRequest(paddr);
     // Do nothing with the response packet as the prefetcher does not read data
     delete pkt;
     return true;

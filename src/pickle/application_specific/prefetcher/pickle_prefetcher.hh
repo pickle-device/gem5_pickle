@@ -76,6 +76,7 @@ class PicklePrefetcher: public ClockedObject
         uint64_t ticks_per_cycle;
         uint64_t num_cores;
         std::vector<LLCPrefetchAgent*> llc_prefetch_agents;
+        bool delegate_last_layer_prefetches_to_llc_agents;
     private:
         std::unordered_map<Addr, std::unique_ptr<uint8_t[]>> packet_data;
         std::unordered_map<Addr, PacketStatus> packet_status;
@@ -109,6 +110,13 @@ class PicklePrefetcher: public ClockedObject
         void receivePrefetch(
             const uint64_t vaddr, std::unique_ptr<uint8_t[]> p
         );
+        // Send the prefetch request to a prefetch agent that monitors the
+        // address range of the physical address. Return true if the request is
+        // sent to an agent, false otherwise.
+        bool delegatePrefetchToLLCAgent(const PrefetchRequest& pf_request);
+        // Notify the prefetcher that a prefetch request has been completed by
+        // an LLC prefetch agent.
+        void agentCompletePrefetchRequest(const PrefetchRequest& pf_request);
         void scheduleDueToIncomingPrefetch();
         void scheduleDueToOutstandingPrefetchRequests();
         PacketPtr zeroCycleLoadWithVAddr(const Addr& vaddr, bool& success);
