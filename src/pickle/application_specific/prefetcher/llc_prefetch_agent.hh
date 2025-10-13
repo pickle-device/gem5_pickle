@@ -75,6 +75,8 @@ class LLCPrefetchAgent: public ClockedObject
         bool isAddressInMonitoredRanges(Addr addr) const;
         // Send out requests in the outgoing request queue
         void processOutgoingRequestQueue();
+        // Trigger some test prefetch requests for testing purposes
+        void triggerTests();
     private:
         PacketPtr createPrefetchPacket(const PrefetchRequest& request) const;
     public:

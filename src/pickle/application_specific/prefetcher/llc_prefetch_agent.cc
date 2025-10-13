@@ -58,6 +58,12 @@ LLCPrefetchAgent::LLCPrefetchAgent(const LLCPrefetchAgentParams &params)
       agent_stats(this)
 {
     assert(llc_controller != nullptr);
+    DPRINTF(LLCPrefetchAgentDebug,
+        "LLC Prefetch Agent created, monitoring address ranges:\n"
+    );
+    for (const auto& range : addr_ranges) {
+        DPRINTF(LLCPrefetchAgentDebug, "  %s\n", range.to_string());
+    }
 }
 
 LLCPrefetchAgent::~LLCPrefetchAgent()
@@ -106,8 +112,11 @@ void LLCPrefetchAgent::processOutgoingRequestQueue()
         const PrefetchRequest& pf_request = prefetch_request_queue.top();
         const Addr paddr = pf_request.getPrefetchPAddr();
         // Check if the cache line is already present in the cache by
-        // consulting the LLC directory
-        if (llc_controller->getDirEntry(paddr) != nullptr) {
+        // consulting the LLC directory and its own cache.
+        // Note that the LLC directory does not keep track of cache lines only
+        // present in LLC.
+        if (llc_controller->getDirEntry(paddr) != nullptr
+            || llc_controller->getCacheEntry(paddr) != nullptr) {
             // Cache line is already present, drop the request
             agent_stats.prefetch_request_dropped_due_to_cache_line_presence++;
             prefetch_request_queue.pop();
@@ -149,6 +158,41 @@ void LLCPrefetchAgent::processOutgoingRequestQueue()
     // the front one but failed because the outgoing port is busy.
     // We'll wait till the port calls back recvReqRetry() to try again, so
     // we do not need to schedule the event again here.
+}
+
+void LLCPrefetchAgent::triggerTests()
+{
+    // Trigger some test prefetch requests for testing purposes
+    // Here we just enqueue some prefetch requests to some hardcoded
+    // physical addresses for testing
+    std::vector <Addr> test_paddrs = {
+        0x110000000,
+        0x110000000 + 1 * 64,
+        0x110000000 + 2 * 64,
+        0x110000000 + 3 * 64,
+        0x110000000 + 4 * 64,
+        0x110000000 + 5 * 64,
+        0x110000000 + 6 * 64,
+        0x110000000 + 7 * 64,
+        0x110000000 + 8 * 64,
+        0x110000000 + 9 * 64,
+    };
+    for (const auto& paddr : test_paddrs) {
+        if (isAddressInMonitoredRanges(paddr)) {
+            PrefetchRequest pf_request = PrefetchRequest::createWithPAddr(
+                paddr, curTick(), (paddr - 0x110000000) / 64
+            );
+            enqueueRequestWithPAddr(std::move(pf_request));
+            DPRINTF(LLCPrefetchAgentDebug,
+                "Triggered test prefetch request for paddr 0x%llx\n", paddr
+            );
+        } else {
+            //DPRINTF(LLCPrefetchAgentDebug,
+            //    "Test prefetch request for paddr 0x%llx is out of "
+            //    "monitored ranges, not enqueued\n", paddr
+            //);
+        }
+    }
 }
 
 PacketPtr LLCPrefetchAgent::createPrefetchPacket(
