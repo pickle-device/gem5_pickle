@@ -100,7 +100,9 @@ PickleDeviceRequestManager::enqueueRequest(
         outstanding_requests.size()
     );
     DPRINTF(PickleDeviceRequestManagerDebug,
-        "enqueueRequest: vaddr = 0x%llx, isLoad = %d\n", vaddr, is_load
+        "enqueueRequest: vaddr = 0x%llx, isLoad = %d, "
+        "only_complete_address_translation = %d\n",
+        vaddr, is_load, only_complete_address_translation
     );
     Addr block_aligned_vaddr = (vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
     profileRequest(block_aligned_vaddr);
@@ -169,6 +171,8 @@ PickleDeviceRequestManager::handleTranslationCompletion(
             request_bookkeeper->getVAddr(), request_bookkeeper->getPAddr(),
             true
         );
+        // Remove the request from the outstanding requests
+        removeOutstandingRequestViaRequestBookkeeper(request_bookkeeper);
         return;
     }
     // When the translation is done, we'll send the request to the cache
