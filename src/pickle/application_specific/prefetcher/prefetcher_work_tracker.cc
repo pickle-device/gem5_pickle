@@ -456,8 +456,10 @@ PrefetcherWorkTrackerCollective::populateCurrLevelPrefetches(
         pf_vaddr_to_work_items_map[addr].push_back(work);
         DPRINTF(
             PickleDevicePrefetcherWorkTrackerDebug,
-            "Adding pf_vaddr 0x%llx from WorkItem = 0x%llx\n",
-            addr, work->getWorkId()
+            "Adding pf_vaddr 0x%llx from WorkItem = 0x%llx, level = %d, "
+            "delegated = %d\n",
+            addr, work->getWorkId(), work->getLevel(),
+            is_delegated_to_prefetch_agent
         );
     }
     owner->scheduleDueToOutstandingPrefetchRequests();
