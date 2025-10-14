@@ -194,8 +194,10 @@ PicklePrefetcher::processOutgoingPrefetchRequestQueue()
         if (status) {
             DPRINTF(
                 PickleDevicePrefetcherDebug,
-                "PREFETCH OUT ---> vaddr 0x%llx, priority: %lld\n",
-                prefetchVAddr, prefetch_request.getPrefetchReqTime()
+                "PREFETCH OUT ---> vaddr 0x%llx, priority: %lld, "
+                "delegated: %d\n",
+                prefetchVAddr, prefetch_request.getPrefetchReqTime(),
+                is_address_translation_only
             );
             packet_status[prefetchVAddr] = PacketStatus::SENT;
             prefetcher_work_tracker_collective->popPrefetchRequest();
@@ -304,6 +306,12 @@ PicklePrefetcher::receiveAddressTranslationOnlyResponse(
         return;
     }
 
+    DPRINTF(
+        PickleDevicePrefetcherDebug,
+        "Receiving Address Translation Only Response: vaddr = 0x%llx, "
+        "paddr = 0x%llx\n", vaddr, paddr
+    );
+
     // we create a prefetch request for each prefetch that is delegated to a
     // prefetch agent (e.g., LLC prefetch agent)
     if (vaddr_to_prefetch_requests_to_be_delegated.find(vaddr) == \
@@ -331,19 +339,6 @@ PicklePrefetcher::receiveAddressTranslationOnlyResponse(
     vaddr_to_prefetch_requests_to_be_delegated.erase(vaddr);
     // send the prefetch request to a prefetch agent that monitors the address
     delegatePrefetchToLLCAgent(pf_request);
-    if (success) {
-        DPRINTF(
-            PickleDevicePrefetcherDebug,
-            "Receiving Address Translation Only Response: vaddr = 0x%llx, "
-            "paddr = 0x%llx\n", vaddr, paddr
-        );
-    } else {
-        DPRINTF(
-            PickleDevicePrefetcherDebug,
-            "Receiving Address Translation Only Fault: vaddr = 0x%llx\n",
-            vaddr
-        );
-    }
 }
 
 void
