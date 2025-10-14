@@ -208,7 +208,7 @@ void LLCPrefetchAgent::triggerTests()
     for (const auto& paddr : test_paddrs) {
         if (isAddressInMonitoredRanges(paddr)) {
             PrefetchRequest pf_request = PrefetchRequest::createWithPAddr(
-                paddr, 0x0, curTick(), (paddr - 0x110000000) / 64
+                paddr, 0x0, curTick(), (paddr - 0x110000000) / 64, true
             );
             enqueueRequestWithPAddr(std::move(pf_request));
             DPRINTF(LLCPrefetchAgentDebug,
@@ -260,6 +260,9 @@ LLCPrefetchAgent::LLCPrefetchAgentRequestPort::recvTimingResp(PacketPtr pkt)
     // Notify the prefetcher that this prefetch request is "completed"
     const Addr paddr = pkt->req->getPaddr();
     owner->completeRequest(paddr);
+    DPRINTF(LLCPrefetchAgentDebug,
+        "Received prefetch response for paddr 0x%llx\n", paddr
+    );
     // Do nothing with the response packet as the prefetcher does not read data
     delete pkt;
     return true;

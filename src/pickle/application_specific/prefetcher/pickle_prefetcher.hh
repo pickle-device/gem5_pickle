@@ -80,6 +80,8 @@ class PicklePrefetcher: public ClockedObject
     private:
         std::unordered_map<Addr, std::unique_ptr<uint8_t[]>> packet_data;
         std::unordered_map<Addr, PacketStatus> packet_status;
+        std::unordered_map<Addr, std::vector<PrefetchRequest>> \
+            vaddr_to_prefetch_requests_to_be_delegated;
         std::unordered_set<Addr> received_packets_to_be_processed;
         // there is a work tracker for each prefetch kernel for each core
         std::shared_ptr<PrefetcherWorkTrackerCollective> \
@@ -109,6 +111,11 @@ class PicklePrefetcher: public ClockedObject
         );
         void receivePrefetch(
             const uint64_t vaddr, std::unique_ptr<uint8_t[]> p
+        );
+        // Notify the prefetcher that an address translation only request is
+        // completed
+        void receiveAddressTranslationOnlyResponse(
+            Addr vaddr, Addr paddr, bool success
         );
         // Send the prefetch request to a prefetch agent that monitors the
         // address range of the physical address. Return true if the request is

@@ -280,8 +280,12 @@ PrefetcherWorkTrackerCollective::PrefetcherWorkTrackerCollective()
 }
 
 PrefetcherWorkTrackerCollective::PrefetcherWorkTrackerCollective(
-    const uint64_t _max_active_work_items
+    const uint64_t _max_active_work_items,
+    const bool _delegate_last_layer_prefetches_to_llc_agents
 ) : max_active_work_items(_max_active_work_items),
+    delegate_last_layer_prefetches_to_llc_agents(
+        _delegate_last_layer_prefetches_to_llc_agents
+    ),
     owner(nullptr)
 {
 }
@@ -432,10 +436,13 @@ PrefetcherWorkTrackerCollective::populateCurrLevelPrefetches(
     std::shared_ptr<WorkItem> work
 )
 {
+    const bool is_delegated_to_prefetch_agent = \
+        delegate_last_layer_prefetches_to_llc_agents && work->isLastLevel();
     for (auto addr: work->getCurrLevelExpectedPrefetches()) {
         outstanding_prefetch_queue.push(
             PrefetchRequest::createWithVAddr(
-                addr, work->getWorkItemReceiveTime(), work->getWorkId()
+                addr, work->getWorkItemReceiveTime(), work->getWorkId(),
+                is_delegated_to_prefetch_agent
             )
         );
         if (

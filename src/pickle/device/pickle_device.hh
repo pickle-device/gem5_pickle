@@ -191,7 +191,10 @@ class PickleDevice: public ClockedObject
         void enqueueControlMessage(uint8_t message);
         void enqueueControlData(uint8_t data);
         bool enqueueResponse(PacketPtr pkt, uint8_t internal_port_id);
-        void handleRequestTranslationFault(const Addr vaddr);
+        void handleRequestTranslationFault(Addr vaddr);
+        void handleAddressTranslationOnlyRequestCompletion(
+            Addr vaddr, Addr paddr, bool success
+        );
         // copying the core thread context when the core is executing the
         // target workloads, required for address translation of the
         // workload

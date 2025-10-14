@@ -67,24 +67,32 @@ PickleDeviceRequestManager::switchOff()
 }
 
 bool
-PickleDeviceRequestManager::enqueueLoadRequest(const Addr vaddr)
+PickleDeviceRequestManager::enqueueLoadRequest(
+    const Addr vaddr, bool only_complete_address_translation
+)
 {
     // Enqueue a load request to the request manager.
-    return enqueueRequest(vaddr, true, nullptr);
+    return enqueueRequest(
+        vaddr, true, nullptr, only_complete_address_translation
+    );
 }
 
 bool
 PickleDeviceRequestManager::enqueueStoreRequest(
-    const Addr vaddr, std::unique_ptr<uint8_t*> data_ptr
+    const Addr vaddr, std::unique_ptr<uint8_t*> data_ptr,
+    bool only_complete_address_translation
 )
 {
     assert(data_ptr != nullptr);
-    return enqueueRequest(vaddr, false, std::move(data_ptr));
+    return enqueueRequest(
+        vaddr, false, std::move(data_ptr), only_complete_address_translation
+    );
 }
 
 bool
 PickleDeviceRequestManager::enqueueRequest(
-    const Addr vaddr, bool is_load, std::unique_ptr<uint8_t*> data_ptr
+    const Addr vaddr, bool is_load, std::unique_ptr<uint8_t*> data_ptr,
+    bool only_complete_address_translation
 )
 {
     request_manager_stats.numRequestsReceivedFromOwner++;
@@ -130,7 +138,8 @@ PickleDeviceRequestManager::enqueueRequest(
     // Add the request
     outstanding_requests[block_aligned_vaddr].emplace_back(
         new RequestBookkeeper(
-            done_callback, fault_callback, req, is_load, std::move(data_ptr)
+            done_callback, fault_callback, req, is_load, std::move(data_ptr),
+            only_complete_address_translation
         )
     );
 
@@ -153,6 +162,15 @@ PickleDeviceRequestManager::handleTranslationCompletion(
     std::shared_ptr<RequestBookkeeper> request_bookkeeper
 )
 {
+    const bool is_translation_only = \
+        request_bookkeeper->isAddressTranslationOnly();
+    if (is_translation_only) {
+        owner->handleAddressTranslationOnlyRequestCompletion(
+            request_bookkeeper->getVAddr(), request_bookkeeper->getPAddr(),
+            true
+        );
+        return;
+    }
     // When the translation is done, we'll send the request to the cache
     // hierarchy.
     DPRINTF(PickleDeviceRequestManagerDebug,
@@ -240,6 +258,16 @@ PickleDeviceRequestManager::handleTranslationFault(
     std::shared_ptr<RequestBookkeeper> request_bookkeeper, const Fault& fault
 )
 {
+    const bool is_translation_only = \
+        request_bookkeeper->isAddressTranslationOnly();
+    if (is_translation_only) {
+        // tell the pickle device that the translation failed
+        owner->handleAddressTranslationOnlyRequestCompletion(
+            request_bookkeeper->getVAddr(), 0x0, false
+        );
+        owner->device_stats.numTranslationFaults++;
+        return;
+    }
     // When the translation fails, we'll notify the requestor.
     // TODO: remove the request from the outstanding requests.
     request_manager_stats.numTranslationFaults++;

@@ -96,6 +96,7 @@ class WorkItem
         const std::unordered_set<Addr>& getCurrLevelExpectedPrefetches() const;
         void moveToNextLevel();
         bool isDoneWithCurrLevel() const;
+        bool isLastLevel() const;
         bool isDone() const;
         uint64_t getLevel() const;
 }; // class WorkItem

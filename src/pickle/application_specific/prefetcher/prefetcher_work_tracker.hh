@@ -61,6 +61,8 @@ class PrefetcherWorkTracker
         // When we drop a prefetch request
         bool enable_dropping_prefetches;
         uint64_t prefetch_dropping_distance;
+        // whether we delegate the last layer prefetches to LLC agents
+        bool delegate_last_layer_prefetches_to_llc_agents;
     public:
         PicklePrefetcher* owner;
         std::shared_ptr<PrefetcherWorkTrackerCollective> collective;
@@ -118,6 +120,8 @@ class PrefetcherWorkTrackerCollective
     private:
         // The maximum number of active work items
         uint64_t max_active_work_items;
+        // whether we delegate the last layer prefetches to LLC agents
+        bool delegate_last_layer_prefetches_to_llc_agents;
         // When we drop a prefetch request
         bool enable_dropping_prefetches;
         uint64_t prefetch_dropping_distance;
@@ -155,7 +159,10 @@ class PrefetcherWorkTrackerCollective
         > core_start_time_map;
     public:
         PrefetcherWorkTrackerCollective();
-        PrefetcherWorkTrackerCollective(const uint64_t max_active_work_items);
+        PrefetcherWorkTrackerCollective(
+            const uint64_t max_active_work_items,
+            const bool delegate_last_layer_prefetches_to_llc_agents
+        );
         void setOwner(PicklePrefetcher* owner);
         void addPrefetcherWorkTracker(
             const uint64_t job_id, const uint64_t core_id,

@@ -77,16 +77,21 @@ class RequestBookkeeper: public std::enable_shared_from_this<RequestBookkeeper>
         Addr vaddr;
         Addr paddr;
         RequestStatus status;
+        bool only_complete_address_translation;
     public:
         RequestBookkeeper(
             AddressTranslationDoneCallbackType _done_callback,
             AddressTranslationFaultCallbackType _fault_callback,
             RequestPtr _req,
             bool _is_load,
-            std::unique_ptr<uint8_t*> _data_ptr
+            std::unique_ptr<uint8_t*> _data_ptr,
+            bool _only_complete_address_translation
         ) : done_callback(_done_callback), fault_callback(_fault_callback),
             pkt(NULL), req(_req), is_load(_is_load), fault(NoFault),
-            paddr(0xBADADD), status(RequestStatus::TRANSLATION_PENDING)
+            paddr(0xBADADD), status(RequestStatus::TRANSLATION_PENDING),
+            only_complete_address_translation(
+                _only_complete_address_translation
+            )
         {
             data_ptr = std::move(_data_ptr);
         }
@@ -106,6 +111,15 @@ class RequestBookkeeper: public std::enable_shared_from_this<RequestBookkeeper>
             fault = _fault;
             if (fault == NoFault) {
                 paddr = req->getPaddr();
+                // if only address translation is needed, we are done;
+                // the done callback will need to handle whether this is a
+                // translation only request or not
+                if (only_complete_address_translation) {
+                    done_callback(shared_from_this());
+                    return;
+                }
+                // if address translation is successful, create a data packet
+                // to send to the cache hierarchy
                 if (is_load) {
                     pkt = Packet::createRead(req);
                     pkt->allocate();
@@ -121,6 +135,10 @@ class RequestBookkeeper: public std::enable_shared_from_this<RequestBookkeeper>
         PacketPtr getPkt() { return pkt; }
         RequestPtr getReq() { return req; }
         Addr getVAddr() const { return req->getVaddr(); }
+        Addr getPAddr() const { return paddr; }
+        bool isAddressTranslationOnly() const {
+            return only_complete_address_translation;
+        }
 };
 
 class PickleDeviceAddressTranslation : public BaseMMU::Translation

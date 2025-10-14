@@ -37,25 +37,31 @@ namespace gem5
 {
 
 PrefetchRequest::PrefetchRequest()
-    : pf_vaddr(-1ULL), pf_req_time(-1ULL), pf_id(-1ULL), has_paddr(false)
+    : pf_vaddr(-1ULL), pf_req_time(-1ULL), pf_id(-1ULL), has_paddr(false),
+      is_delegated_to_prefetch_agent(false)
 {
 }
 
 PrefetchRequest
-PrefetchRequest::createWithVAddr(const Addr pf_vaddr, const Tick pf_req_time,
-                                const uint64_t pf_id)
+PrefetchRequest::createWithVAddr(
+    Addr pf_vaddr, Tick pf_req_time, uint64_t pf_id,
+    bool is_delegated_to_prefetch_agent
+)
 {
     PrefetchRequest request;
     request.pf_vaddr = pf_vaddr;
     request.pf_req_time = pf_req_time;
     request.pf_id = pf_id;
     request.has_paddr = false;
+    request.is_delegated_to_prefetch_agent = is_delegated_to_prefetch_agent;
     return request;
 }
 
 PrefetchRequest
-PrefetchRequest::createWithPAddr(const Addr pf_paddr, const Addr pf_vaddr,
-                                 const Tick pf_req_time, const uint64_t pf_id)
+PrefetchRequest::createWithPAddr(
+    Addr pf_paddr, Addr pf_vaddr, Tick pf_req_time, uint64_t pf_id,
+    bool is_delegated_to_prefetch_agent
+)
 {
     PrefetchRequest request;
     request.pf_paddr = pf_paddr;
@@ -63,6 +69,7 @@ PrefetchRequest::createWithPAddr(const Addr pf_paddr, const Addr pf_vaddr,
     request.pf_req_time = pf_req_time;
     request.pf_id = pf_id;
     request.has_paddr = true;
+    request.is_delegated_to_prefetch_agent = is_delegated_to_prefetch_agent;
     return request;
 }
 
@@ -80,7 +87,7 @@ PrefetchRequest::getPrefetchPAddr() const
 }
 
 void
-PrefetchRequest::setPrefetchPAddr(const Addr pf_paddr)
+PrefetchRequest::setPrefetchPAddr(Addr pf_paddr)
 {
     this->pf_paddr = pf_paddr;
     this->has_paddr = true;
@@ -96,6 +103,18 @@ Tick
 PrefetchRequest::getPrefetchReqTime() const
 {
     return pf_req_time;
+}
+
+uint64_t
+PrefetchRequest::getPrefetchId() const
+{
+    return pf_id;
+}
+
+bool
+PrefetchRequest::isDelegatedToPrefetchAgent() const
+{
+    return is_delegated_to_prefetch_agent;
 }
 
 }; // namespace gem5

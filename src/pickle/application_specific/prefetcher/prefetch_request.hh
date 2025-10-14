@@ -45,19 +45,22 @@ class PrefetchRequest
         Tick pf_req_time;
         uint64_t pf_id;
         bool has_paddr;
+        bool is_delegated_to_prefetch_agent;
     public:
         PrefetchRequest();
         static PrefetchRequest createWithVAddr(
-            const Addr pf_vaddr, const Tick pf_req_time, const uint64_t pf_id);
+            Addr pf_vaddr, Tick pf_req_time, uint64_t pf_id,
+            bool is_delegated_to_prefetch_agent);
         static PrefetchRequest createWithPAddr(
-            const Addr pf_paddr, const Addr pf_vaddr, const Tick pf_req_time,
-            const uint64_t pf_id);
+            Addr pf_paddr, Addr pf_vaddr, Tick pf_req_time,
+            uint64_t pf_id, bool is_delegated_to_prefetch_agent);
         Addr getPrefetchVAddr() const;
         Addr getPrefetchPAddr() const;
-        void setPrefetchPAddr(const Addr pf_paddr);
+        void setPrefetchPAddr(Addr pf_paddr);
         bool hasPAddr() const;
         Tick getPrefetchReqTime() const;
         uint64_t getPrefetchId() const;
+        bool isDelegatedToPrefetchAgent() const;
 };
 
 

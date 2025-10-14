@@ -231,6 +231,12 @@ WorkItem::isDoneWithCurrLevel() const
 }
 
 bool
+WorkItem::isLastLevel() const
+{
+    return curr_level == num_indirection_levels - 1;
+}
+
+bool
 WorkItem::isDone() const
 {
     return curr_level == num_indirection_levels;

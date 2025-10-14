@@ -739,9 +739,19 @@ PickleDevice::enqueueResponse(PacketPtr pkt, uint8_t internal_port_id)
 }
 
 void
-PickleDevice::handleRequestTranslationFault(const Addr vaddr)
+PickleDevice::handleRequestTranslationFault(Addr vaddr)
 {
     pickle_prefetcher->receivePrefetch(vaddr, nullptr);
+}
+
+void
+PickleDevice::handleAddressTranslationOnlyRequestCompletion(
+    Addr vaddr, Addr paddr, bool success
+)
+{
+    pickle_prefetcher->receiveAddressTranslationOnlyResponse(
+        vaddr, paddr, success
+    );
 }
 
 void

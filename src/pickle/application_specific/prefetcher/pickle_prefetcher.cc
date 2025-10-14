@@ -93,7 +93,10 @@ PicklePrefetcher::PicklePrefetcher(
 
     prefetcher_work_tracker_collective =
         std::shared_ptr<PrefetcherWorkTrackerCollective>(
-            new PrefetcherWorkTrackerCollective(concurrent_work_item_capacity)
+            new PrefetcherWorkTrackerCollective(
+                concurrent_work_item_capacity,
+                delegate_last_layer_prefetches_to_llc_agents
+            )
         );
     prefetcher_work_tracker_collective->setOwner(this);
 
@@ -164,7 +167,12 @@ PicklePrefetcher::processOutgoingPrefetchRequestQueue()
     {
         PrefetchRequest prefetch_request = \
             prefetcher_work_tracker_collective->peekNextPrefetchRequest();
-        Addr prefetchVAddr = prefetch_request.getPrefetchVAddr();
+        const Addr prefetchVAddr = prefetch_request.getPrefetchVAddr();
+        // if the prefetch is delegated to an LLC prefetch agent, the main
+        // prefetcher only performs address translation and sends the prefetch
+        // request to the prefetch agent
+        bool is_address_translation_only = \
+            prefetch_request.isDelegatedToPrefetchAgent();
         if (packet_status.find(prefetchVAddr) != packet_status.end()) {
             DPRINTF(
                 PickleDevicePrefetcherDebug,
@@ -175,8 +183,14 @@ PicklePrefetcher::processOutgoingPrefetchRequestQueue()
             prefetcher_work_tracker_collective->popPrefetchRequest();
             continue;
         }
+        // if the prefetch is delegated, we keep track of it
+        vaddr_to_prefetch_requests_to_be_delegated[prefetchVAddr].push_back(
+            prefetch_request
+        );
         bool status = \
-            owner->request_manager->enqueueLoadRequest(prefetchVAddr);
+            owner->request_manager->enqueueLoadRequest(
+                prefetchVAddr, is_address_translation_only
+            );
         if (status) {
             DPRINTF(
                 PickleDevicePrefetcherDebug,
@@ -272,6 +286,67 @@ PicklePrefetcher::enqueueWork(
 }
 
 void
+PicklePrefetcher::receiveAddressTranslationOnlyResponse(
+    Addr vaddr, Addr paddr, bool success
+)
+{
+    packet_status.erase(vaddr);
+    packet_data.erase(vaddr);
+
+    // if the translation is faulted, we do not issue the prefetch
+    if (!success) {
+        vaddr_to_prefetch_requests_to_be_delegated.erase(vaddr);
+        DPRINTF(
+            PickleDevicePrefetcherDebug,
+            "Receiving Address Translation Only Fault: vaddr = 0x%llx\n",
+            vaddr
+        );
+        return;
+    }
+
+    // we create a prefetch request for each prefetch that is delegated to a
+    // prefetch agent (e.g., LLC prefetch agent)
+    if (vaddr_to_prefetch_requests_to_be_delegated.find(vaddr) == \
+        vaddr_to_prefetch_requests_to_be_delegated.end()) {
+        // this should never happen
+        warn("No prefetch request is found for vaddr 0x%llx\n", vaddr);
+    }
+    // we pick the request with the highest priority (i.e., the earliest
+    // request time)
+    Tick earliest_req_time = -1ULL;
+    uint64_t pf_id = 0;
+    for (auto &req: vaddr_to_prefetch_requests_to_be_delegated[vaddr]) {
+        if (req.getPrefetchReqTime() < earliest_req_time) {
+            earliest_req_time = req.getPrefetchReqTime();
+            pf_id = req.getPrefetchId();
+        }
+    }
+    PrefetchRequest pf_request = PrefetchRequest::createWithPAddr(
+        paddr, //paddr
+        vaddr, // vaddr,
+        earliest_req_time, // req_time
+        pf_id, // unused
+        true // is_delegated_to_prefetch_agent
+    );
+    vaddr_to_prefetch_requests_to_be_delegated.erase(vaddr);
+    // send the prefetch request to a prefetch agent that monitors the address
+    delegatePrefetchToLLCAgent(pf_request);
+    if (success) {
+        DPRINTF(
+            PickleDevicePrefetcherDebug,
+            "Receiving Address Translation Only Response: vaddr = 0x%llx, "
+            "paddr = 0x%llx\n", vaddr, paddr
+        );
+    } else {
+        DPRINTF(
+            PickleDevicePrefetcherDebug,
+            "Receiving Address Translation Only Fault: vaddr = 0x%llx\n",
+            vaddr
+        );
+    }
+}
+
+void
 PicklePrefetcher::receivePrefetch(
   const uint64_t vaddr, std::unique_ptr<uint8_t[]> p
 )
@@ -312,6 +387,7 @@ PicklePrefetcher::agentCompletePrefetchRequest(
     const PrefetchRequest& pf_request
 )
 {
+    // Notify the work tracker that the prefetch request is completed
     prefetcher_work_tracker_collective->processIncomingPrefetch(
         pf_request.getPrefetchVAddr()
     );

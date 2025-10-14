@@ -58,13 +58,40 @@ class PickleDeviceRequestManager : public SimObject
     public:
         void switchOn();
         void switchOff();
-        bool enqueueLoadRequest(const Addr vaddr);
-        bool enqueueStoreRequest(
-            const Addr vaddr, std::unique_ptr<uint8_t*> data_ptr
+        // Enqueue a load request.
+        // Returns true if the request is successfully enqueued, false if the
+        // request manager is not activated.
+        //  - vaddr: the virtual address of the load request
+        //  - only_complete_address_translation: if true, the request manager
+        //               only performs address translation for the request, and
+        //               does not send the data request to the cache hierarchy
+        bool enqueueLoadRequest(
+            const Addr vaddr, bool only_complete_address_translation
         );
+        // Enqueue a store request.
+        // Returns true if the request is successfully enqueued, false if the
+        // request manager is not activated.
+        //  - vaddr: the virtual address of the store request
+        //  - data_ptr: the data pointer for the store request
+        //  - only_complete_address_translation: if true, the request manager
+        //               only performs address translation for the request, and
+        //               does not send the data request to the cache hierarchy
+        bool enqueueStoreRequest(
+            const Addr vaddr, std::unique_ptr<uint8_t*> data_ptr,
+            bool only_complete_address_translation
+        );
+        // Add a request to the request manager.
+        //   - vaddr: the virtual address of the request
+        //   - is_load: true if the request is a load, false if it is a store
+        //   - data_ptr: the data pointer for store requests, nullptr for load
+        //               requests
+        //  - only_complete_address_translation: if true, the request manager
+        //               only performs address translation for the request, and
+        //               does not send the data request to the cache hierarchy
         bool enqueueRequest(
             const Addr vaddr, bool is_load,
-            std::unique_ptr<uint8_t*> data_ptr
+            std::unique_ptr<uint8_t*> data_ptr,
+            bool only_complete_address_translation
         );
         void setRequestorID(const RequestorID requestor_id);
         void setMMU(BaseMMU* mmu);
@@ -87,7 +114,7 @@ class PickleDeviceRequestManager : public SimObject
         static constexpr uint64_t PAGE_SHIFT = 12;
         static constexpr uint64_t BLOCK_SIZE = (1 << BLOCK_SHIFT);
         static constexpr uint64_t PAGE_SIZE = (1 << PAGE_SHIFT);
-        //                 block_aligned_vaddr
+        // block_aligned_vaddr -> list of request bookkeepers
         std::unordered_map< \
             Addr, std::vector<std::shared_ptr<RequestBookkeeper>> \
         > outstanding_requests;
