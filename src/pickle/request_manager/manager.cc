@@ -217,7 +217,7 @@ PickleDeviceRequestManager::retryHandleTranslationCompletion()
         if (!success) {
             schedule(
                 retry_handle_translation_completion_event,
-                curTick() + 1000
+                curTick() + ticks_per_cycle
             );
             DPRINTF(PickleDeviceRequestManagerDebug,
                 "Retrying translation completion for vaddr 0x%llx\n",
