@@ -97,6 +97,10 @@ LLCPrefetchAgent::enqueueRequestWithPAddr(const PrefetchRequest& pf_request)
             curTick() + ticks_per_cycle
         );
     }
+    DPRINTF(LLCPrefetchAgentDebug,
+        "Enqueued prefetch request for paddr 0x%llx\n",
+        pf_request.getPrefetchPAddr()
+    );
 }
 
 void
@@ -182,10 +186,15 @@ LLCPrefetchAgent::processOutgoingRequestQueue()
         }
     }
 
-    // If there are still requests in the queue, we already tried to send
-    // the front one but failed because the outgoing port is busy.
-    // We'll wait till the port calls back recvReqRetry() to try again, so
-    // we do not need to schedule the event again here.
+    // Schedule the event again if there are still requests in the queue
+    if (!prefetch_request_queue.empty()) {
+        if (!processOutgoingRequestQueueEvent.scheduled()) {
+            schedule(
+                processOutgoingRequestQueueEvent,
+                curTick() + ticks_per_cycle
+            );
+        }
+    }
 }
 
 void LLCPrefetchAgent::triggerTests()

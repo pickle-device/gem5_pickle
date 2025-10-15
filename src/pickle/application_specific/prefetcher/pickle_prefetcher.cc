@@ -176,8 +176,7 @@ PicklePrefetcher::processOutgoingPrefetchRequestQueue()
         if (packet_status.find(prefetchVAddr) != packet_status.end()) {
             DPRINTF(
                 PickleDevicePrefetcherDebug,
-                "PREFETCH OUT COALESCED ---> vaddr 0x%llx already in "
-                "queue\n",
+                "PREFETCH OUT COALESCED ---> vaddr 0x%llx already in queue\n",
                 prefetchVAddr
             );
             prefetcher_work_tracker_collective->popPrefetchRequest();
@@ -292,11 +291,10 @@ PicklePrefetcher::receiveAddressTranslationOnlyResponse(
     Addr vaddr, Addr paddr, bool success
 )
 {
-    packet_status.erase(vaddr);
-    packet_data.erase(vaddr);
-
     // if the translation is faulted, we do not issue the prefetch
     if (!success) {
+        packet_status.erase(vaddr);
+        packet_data.erase(vaddr);
         vaddr_to_prefetch_requests_to_be_delegated.erase(vaddr);
         DPRINTF(
             PickleDevicePrefetcherDebug,
@@ -382,10 +380,16 @@ PicklePrefetcher::agentCompletePrefetchRequest(
     const PrefetchRequest& pf_request
 )
 {
+    const Addr vaddr = pf_request.getPrefetchVAddr();
+    packet_status.erase(vaddr);
+    packet_data.erase(vaddr);
+
     // Notify the work tracker that the prefetch request is completed
     prefetcher_work_tracker_collective->processIncomingPrefetch(
         pf_request.getPrefetchVAddr()
     );
+    // Notify the work tracker that the prefetch request is completed
+    //scheduleDueToIncomingPrefetch();
 }
 
 void
