@@ -70,6 +70,8 @@ class MemInterface;
 class DRAMInterface;
 class NVMInterface;
 
+enum MemCtrlState { IDLE = 0, BUSY };
+
 /**
  * A burst helper helps organize and manage a packet that is larger than
  * the memory burst size. A system packet that is larger than the burst size
@@ -245,6 +247,9 @@ typedef std::deque<MemPacket*> MemPacketQueue;
  */
 class MemCtrl : public qos::MemCtrl
 {
+  private:
+    MemCtrlState memCtrlState;
+
   protected:
 
     // For now, make use of a queued response port to avoid dealing with
@@ -591,6 +596,12 @@ class MemCtrl : public qos::MemCtrl
         statistics::Scalar bytesReadWrQ;
         statistics::Scalar bytesReadSys;
         statistics::Scalar bytesWrittenSys;
+
+        // Total non-idle ticks
+        statistics::Scalar previousCheckTick;
+        statistics::Scalar totalIdleTicks;
+        statistics::Formula avgUtilization;
+
         // Average bandwidth
         statistics::Formula avgRdBWSys;
         statistics::Formula avgWrBWSys;
@@ -637,6 +648,20 @@ class MemCtrl : public qos::MemCtrl
     {
         return (is_read ? readQueue : writeQueue);
     };
+
+    /**
+     * Profile the event that a new entry is added to one of the read/write
+     * queue. Must be called before the new entry is added.
+     * Useful to know if the device becomes busy.
+     */
+    void ProfileAddingToQueueEvent();
+
+    /**
+     * Profile the event that a response leaves the response queue.
+     * Must be called after the response is sent.
+     * Useful to know if the device becomes idle.
+     */
+    void ProfileResponseLeavingEvent();
 
     virtual bool respQEmpty()
     {

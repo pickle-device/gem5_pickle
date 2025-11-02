@@ -59,6 +59,7 @@ namespace memory
 
 MemCtrl::MemCtrl(const MemCtrlParams &p) :
     qos::MemCtrl(p),
+    memCtrlState(MemCtrlState::IDLE),
     port(name() + ".port", *this), isTimingMode(false),
     retryRdReq(false), retryWrReq(false),
     nextReqEvent([this] {processNextReqEvent(dram, respQueue,
@@ -119,6 +120,8 @@ MemCtrl::startup()
         // start of simulation
         dram->nextBurstAt = curTick() + dram->commandOffset();
     }
+
+    stats.previousCheckTick = curTick();
 }
 
 Tick
@@ -185,10 +188,68 @@ MemCtrl::writeQueueFull(unsigned int neededEntries) const
     return  wrsize_new > writeBufferSize;
 }
 
+void
+MemCtrl::ProfileAddingToQueueEvent()
+{
+    // ----- Check mem_ctrl state -----
+    // If the readQueue + writeQueue + responseQueue are empty, and if the
+    // current state is MemCtrlState::IDLE, then we record the time between
+    // the previous check and this check as IDLE, and we turn the mem
+    // controller state to BUSY.
+    if ((totalReadQueueSize + totalWriteQueueSize + respQueue.size() == 0)
+        && (memCtrlState == MemCtrlState::IDLE)) {
+        const Tick curTime = curTick();
+        // Make sure that we haven't checked this tick
+        if (curTime > stats.previousCheckTick.value()) {
+            stats.totalIdleTicks += curTime - stats.previousCheckTick.value();
+            stats.previousCheckTick = curTime;
+        }
+    }
+    // Regardless of whether the read/write queue accepts the request, the
+    // controller is going to or currently busy.
+    // This is because, if the mem_ctrl rejects the request, there must be
+    // a queue that contains the request, or the read/write queue is full. In
+    // both cases, the mem_ctrl is busy.
+    memCtrlState = MemCtrlState::BUSY;
+    // -----
+}
+
+void
+MemCtrl::ProfileResponseLeavingEvent()
+{
+    // ----- Check mem_ctrl state -----
+    // If the readQueue + writeQueue + responseQueue are empty, and if the
+    // current state is MemCtrlState::IDLE, then we record the time between
+    // the previous check and this check as IDLE, and we turn the mem
+    // controller state to BUSY.
+    if ((totalReadQueueSize + totalWriteQueueSize + respQueue.size() == 0)) {
+        const Tick curTime = curTick();
+        // I'm pretty sure the device must be BUSY at this point
+        if (memCtrlState == MemCtrlState::BUSY) {
+            // Make sure that we haven't checked this tick
+            if (curTime > stats.previousCheckTick.value()) {
+                stats.previousCheckTick = curTime;
+            }
+        } else if (memCtrlState == MemCtrlState::IDLE) {
+            warn_once("MemCtrlState is already IDLE when response leaves");
+            // Make sure that we haven't checked this tick
+            if (curTime > stats.previousCheckTick.value()) {
+                stats.totalIdleTicks += \
+                    curTime - stats.previousCheckTick.value();
+                stats.previousCheckTick = curTime;
+            }
+        }
+        memCtrlState = MemCtrlState::IDLE;
+    }
+    // -----
+}
+
 bool
 MemCtrl::addToReadQueue(PacketPtr pkt,
                 unsigned int pkt_count, MemInterface* mem_intr)
 {
+    ProfileAddingToQueueEvent();
+
     // only add to the read queue here. whenever the request is
     // eventually done, set the readyTime, and call schedule()
     assert(!pkt->isWrite());
@@ -304,6 +365,8 @@ void
 MemCtrl::addToWriteQueue(PacketPtr pkt, unsigned int pkt_count,
                                 MemInterface* mem_intr)
 {
+    ProfileAddingToQueueEvent();
+
     // only add to the write queue here. whenever the request is
     // eventually done, set the readyTime, and call schedule()
     assert(pkt->isWrite());
@@ -521,6 +584,7 @@ MemCtrl::processRespondEvent(MemInterface* mem_intr,
     }
 
     queue.pop_front();
+    ProfileResponseLeavingEvent();
 
     if (!queue.empty()) {
         assert(queue.front()->readyTime >= curTick());
@@ -1235,6 +1299,13 @@ MemCtrl::CtrlStats::CtrlStats(MemCtrl &_ctrl)
     ADD_STAT(bytesWrittenSys, statistics::units::Byte::get(),
              "Total written bytes from the system interface side"),
 
+    ADD_STAT(previousCheckTick, statistics::units::Tick::get(),
+             "The previous time we check if the mem controller state"),
+    ADD_STAT(totalIdleTicks, statistics::units::Tick::get(),
+             "Total number of ticks the memory system is idle"),
+    ADD_STAT(avgUtilization, statistics::units::Ratio::get(),
+             "Ratio of ticks that the memory system is not idle"),
+
     ADD_STAT(avgRdBWSys, statistics::units::Rate<
                 statistics::units::Byte, statistics::units::Second>::get(),
              "Average system read bandwidth in Byte/s"),
@@ -1364,6 +1435,7 @@ MemCtrl::CtrlStats::regStats()
     avgWrBWSys = (bytesWrittenSys) / simSeconds;
 
     avgGap = totGap / (readReqs + writeReqs);
+    avgUtilization = 1.0 - totalIdleTicks / simTicks;
 
     requestorReadRate = requestorReadBytes / simSeconds;
     requestorWriteRate = requestorWriteBytes / simSeconds;
