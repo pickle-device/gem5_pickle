@@ -44,6 +44,7 @@
 #include "debug/DRAM.hh"
 #include "debug/Drain.hh"
 #include "debug/MemCtrl.hh"
+#include "debug/MemCtrlUtilization.hh"
 #include "debug/NVM.hh"
 #include "debug/QOS.hh"
 #include "mem/dram_interface.hh"
@@ -60,6 +61,7 @@ namespace memory
 MemCtrl::MemCtrl(const MemCtrlParams &p) :
     qos::MemCtrl(p),
     memCtrlState(MemCtrlState::IDLE),
+    previousCheckTick(0),
     port(name() + ".port", *this), isTimingMode(false),
     retryRdReq(false), retryWrReq(false),
     nextReqEvent([this] {processNextReqEvent(dram, respQueue,
@@ -121,7 +123,9 @@ MemCtrl::startup()
         dram->nextBurstAt = curTick() + dram->commandOffset();
     }
 
-    stats.previousCheckTick = curTick();
+    previousCheckTick = curTick();
+    DPRINTF(MemCtrlUtilization, "Setting previousCheckTick to %ld\n",
+            previousCheckTick);
 }
 
 Tick
@@ -191,18 +195,27 @@ MemCtrl::writeQueueFull(unsigned int neededEntries) const
 void
 MemCtrl::ProfileAddingToQueueEvent()
 {
+    const uint64_t totalQueueSize = \
+      totalReadQueueSize + respQueue.size();
+    if (memCtrlState == MemCtrlState::IDLE) {
+        DPRINTF(MemCtrlUtilization,
+                "[ADD] totalQueueSize: %ld, status: IDLE\n", totalQueueSize);
+    } else {
+        DPRINTF(MemCtrlUtilization,
+                "[ADD] totalQueueSize: %ld, status: BUSY\n", totalQueueSize);
+    }
     // ----- Check mem_ctrl state -----
     // If the readQueue + writeQueue + responseQueue are empty, and if the
     // current state is MemCtrlState::IDLE, then we record the time between
     // the previous check and this check as IDLE, and we turn the mem
     // controller state to BUSY.
-    if ((totalReadQueueSize + totalWriteQueueSize + respQueue.size() == 0)
+    if ((totalQueueSize == 0)
         && (memCtrlState == MemCtrlState::IDLE)) {
         const Tick curTime = curTick();
         // Make sure that we haven't checked this tick
-        if (curTime > stats.previousCheckTick.value()) {
-            stats.totalIdleTicks += curTime - stats.previousCheckTick.value();
-            stats.previousCheckTick = curTime;
+        if (curTime > previousCheckTick) {
+            stats.totalIdleTicks += curTime - previousCheckTick;
+            previousCheckTick = curTime;
         }
     }
     // Regardless of whether the read/write queue accepts the request, the
@@ -217,26 +230,33 @@ MemCtrl::ProfileAddingToQueueEvent()
 void
 MemCtrl::ProfileResponseLeavingEvent()
 {
+    const uint64_t totalQueueSize = totalReadQueueSize + respQueue.size();
+    if (memCtrlState == MemCtrlState::IDLE) {
+        DPRINTF(MemCtrlUtilization,
+                "[DEL] totalQueueSize: %ld, status: IDLE\n", totalQueueSize);
+    } else {
+        DPRINTF(MemCtrlUtilization,
+                "[DEL] totalQueueSize: %ld, status: BUSY\n", totalQueueSize);
+    }
     // ----- Check mem_ctrl state -----
     // If the readQueue + writeQueue + responseQueue are empty, and if the
     // current state is MemCtrlState::IDLE, then we record the time between
     // the previous check and this check as IDLE, and we turn the mem
     // controller state to BUSY.
-    if ((totalReadQueueSize + totalWriteQueueSize + respQueue.size() == 0)) {
+    if (totalQueueSize == 0) {
         const Tick curTime = curTick();
         // I'm pretty sure the device must be BUSY at this point
         if (memCtrlState == MemCtrlState::BUSY) {
             // Make sure that we haven't checked this tick
-            if (curTime > stats.previousCheckTick.value()) {
-                stats.previousCheckTick = curTime;
+            if (curTime > previousCheckTick) {
+                previousCheckTick = curTime;
             }
         } else if (memCtrlState == MemCtrlState::IDLE) {
             warn_once("MemCtrlState is already IDLE when response leaves");
             // Make sure that we haven't checked this tick
-            if (curTime > stats.previousCheckTick.value()) {
-                stats.totalIdleTicks += \
-                    curTime - stats.previousCheckTick.value();
-                stats.previousCheckTick = curTime;
+            if (curTime > previousCheckTick) {
+                stats.totalIdleTicks += curTime - previousCheckTick;
+                previousCheckTick = curTime;
             }
         }
         memCtrlState = MemCtrlState::IDLE;
@@ -1299,8 +1319,6 @@ MemCtrl::CtrlStats::CtrlStats(MemCtrl &_ctrl)
     ADD_STAT(bytesWrittenSys, statistics::units::Byte::get(),
              "Total written bytes from the system interface side"),
 
-    ADD_STAT(previousCheckTick, statistics::units::Tick::get(),
-             "The previous time we check if the mem controller state"),
     ADD_STAT(totalIdleTicks, statistics::units::Tick::get(),
              "Total number of ticks the memory system is idle"),
     ADD_STAT(avgUtilization, statistics::units::Ratio::get(),

@@ -249,6 +249,7 @@ class MemCtrl : public qos::MemCtrl
 {
   private:
     MemCtrlState memCtrlState;
+    Tick previousCheckTick;
 
   protected:
 
@@ -598,7 +599,6 @@ class MemCtrl : public qos::MemCtrl
         statistics::Scalar bytesWrittenSys;
 
         // Total non-idle ticks
-        statistics::Scalar previousCheckTick;
         statistics::Scalar totalIdleTicks;
         statistics::Formula avgUtilization;
 
