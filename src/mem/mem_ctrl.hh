@@ -598,8 +598,8 @@ class MemCtrl : public qos::MemCtrl
         statistics::Scalar bytesReadSys;
         statistics::Scalar bytesWrittenSys;
 
-        // Total non-idle ticks
-        statistics::Scalar totalIdleTicks;
+        // Tracking if we can serve more read requests but we don't have any
+        statistics::Scalar totalReadIdleTicks;
         statistics::Formula avgUtilization;
 
         // Average bandwidth
