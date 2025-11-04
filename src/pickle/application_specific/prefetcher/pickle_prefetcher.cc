@@ -271,8 +271,9 @@ PicklePrefetcher::enqueueWork(
             packet_status.size()
         );
     }
-    // For BFS: workData = curr_ptr + sw_prefetch_distance * 4 of the workQueue
+    // For BFS: workData = curr_ptr of the workQueue
     // For PR: workData = node_id + sw_prefetch_distance
+    // For SPMV: workData = node_id
     prefetcher_work_tracker_collective->getPrefetcherWorkTracker(
         prefetchKernelId, cpuId
     )->addWorkItem(workData);

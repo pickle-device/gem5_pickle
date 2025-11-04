@@ -88,6 +88,13 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             this
         );
+    } else if (job_descriptor->kernel_name == "spmv") {
+        prefetch_generator = std::make_shared<SPMVPrefetchGenerator>(
+            "SPMVPrefetchGenerator",
+            owner->getSoftwareHintPrefetchDistance(),
+            owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            this
+        );
     } else {
         panic(
             "Unknown prefetch generator mode: %s\n",
@@ -256,6 +263,9 @@ PrefetcherWorkTracker::updateWorkItemQueue()
                 too_close = getCoreLatestWorkId() \
                             + prefetch_dropping_distance * 4 > work_id;
             } else if (job_descriptor->kernel_name == "pr_kernel") {
+                too_close = getCoreLatestWorkId() \
+                            + prefetch_dropping_distance > work_id;
+            } else if (job_descriptor->kernel_name == "spmv") {
                 too_close = getCoreLatestWorkId() \
                             + prefetch_dropping_distance > work_id;
             } else {
