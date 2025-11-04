@@ -106,6 +106,14 @@ PrefetcherWorkTracker::addWorkItem(Addr work_data)
     // The prefetcher generator will need to figure out the next node to
     // prefetch.
     auto work_item = prefetch_generator->generateWorkItem(work_data);
+    if (work_item == nullptr) {
+        DPRINTF(
+            PickleDevicePrefetcherWorkTrackerDebug,
+            "addWorkItem: No work item generated for work_data 0x%llx\n",
+            work_data
+        );
+        return;
+    }
     work_item->setJobId(job_id);
     work_item->setCoreId(core_id);
     work_id_to_work_items_map[work_item->getWorkId()] = work_item;
