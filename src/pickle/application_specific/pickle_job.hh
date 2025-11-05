@@ -61,6 +61,10 @@ class PickleJobArrayDescriptor
             element_size(element_size),
             is_ranged_access(is_ranged_access),
             is_indexed_access(is_indexed_access) {}
+        uint64_t num_elements() const
+        {
+            return (vaddr_end - vaddr_start) / element_size;
+        }
         std::string to_string() const
         {
             std::stringstream ss;

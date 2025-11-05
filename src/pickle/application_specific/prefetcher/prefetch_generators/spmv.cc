@@ -69,9 +69,9 @@ SPMVPrefetchGenerator::generateWorkItem(Addr work_data)
     // row (array 0) -> col_ind (array_id 1) -> x (array_id 3)
 
     const uint64_t num_rows = \
-        work_tracker->job_descriptor->get_array(0).num_elements - 1;
+        work_tracker->job_descriptor->get_array(0).num_elements() - 1;
     const uint64_t num_cols = \
-        work_tracker->job_descriptor->get_array(3).num_elements;
+        work_tracker->job_descriptor->get_array(3).num_elements();
     if (work_id >= num_rows) {
         return nullptr;
     }
@@ -180,6 +180,83 @@ SPMVPrefetchGenerator::generateWorkItem(Addr work_data)
             "Work Item = 0x%llx, row_start = 0x%llx\n",
             work_id, row_start
         );
+    }
+    if (row_start == row_end) {
+        // empty row
+        return workItem;
+    }
+
+    // level 2: we fetch the column indices of the row
+    {
+        Addr curr_block_vaddr = 1;
+        PacketPtr pkt = nullptr;
+        uint32_t* data_ptr = nullptr;
+        const Addr start_col_vaddr = \
+            col_ind_base_vaddr + row_start * col_ind_element_size;
+        const Addr end_col_vaddr = \
+            col_ind_base_vaddr + (row_end - 1) * col_ind_element_size;
+
+        col_indices.reserve(row_end - row_start);
+        for (
+            Addr col_vaddr = start_col_vaddr;
+            col_vaddr < end_col_vaddr;
+            col_vaddr += 4
+        )
+        {
+            const Addr col_vaddr_block_aligned = \
+                (col_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+            if (col_vaddr_block_aligned != curr_block_vaddr) {
+                bool success = false;
+                DPRINTF(
+                    PickleDevicePrefetcherWorkTrackerDebug,
+                    "Fetching col vaddr 0x%llx\n",
+                    col_vaddr_block_aligned
+                );
+                pkt = work_tracker->owner->zeroCycleLoadWithVAddr(
+                    col_vaddr_block_aligned, success
+                );
+                if (!success) {
+                    DPRINTF(
+                        PickleDevicePrefetcherTrace,
+                        "Failed to fetch level = 2, Work Item = 0x%llx, "
+                        "vaddr = 0x%llx\n",
+                        work_id, col_vaddr_block_aligned
+                    );
+                    return nullptr;
+                }
+                curr_block_vaddr = col_vaddr_block_aligned;
+                data_ptr = pkt->getPtr<uint32_t>();
+                // We add expected prefetches
+                workItem->addExpectedPrefetch(curr_block_vaddr, 1);
+                warnIfOutsideRanges(work_id, curr_block_vaddr);
+            }
+            constexpr Addr item_size = 4;
+            Addr col_index = \
+                (col_vaddr - curr_block_vaddr) / item_size;
+            col_indices.push_back(data_ptr[col_index]);
+            DPRINTF(
+                PickleDevicePrefetcherTrace,
+                "Work Item = 0x%llx, col_index = %lld\n",
+                work_id, col_indices.back()
+            );
+        }
+    }
+
+    // level 3: we fetch the values of x array
+    {
+        for (auto col_index : col_indices) {
+            Addr x_element_vaddr = x_base_vaddr + col_index * 4;
+            Addr x_element_vaddr_block_aligned = \
+                (x_element_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+            // We add expected prefetches
+            workItem->addExpectedPrefetch(x_element_vaddr_block_aligned, 2);
+            warnIfOutsideRanges(work_id, x_element_vaddr_block_aligned);
+            DPRINTF(
+                PickleDevicePrefetcherTrace,
+                "Work Item = 0x%llx, x_element = 0x%llx\n",
+                work_id, x_element_vaddr_block_aligned
+            );
+        }
     }
 
     return workItem;
