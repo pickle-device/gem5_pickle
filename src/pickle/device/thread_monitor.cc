@@ -36,7 +36,9 @@
 #include <unordered_map>
 #include <vector>
 
+#include "base/trace.hh"
 #include "base/types.hh"
+#include "debug/PickleDeviceThreadMonitor.hh"
 #include "sim/cur_tick.hh"
 
 namespace gem5 {
@@ -65,12 +67,14 @@ ThreadMonitor::getThreadRunDuration() {
 }
 
 void ThreadMonitor::recordThreadStart(uint64_t thread_id, Tick start_tick) {
+  DPRINTF(PickleDeviceThreadMonitor, "Record thread %ld starts\n", thread_id);
   thread_start_ticks[thread_id].push_back(start_tick);
 }
 
 void ThreadMonitor::recordThreadCompletion(
   uint64_t thread_id, Tick completion_tick
 ) {
+  DPRINTF(PickleDeviceThreadMonitor, "Record thread %ld ends\n", thread_id);
   thread_completion_ticks[thread_id].push_back(completion_tick);
 }
 
