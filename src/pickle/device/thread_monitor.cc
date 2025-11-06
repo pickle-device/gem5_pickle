@@ -31,7 +31,6 @@
 
 #include "pickle/device/thread_monitor.hh"
 
-#include <cassert>
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
@@ -55,9 +54,25 @@ ThreadMonitor::getThreadRunDuration() {
   for (const auto& [thread_id, start_ticks] : thread_start_ticks) {
     const std::vector<Tick>& completion_ticks = \
         thread_completion_ticks[thread_id];
-    assert(start_ticks.size() >= completion_ticks.size());
+    panic_if(
+        start_ticks.size() < completion_ticks.size(),
+        "Thread %ld has more completion ticks (%ld) than start ticks (%ld)\n",
+        thread_id, completion_ticks.size(), start_ticks.size()
+    );
     for (size_t i = 0; i < completion_ticks.size(); ++i) {
-      assert(completion_ticks[i] >= start_ticks[i]);
+      if (start_ticks[i] > completion_ticks[i]) {
+          for (const auto start_tick: start_ticks) {
+              inform("Thread %ld start tick: %ld\n", thread_id, start_tick);
+          }
+          for (const auto completion_tick: completion_ticks) {
+              inform(
+                  "Thread %ld completion tick: %ld\n",
+                  thread_id, completion_tick
+              );
+          }
+          panic("Thread %ld has invalid start tick and completion tick at "
+                "index %ld\n", thread_id, i);
+      }
       thread_run_durations[thread_id].push_back(
         completion_ticks[i] - start_ticks[i]
       );
