@@ -70,8 +70,8 @@ SPMVPrefetchGenerator::generateWorkItem(Addr work_data)
 
     const uint64_t num_rows = \
         work_tracker->job_descriptor->get_array(0).num_elements() - 1;
-    const uint64_t num_cols = \
-        work_tracker->job_descriptor->get_array(3).num_elements();
+    //const uint64_t num_cols = \
+    //    work_tracker->job_descriptor->get_array(3).num_elements();
     if (work_id >= num_rows) {
         return nullptr;
     }
