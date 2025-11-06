@@ -102,6 +102,10 @@ SPMVPrefetchGenerator::generateWorkItem(Addr work_data)
 
     constexpr Addr BLOCK_SHIFT = 6;
 
+    DPRINTF(
+        PickleDevicePrefetcherWorkTrackerDebug,
+        "----- Working on node_id %lld\n", node_id
+    );
     // level 1: we fetch the start and the end of the work_id's row
     {
         bool success = false;
@@ -123,12 +127,12 @@ SPMVPrefetchGenerator::generateWorkItem(Addr work_data)
             DPRINTF(
                 PickleDevicePrefetcherTrace,
                 "Failed to fetch level = 1, Work Item = 0x%llx, "
-                "pf_vaddr = 0x%llx, start_node\n",
+                "pf_vaddr = 0x%llx, row_start\n",
                 work_id, first_item_vaddr_block_aligned
             );
             return nullptr;
         }
-        Addr start_index = \
+        const Addr start_index = \
             (first_item_vaddr - first_item_vaddr_block_aligned) \
                 / row_ptr_element_size;
         // // 4 bytes per element
@@ -162,23 +166,23 @@ SPMVPrefetchGenerator::generateWorkItem(Addr work_data)
             DPRINTF(
                 PickleDevicePrefetcherTrace,
                 "Failed to fetch level = 1, Work Item = 0x%llx, "
-                "pf_vaddr = 0x%llx, start_node\n",
+                "pf_vaddr = 0x%llx, row_end\n",
                 work_id, second_item_vaddr_block_aligned
             );
             return nullptr;
         }
-        Addr start_index = \
+        const Addr end_index = \
             (second_item_vaddr - second_item_vaddr_block_aligned) \
                 / row_ptr_element_size;
         // // 4 bytes per element
-        row_start = (pkt->getConstPtr<uint32_t>()[start_index]);
+        row_end = (pkt->getConstPtr<uint32_t>()[end_index]);
         // We add expected prefetches
         workItem->addExpectedPrefetch(second_item_vaddr_block_aligned, 0);
         warnIfOutsideRanges(work_id, second_item_vaddr_block_aligned);
         DPRINTF(
             PickleDevicePrefetcherTrace,
-            "Work Item = 0x%llx, row_start = 0x%llx\n",
-            work_id, row_start
+            "Work Item = 0x%llx, row_end = 0x%llx\n",
+            work_id, row_end
         );
     }
     if (row_start == row_end) {
@@ -196,10 +200,15 @@ SPMVPrefetchGenerator::generateWorkItem(Addr work_data)
         const Addr end_col_vaddr = \
             col_ind_base_vaddr + (row_end - 1) * col_ind_element_size;
 
+        DPRINTF(
+            PickleDevicePrefetcherWorkTrackerDebug,
+            "row_start: %lld, row_end: %lld\n",
+            row_start, row_end
+        );
         col_indices.reserve(row_end - row_start);
         for (
             Addr col_vaddr = start_col_vaddr;
-            col_vaddr < end_col_vaddr;
+            col_vaddr <= end_col_vaddr;
             col_vaddr += 4
         )
         {
@@ -245,7 +254,7 @@ SPMVPrefetchGenerator::generateWorkItem(Addr work_data)
     // level 3: we fetch the values of x array
     {
         for (auto col_index : col_indices) {
-            Addr x_element_vaddr = x_base_vaddr + col_index * 4;
+            Addr x_element_vaddr = x_base_vaddr + col_index * x_element_size;
             Addr x_element_vaddr_block_aligned = \
                 (x_element_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
             // We add expected prefetches
