@@ -54,7 +54,7 @@ ThreadMonitor::getThreadRunDuration() {
   for (const auto& [thread_id, start_ticks] : thread_start_ticks) {
     const std::vector<Tick>& completion_ticks = \
         thread_completion_ticks[thread_id];
-    panic_if(
+    warn_if(
         start_ticks.size() < completion_ticks.size(),
         "Thread %ld has more completion ticks (%ld) than start ticks (%ld)\n",
         thread_id, completion_ticks.size(), start_ticks.size()
@@ -70,7 +70,7 @@ ThreadMonitor::getThreadRunDuration() {
                   thread_id, completion_tick
               );
           }
-          panic("Thread %ld has invalid start tick and completion tick at "
+          warn("Thread %ld has invalid start tick and completion tick at "
                 "index %ld\n", thread_id, i);
       }
       thread_run_durations[thread_id].push_back(
