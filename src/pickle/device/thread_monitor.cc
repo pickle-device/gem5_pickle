@@ -55,8 +55,8 @@ ThreadMonitor::getThreadRunDuration() {
   for (const auto& [thread_id, start_ticks] : thread_start_ticks) {
     const std::vector<Tick>& completion_ticks = \
         thread_completion_ticks[thread_id];
-    assert(start_ticks.size() == completion_ticks.size());
-    for (size_t i = 0; i < start_ticks.size(); ++i) {
+    assert(start_ticks.size() >= completion_ticks.size());
+    for (size_t i = 0; i < completion_ticks.size(); ++i) {
       assert(completion_ticks[i] >= start_ticks[i]);
       thread_run_durations[thread_id].push_back(
         completion_ticks[i] - start_ticks[i]
@@ -66,13 +66,15 @@ ThreadMonitor::getThreadRunDuration() {
   return thread_run_durations;
 }
 
-void ThreadMonitor::recordThreadStart(uint64_t thread_id, Tick start_tick) {
+void ThreadMonitor::recordThreadStart(
+  const uint64_t thread_id, const Tick start_tick
+) {
   DPRINTF(PickleDeviceThreadMonitor, "Record thread %ld starts\n", thread_id);
   thread_start_ticks[thread_id].push_back(start_tick);
 }
 
 void ThreadMonitor::recordThreadCompletion(
-  uint64_t thread_id, Tick completion_tick
+  const uint64_t thread_id, const Tick completion_tick
 ) {
   DPRINTF(PickleDeviceThreadMonitor, "Record thread %ld ends\n", thread_id);
   thread_completion_ticks[thread_id].push_back(completion_tick);

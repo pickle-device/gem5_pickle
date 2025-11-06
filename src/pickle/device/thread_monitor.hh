@@ -49,8 +49,8 @@ class ThreadMonitor
   ThreadMonitor();
   ~ThreadMonitor();
   std::unordered_map<uint64_t, uint64_t> core_thread_map;
-  void recordThreadStart(uint64_t thread_id, Tick start_tick);
-  void recordThreadCompletion(uint64_t thread_id, Tick end_tick);
+  void recordThreadStart(const uint64_t thread_id, const Tick start_tick);
+  void recordThreadCompletion(const uint64_t thread_id, const Tick end_tick);
   // Return the map of thread IDs to their respective vectors of run
   // durations.
   std::unordered_map<uint64_t, std::vector<Tick>> getThreadRunDuration();
