@@ -138,7 +138,7 @@ CCPrefetchGenerator::generateWorkItem(Addr work_data)
     {
         bool success = false;
         const Addr end_ptr_vaddr = \
-            out_neighbors_base + node_id * out_neighbors_element_size;
+            out_neighbors_base + node_id * out_index_ptr_element_size;
         const Addr end_ptr_vaddr_block_aligned = \
             (end_ptr_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
         DPRINTF(
