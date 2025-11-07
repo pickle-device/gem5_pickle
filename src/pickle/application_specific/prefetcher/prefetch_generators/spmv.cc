@@ -29,7 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "pickle/application_specific/prefetcher/prefetch_generators/bfs.hh"
+#include "pickle/application_specific/prefetcher/prefetch_generators/spmv.hh"
 
 #include "base/logging.hh"
 #include "base/trace.hh"
