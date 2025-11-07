@@ -81,6 +81,13 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             this
         );
+    } else if (job_descriptor->kernel_name == "cc_kernel") {
+        prefetch_generator = std::make_shared<CCPrefetchGenerator>(
+            "CCPrefetchGenerator",
+            owner->getSoftwareHintPrefetchDistance(),
+            owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            this
+        );
     } else if (job_descriptor->kernel_name == "pr_kernel") {
         prefetch_generator = std::make_shared<PRPrefetchGenerator>(
             "PRPrefetchGenerator",
