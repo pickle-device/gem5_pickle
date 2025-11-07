@@ -59,7 +59,8 @@ std::shared_ptr<WorkItem>
 SPMVPrefetchGenerator::generateWorkItem(Addr work_data)
 {
     // work_data is the node_id that the core is working on
-    const Addr work_id = work_data + software_hint_distance;
+    const Addr work_id = work_data + software_hint_distance - \
+        prefetch_distance_offset_from_software_hint;
 
     // Level 1: we fetch the start and the end of the work_id's row
     // Level 2: we fetch the column indices of the row
