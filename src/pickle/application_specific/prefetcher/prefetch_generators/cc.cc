@@ -62,6 +62,12 @@ CCPrefetchGenerator::generateWorkItem(Addr work_data)
     const Addr node_id = work_data + \
         software_hint_distance - prefetch_distance_offset_from_software_hint;
 
+    const uint64_t num_nodes = \
+        work_tracker->job_descriptor->get_array(0).num_elements() - 1;
+    if (node_id >= num_nodes) {
+        return nullptr;
+    }
+
     std::shared_ptr<WorkItem> workItem(new WorkItem(node_id));
 
     // Level 1: we fetch the start_ptr/end_ptr from out_index_ptr array
@@ -138,7 +144,7 @@ CCPrefetchGenerator::generateWorkItem(Addr work_data)
     {
         bool success = false;
         const Addr end_ptr_vaddr = \
-            out_neighbors_base + node_id * out_index_ptr_element_size;
+            out_index_ptr_base + (node_id + 1) * out_index_ptr_element_size;
         const Addr end_ptr_vaddr_block_aligned = \
             (end_ptr_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
         DPRINTF(
@@ -161,7 +167,7 @@ CCPrefetchGenerator::generateWorkItem(Addr work_data)
         }
         const Addr end_index = \
             (end_ptr_vaddr - end_ptr_vaddr_block_aligned) \
-                / out_neighbors_element_size;
+                / out_index_ptr_element_size;
         lv1_end_edge_vaddr = (pkt->getConstPtr<uint64_t>()[end_index]);
         // We add expected prefetches
         workItem->addExpectedPrefetch(end_ptr_vaddr_block_aligned, 0);

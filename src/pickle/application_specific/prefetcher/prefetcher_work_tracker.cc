@@ -269,6 +269,9 @@ PrefetcherWorkTracker::updateWorkItemQueue()
             if (job_descriptor->kernel_name == "bfs_kernel") {
                 too_close = getCoreLatestWorkId() \
                             + prefetch_dropping_distance * 4 > work_id;
+            } else if (job_descriptor->kernel_name == "cc_kernel") {
+                too_close = getCoreLatestWorkId() \
+                            + prefetch_dropping_distance > work_id;
             } else if (job_descriptor->kernel_name == "pr_kernel") {
                 too_close = getCoreLatestWorkId() \
                             + prefetch_dropping_distance > work_id;
