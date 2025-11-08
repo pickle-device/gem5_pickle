@@ -32,7 +32,12 @@
 Import('*')
 
 Source('prefetch_generator.cc')
+
+# gapbs
 Source('bfs.cc')
 Source('cc.cc')
 Source('pr.cc')
+Source('tc.cc')
+
+# benchmarks
 Source('spmv.cc')
