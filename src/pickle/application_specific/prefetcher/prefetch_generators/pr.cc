@@ -70,17 +70,25 @@ PRPrefetchGenerator::generateWorkItem(Addr work_data)
     uint64_t lv1_end_edge_vaddr = 0;
     std::vector<uint64_t> lv2_edge_indices;
 
-    // 0 -> 1 -> 2
+    // Array 0: in_index array (level 1)
+    // Array 1: in_neighbors array (level 2)
+    // Array 2: scores array (level 3)
+    // Array 3: outgoing_contrib array (level 3)
+
+    // Since we are not accessing the neighbors' scores array, we do not need
+    // to prefetch it. Instead, we prefetch the outgoing_contrib array.
+    // The access pattern is:
+    //   array 0 -> array 1 -> array 3
 
     // level 1: we fetch the start and the end of the edge indices
     {
         bool success = false;
-        Addr first_item_index = node_id;
-        Addr array_vaddr = \
+        const Addr first_item_index = node_id;
+        const Addr array_vaddr = \
             work_tracker->job_descriptor->get_array(0).vaddr_start;
 
-        Addr first_item_vaddr = array_vaddr + first_item_index * 8;
-        Addr first_item_vaddr_block_aligned = \
+        const Addr first_item_vaddr = array_vaddr + first_item_index * 8;
+        const Addr first_item_vaddr_block_aligned = \
             (first_item_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
         DPRINTF(
             PickleDevicePrefetcherWorkTrackerDebug,
@@ -101,7 +109,7 @@ PRPrefetchGenerator::generateWorkItem(Addr work_data)
             return nullptr;
         }
         constexpr Addr item_size = 8;
-        Addr start_index = \
+        const Addr start_index = \
             (first_item_vaddr - first_item_vaddr_block_aligned) / item_size;
         lv1_start_edge_vaddr = (pkt->getConstPtr<uint64_t>()[start_index]);
         // We add expected prefetches
@@ -115,12 +123,12 @@ PRPrefetchGenerator::generateWorkItem(Addr work_data)
     }
     {
         bool success = false;
-        Addr second_item_index = node_id + 1;
-        Addr array_vaddr = \
+        const Addr second_item_index = node_id + 1;
+        const Addr array_vaddr = \
             work_tracker->job_descriptor->get_array(0).vaddr_start;
 
-        Addr second_item_vaddr = array_vaddr + second_item_index * 8;
-        Addr second_item_vaddr_block_aligned = \
+        const Addr second_item_vaddr = array_vaddr + second_item_index * 8;
+        const Addr second_item_vaddr_block_aligned = \
             (second_item_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
         DPRINTF(
             PickleDevicePrefetcherWorkTrackerDebug,
@@ -141,7 +149,7 @@ PRPrefetchGenerator::generateWorkItem(Addr work_data)
             return nullptr;
         }
         constexpr Addr item_size = 8;
-        Addr end_index = \
+        const Addr end_index = \
             (second_item_vaddr - second_item_vaddr_block_aligned) / item_size;
         lv1_end_edge_vaddr = (pkt->getConstPtr<uint64_t>()[end_index]);
         // We add expected prefetches
@@ -167,7 +175,7 @@ PRPrefetchGenerator::generateWorkItem(Addr work_data)
             edge_vaddr += 4
         )
         {
-            Addr edge_vaddr_block_aligned = \
+            const Addr edge_vaddr_block_aligned = \
                 (edge_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
             if (edge_vaddr_block_aligned != curr_block_vaddr) {
                 bool success = false;
@@ -195,7 +203,7 @@ PRPrefetchGenerator::generateWorkItem(Addr work_data)
                 warnIfOutsideRanges(node_id, curr_block_vaddr);
             }
             constexpr Addr item_size = 4;
-            Addr edge_index = \
+            const Addr edge_index = \
                 (edge_vaddr - curr_block_vaddr) / item_size;
             lv2_edge_indices.push_back(data_ptr[edge_index]);
             DPRINTF(
@@ -206,21 +214,24 @@ PRPrefetchGenerator::generateWorkItem(Addr work_data)
         }
     }
 
-    // level 3: we fetch the contrib array
+    // level 3: we fetch the outgoing_contrib array
     {
-        Addr visited_start_vaddr = \
-            work_tracker->job_descriptor->get_array(2).vaddr_start;
+        const Addr outgoing_contrib_start_vaddr = \
+            work_tracker->job_descriptor->get_array(3).vaddr_start;
         for (auto edge_index : lv2_edge_indices) {
-            Addr visited_vaddr = visited_start_vaddr + edge_index * 4;
-            Addr visited_vaddr_block_aligned = \
-                (visited_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+            const Addr outgoing_contrib_vaddr = \
+                outgoing_contrib_start_vaddr + edge_index * 4;
+            const Addr outgoing_contrib_vaddr_block_aligned = \
+                (outgoing_contrib_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
             // We add expected prefetches
-            workItem->addExpectedPrefetch(visited_vaddr_block_aligned, 2);
-            warnIfOutsideRanges(node_id, visited_vaddr_block_aligned);
+            workItem->addExpectedPrefetch(
+                outgoing_contrib_vaddr_block_aligned, 2
+            );
+            warnIfOutsideRanges(node_id, outgoing_contrib_vaddr_block_aligned);
             DPRINTF(
                 PickleDevicePrefetcherTrace,
-                "Work Item = 0x%llx, visited = 0x%llx\n",
-                node_id, visited_vaddr_block_aligned
+                "Work Item = 0x%llx, outgoing_contrib = 0x%llx\n",
+                node_id, outgoing_contrib_vaddr_block_aligned
             );
         }
     }
