@@ -352,7 +352,7 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
         else if (
             pkt->req->hasPaddr()
                 && (pkt->req->getPaddr() >= 0x10110010
-                    && pkt->req->getPaddr() <= 0x10110020)
+                    && pkt->req->getPaddr() <= 0x10110030)
         ) {
             uint64_t data = -1;
             Addr paddr = pkt->req->getPaddr();
@@ -363,6 +363,12 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
                 case 0x10110018:
                     data = owner->getPrefetcher()\
                                 ->getSoftwareHintPrefetchDistance();
+                    break;
+                case 0x10110020:
+                    data = owner->getPrefetcher()->getPrefetchMode();
+                    break;
+                case 0x10110028:
+                    data = owner->getPrefetcher()->getBulkPrefetchChunkSize();
                     break;
             };
             uint8_t* data_ptr = (uint8_t*) &data;
@@ -477,7 +483,7 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvAtomic(PacketPtr pkt)
         else if (
             pkt->req->hasPaddr()
                 && (pkt->req->getPaddr() >= 0x10110010
-                    && pkt->req->getPaddr() <= 0x10110020)
+                    && pkt->req->getPaddr() <= 0x10110030)
         ) {
             uint64_t data = -1;
             Addr paddr = pkt->req->getPaddr();
@@ -488,6 +494,12 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvAtomic(PacketPtr pkt)
                 case 0x10110018:
                     data = owner->getPrefetcher()\
                                 ->getSoftwareHintPrefetchDistance();
+                    break;
+                case 0x10110020:
+                    data = owner->getPrefetcher()->getPrefetchMode();
+                    break;
+                case 0x10110028:
+                    data = owner->getPrefetcher()->getBulkPrefetchChunkSize();
                     break;
             };
             uint8_t* data_ptr = (uint8_t*) &data;
@@ -579,7 +591,7 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvFunctional(PacketPtr pkt)
         else if (
             pkt->req->hasPaddr()
                 && (pkt->req->getPaddr() >= 0x10110010
-                    && pkt->req->getPaddr() <= 0x10110020)
+                    && pkt->req->getPaddr() <= 0x10110030)
         ) {
             uint64_t data = -1;
             Addr paddr = pkt->req->getPaddr();
@@ -590,6 +602,12 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvFunctional(PacketPtr pkt)
                 case 0x10110018:
                     data = owner->getPrefetcher()\
                                 ->getSoftwareHintPrefetchDistance();
+                    break;
+                case 0x10110020:
+                    data = owner->getPrefetcher()->getPrefetchMode();
+                    break;
+                case 0x10110028:
+                    data = owner->getPrefetcher()->getBulkPrefetchChunkSize();
                     break;
             };
             uint8_t* data_ptr = (uint8_t*) &data;

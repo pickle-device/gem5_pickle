@@ -42,11 +42,41 @@ class PicklePrefetcher(ClockedObject):
     cxx_class = "gem5::PicklePrefetcher"
     cxx_exports = [PyBindMethod("switchOn"), PyBindMethod("switchOff")]
 
+    # Prefetch strategy parameters
     software_hint_prefetch_distance = Param.Int(1, "Prefetch distance")
     prefetch_distance_offset_from_software_hint = Param.Int(
         0,
         "Prefetch distance offset from software hint",
     )
+    prefetch_mode = Param.Int(
+        1,
+        "Choices: "
+        "0 - Invalid"
+        "1 - Single prefetch item per hint"
+        "2 - Bulk prefetch: more than 1 prefetch item per hint",
+    )
+    bulk_prefetch_chunk_size = Param.Int(
+        16384,
+        "Only used when bulk prefetch mode is chosen."
+        "If this parameter is N, the prefetch hint will be sent per "
+        "N work items. For example, if this parameter is 16384 when running "
+        "PR workload, a prefetch hint will be sent when the core is working "
+        "on item index 0, 16384, 2*16384, etc."
+        "This parameter must be non-zero if the prefetch_mode is bulk",
+    )
+    bulk_prefetch_num_prefetches_per_hint = Param.Int(
+        1,
+        "Only used when bulk prfetch mode is chosen."
+        "If this parameter is N, the prefetcher will generate N prefetch "
+        "items per prefetch hint.",
+    )
+    prefetch_dropping_distance = Param.Int(
+        0,
+        "Distance at which prefetches are dropped. "
+        "If set to 0, prefetches are never dropped.",
+    )
+
+    # Resource parameters
     concurrent_work_item_capacity = Param.Int(
         0,
         "Number of wokk items that can be prefetched concurrently",
@@ -63,6 +93,7 @@ class PicklePrefetcher(ClockedObject):
         "many sets of task-related stats to allocate.",
     )
 
+    # Prefetcher design choices
     llc_prefetch_agents = VectorParam.LLCPrefetchAgent(
         "The LLC prefetch agent(s) that this prefetcher sends prefetches to.",
     )
@@ -72,11 +103,4 @@ class PicklePrefetcher(ClockedObject):
         "If true, the prefetcher will delegate the last layer prefetches to "
         "LLC agents. Otherwise, the PicklePrefetcher will issue the last layer "
         "prefetches itself.",
-    )
-
-    # Optimization parameters
-    prefetch_dropping_distance = Param.Int(
-        0,
-        "Distance at which prefetches are dropped. "
-        "If set to 0, prefetches are never dropped.",
     )

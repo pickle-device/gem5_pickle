@@ -49,6 +49,11 @@ PicklePrefetcher::PicklePrefetcher(
     prefetch_distance_offset_from_software_hint(
         params.prefetch_distance_offset_from_software_hint
     ),
+    prefetch_mode(PrefetchMode(params.prefetch_mode)),
+    bulk_prefetch_chunk_size(params.bulk_prefetch_chunk_size),
+    bulk_prefetch_num_prefetches_per_hint(
+        params.bulk_prefetch_num_prefetches_per_hint
+    ),
     concurrent_work_item_capacity(
         params.concurrent_work_item_capacity
     ),
@@ -89,6 +94,27 @@ PicklePrefetcher::PicklePrefetcher(
         concurrent_work_item_capacity < 1,
         "The prefetcher must be able to handle at least 1 work item at a time"
         "\n"
+    );
+
+    panic_if(
+        prefetch_mode == PrefetchMode::UNKNOWN,
+        "Unknown prefetch mode\n"
+    );
+
+    panic_if(
+        (prefetch_mode == PrefetchMode::BULK_PREFETCH) &&
+        (bulk_prefetch_chunk_size <= 0),
+        "Chunk size must be positive when prefetch_mode is BULK "
+        "(chunk_size=%ld)\n",
+        bulk_prefetch_chunk_size
+    );
+
+    panic_if(
+        (prefetch_mode == PrefetchMode::BULK_PREFETCH) &&
+        (bulk_prefetch_num_prefetches_per_hint <= 0),
+        "Num prefetches per hint must be positive when prefetch_mode is BULK ",
+        "(num_prefetches_per_hint=%ld)\n",
+        bulk_prefetch_num_prefetches_per_hint
     );
 
     prefetcher_work_tracker_collective =
@@ -215,13 +241,31 @@ PicklePrefetcher::processOutgoingPrefetchRequestQueue()
 uint64_t
 PicklePrefetcher::getSoftwareHintPrefetchDistance() const
 {
-    return software_hint_prefetch_distance;
+    return static_cast<uint64_t>(software_hint_prefetch_distance);
 }
 
 uint64_t
 PicklePrefetcher::getPrefetchDistanceOffsetFromSoftwareHint() const
 {
-    return prefetch_distance_offset_from_software_hint;
+    return static_cast<uint64_t>(prefetch_distance_offset_from_software_hint);
+}
+
+uint64_t
+PicklePrefetcher::getPrefetchMode() const
+{
+    return static_cast<uint64_t>(prefetch_mode);
+}
+
+uint64_t
+PicklePrefetcher::getBulkPrefetchChunkSize() const
+{
+    return static_cast<uint64_t>(bulk_prefetch_chunk_size);
+}
+
+uint64_t
+PicklePrefetcher::getBulkPrefetchNumPrefetchesPerHint() const
+{
+    return static_cast<uint64_t>(bulk_prefetch_num_prefetches_per_hint);
 }
 
 void

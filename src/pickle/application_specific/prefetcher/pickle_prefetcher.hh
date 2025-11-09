@@ -60,6 +60,13 @@ enum PacketStatus
     ARRIVED
 };
 
+enum PrefetchMode
+{
+    UNKNOWN = 0,
+    SINGLE_PREFETCH = 1,
+    BULK_PREFETCH = 2
+};
+
 class PickleDevice;
 
 class PicklePrefetcher: public ClockedObject
@@ -67,6 +74,9 @@ class PicklePrefetcher: public ClockedObject
     private:
         int64_t software_hint_prefetch_distance;
         int64_t prefetch_distance_offset_from_software_hint;
+        PrefetchMode prefetch_mode;
+        int64_t bulk_prefetch_chunk_size;
+        int64_t bulk_prefetch_num_prefetches_per_hint;
         uint64_t concurrent_work_item_capacity;
         uint64_t expected_number_of_prefetch_generators;
         uint64_t prefetch_dropping_distance;
@@ -104,6 +114,9 @@ class PicklePrefetcher: public ClockedObject
         bool isActivated() const { return prefetcher_initialized; }
         uint64_t getSoftwareHintPrefetchDistance() const;
         uint64_t getPrefetchDistanceOffsetFromSoftwareHint() const;
+        uint64_t getPrefetchMode() const;
+        uint64_t getBulkPrefetchChunkSize() const;
+        uint64_t getBulkPrefetchNumPrefetchesPerHint() const;
     public: // the interface
         bool enqueueWork(
             const uint64_t workData, const uint64_t prefetchKernelId,
