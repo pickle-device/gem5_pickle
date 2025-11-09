@@ -64,6 +64,13 @@ TCPrefetchGenerator::generateWorkItem(Addr work_data)
 
     const uint64_t num_nodes = \
         work_tracker->job_descriptor->get_array(0).num_elements() - 1;
+
+    DPRINTF(
+        PickleDevicePrefetcherTrace,
+        "Received work_data: 0x%llx, node_id: 0x%llx, num_nodes: 0x%llx\n",
+        work_data, node_id, num_nodes
+    );
+
     if (node_id >= num_nodes) {
         return nullptr;
     }
