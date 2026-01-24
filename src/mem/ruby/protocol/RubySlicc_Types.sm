@@ -278,7 +278,7 @@ structure(RubyPrefetcherProxy, external = "yes") {
 structure (RubyDataMovementTrackerProxy, external = "yes") {
     void notifyWriteback(
         RequestPtr, MachineID, MachineID, bool, Tick, DataBlock, int);
-    void notifyHit(RequestPtr, MachineID, Addr, int);
+    void notifyHit(RequestPtr, MachineID, Addr, int, DataBlock);
     void notifyAccess(RequestPtr, MachineID, Addr, int);
     void regProbePoints();
 }

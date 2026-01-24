@@ -3813,7 +3813,7 @@ action(Profile_Hit, desc="") {
   int tbe_state_int := Cache_State_to_int(tbe.state);
   if (is_demand) {
     cache.profileDemandHit();
-    dmvProxy.notifyHit(tbe.seqReq, machineID, tbe.addr, tbe_state_int);
+    dmvProxy.notifyHit(tbe.seqReq, machineID, tbe.addr, tbe_state_int, tbe.dataBlk);
   } else {
     assert(use_prefetcher || tbe.is_remote_pf);
     cache.profilePrefetchHit();

@@ -40,22 +40,35 @@ RubyDataMovementTrackerProxy::notifyWriteback(
 {
     assert(req);
     RequestPtr req_copy(new Request(*req));
+    const uint64_t data_size = req->getSize();
+    const uint8_t* data = data_blk.getData(
+        /*Offset*/ getOffset(req->getPaddr()),
+        /*Length*/ data_size
+    );
+    std::vector<uint8_t> cache_fill_data(data, data + data_size);
     ppWriteback->notify(SimpleCacheAccessProbeArg(
         req_copy, *this, data_sender_id, data_sender_id_valid, latency,
-        cache_state)
-    );
+        cache_state, std::move(cache_fill_data)
+    ));
 }
 
 void
 RubyDataMovementTrackerProxy::notifyHit(
     const RequestPtr& req, const MachineID machine_id, const Addr addr,
-    const unsigned cache_state
+    const unsigned cache_state, const DataBlock& data_blk
 )
 {
     assert(req);
     RequestPtr req_copy(new Request(*req));
+    const uint64_t data_size = req->getSize();
+    const uint8_t* data = data_blk.getData(
+        /*Offset*/ getOffset(req->getPaddr()),
+        /*Length*/ data_size
+    );
+    std::vector<uint8_t> cache_fill_data(data, data + data_size);
     ppHit->notify(SimpleCacheAccessProbeArg(
-        req_copy, *this, machine_id, true, 0, cache_state
+        req_copy, *this, machine_id, true, 0, cache_state,
+        std::move(cache_fill_data)
     ));
 }
 
@@ -68,7 +81,7 @@ RubyDataMovementTrackerProxy::notifyAccess(
     assert(req);
     RequestPtr req_copy(new Request(*req));
     ppAccess->notify(SimpleCacheAccessProbeArg(
-        req_copy, *this, machine_id, true, 0, cache_state
+        req_copy, *this, machine_id, true, 0, cache_state, {}
     ));
 }
 

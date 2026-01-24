@@ -39,7 +39,7 @@
      );
      void notifyHit(
          const RequestPtr& req, const MachineID machine_id, const Addr addr,
-         const unsigned cache_state
+         const unsigned cache_state, const DataBlock& data_blk
      );
      void notifyAccess(
          const RequestPtr& req, const MachineID requestor_id, const Addr addr,
