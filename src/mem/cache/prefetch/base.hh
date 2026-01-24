@@ -277,7 +277,9 @@ class Base : public ClockedObject
 
         ~PrefetchInfo()
         {
-            delete[] data;
+            if (data != nullptr) {
+                delete[] data;
+            }
         }
     };
 
