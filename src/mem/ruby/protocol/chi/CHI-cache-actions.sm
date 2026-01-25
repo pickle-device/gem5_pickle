@@ -3783,6 +3783,7 @@ action(Profile_Miss, desc="") {
   assert(is_valid(tbe));
   bool is_demand := (tbe.is_local_pf || tbe.is_remote_pf) == false;
   bool is_remote_can_notify := tbe.is_remote_pf && upstream_prefetch_trains_prefetcher;
+  int tbe_state_int := Cache_State_to_int(tbe.state);
   if (is_demand) {
     cache.profileDemandMiss();
   } else {
@@ -3790,17 +3791,20 @@ action(Profile_Miss, desc="") {
     cache.profilePrefetchMiss();
   }
   // notify prefetcher about this demand miss
-  if (use_prefetcher && tbe.isSeqReqValid && (is_demand || is_remote_can_notify)) {
-    bool is_read := false;
-    if (isReadReqType(tbe.reqType)) {
-      is_read := true;
-    } else {
-      assert(isWriteReqType(tbe.reqType));
-    }
+  if (tbe.isSeqReqValid && (is_demand || is_remote_can_notify)) {
+    dmvProxy.notifyMiss(tbe.seqReq, machineID, tbe.addr, tbe_state_int);
+    if (use_prefetcher) {
+      bool is_read := false;
+      if (isReadReqType(tbe.reqType)) {
+        is_read := true;
+      } else {
+        assert(isWriteReqType(tbe.reqType));
+      }
 
-    // FIXME: this dataBlk is likely to have stale data. This should be fixed
-    // if our prefetcher uses cached data to make prefetch decisions.
-    pfProxy.notifyPfMiss(tbe.seqReq, is_read, tbe.dataBlk);
+      // FIXME: this dataBlk is likely to have stale data. This should be fixed
+      // if our prefetcher uses cached data to make prefetch decisions.
+      pfProxy.notifyPfMiss(tbe.seqReq, is_read, tbe.dataBlk);
+    }
   }
 }
 

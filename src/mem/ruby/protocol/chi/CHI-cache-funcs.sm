@@ -353,8 +353,14 @@ void notifyCoalesced(Addr addr, RubyRequestType type, RequestPtr req,
                       addr, type, was_miss);
   if (was_miss) {
     cache.profileDemandMiss();
+    // We don't have the cache state here; however, this only happens at the
+    // sequencer
+    dmvProxy.notifyMiss(req, machineID, addr, 0);
   } else {
     cache.profileDemandHit();
+    // We don't have the cache state here; however, this only happens at the
+    // sequencer
+    dmvProxy.notifyHit(req, machineID, addr, 0, data_blk);
   }
   if (use_prefetcher) {
     bool is_read := (type == RubyRequestType:LD) ||

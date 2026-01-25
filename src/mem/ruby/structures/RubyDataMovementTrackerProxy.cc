@@ -23,7 +23,7 @@ RubyDataMovementTrackerProxy::RubyDataMovementTrackerProxy(
     cacheController(_cacheController),
     ppWriteback(nullptr),
     ppHit(nullptr),
-    ppAccess(nullptr)
+    ppMiss(nullptr)
 {
     fatal_if(
         !cacheController,
@@ -73,14 +73,26 @@ RubyDataMovementTrackerProxy::notifyHit(
 }
 
 void
-RubyDataMovementTrackerProxy::notifyAccess(
+RubyDataMovementTrackerProxy::notifyHitFromMemory(
+    const RequestPtr& req, const MachineID machine_id, const Addr addr
+)
+{
+    assert(req);
+    RequestPtr req_copy(new Request(*req));
+    ppHit->notify(SimpleCacheAccessProbeArg(
+        req_copy, *this, machine_id, true, 0, 0, {}
+    ));
+}
+
+void
+RubyDataMovementTrackerProxy::notifyMiss(
     const RequestPtr& req, const MachineID machine_id, const Addr addr,
     const unsigned cache_state
 )
 {
     assert(req);
     RequestPtr req_copy(new Request(*req));
-    ppAccess->notify(SimpleCacheAccessProbeArg(
+    ppMiss->notify(SimpleCacheAccessProbeArg(
         req_copy, *this, machine_id, true, 0, cache_state, {}
     ));
 }
@@ -94,8 +106,11 @@ RubyDataMovementTrackerProxy::regProbePoints()
     ppHit = new ProbePointArg<SimpleCacheAccessProbeArg>(
         cacheController->getProbeManager(), "DataMovementHit"
     );
-    ppAccess = new ProbePointArg<SimpleCacheAccessProbeArg>(
-        cacheController->getProbeManager(), "DataMovementAccess"
+    ppHitFromMemory = new ProbePointArg<SimpleCacheAccessProbeArg>(
+        cacheController->getProbeManager(), "DataMovementHitFromMemory"
+    );
+    ppMiss = new ProbePointArg<SimpleCacheAccessProbeArg>(
+        cacheController->getProbeManager(), "DataMovementMiss"
     );
 }
 
