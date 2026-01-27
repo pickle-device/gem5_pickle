@@ -206,10 +206,10 @@ DifferentialMatchingPrefetcher::observeL1CacheHit(
     }
 
     DMP_PREFETCHER_DEBUG(
-        "DMP L1 Cache HIT observed: paddr=%#x, vaddr=%#x, pc=%#x, hasData=%d"
-        "\n",
-        arg.req->getPaddr(), arg.req->getVaddr(), arg.req->getPC(),
-        arg.hasCacheFillData()
+        "DMP L1 Cache HIT observed: paddr=%#x, vaddr=%#x, size=%d, pc=%#x, "
+        "hasData=%d\n",
+        arg.req->getPaddr(), arg.req->getVaddr(), arg.req->getSize(),
+        arg.req->getPC(), arg.hasCacheFillData()
     );
 
     const Addr pc = arg.req->getPC();
@@ -228,10 +228,10 @@ DifferentialMatchingPrefetcher::observeL1CacheMiss(
     }
 
     DMP_PREFETCHER_DEBUG(
-        "DMP L1 Cache MISS observed: paddr=%#x, vaddr=%#x, pc=%#x, hasData=%d"
-        "\n",
-        arg.req->getPaddr(), arg.req->getVaddr(), arg.req->getPC(),
-        arg.hasCacheFillData()
+        "DMP L1 Cache MISS observed: paddr=%#x, vaddr=%#x, size=%d, pc=%#x, "
+        "hasData=%d\n",
+        arg.req->getPaddr(), arg.req->getVaddr(), arg.req->getSize(),
+        arg.req->getPC(), arg.hasCacheFillData()
     );
     const Addr pc = arg.req->getPC();
     const Addr block_address = getBlockAddress(arg.req->getPaddr());
@@ -250,10 +250,10 @@ DifferentialMatchingPrefetcher::observeL1CacheFill(
     }
 
     DMP_PREFETCHER_DEBUG(
-        "DMP L1 Cache FILL observed: paddr=%#x, vaddr=%#x, pc=%#x, hasData=%d"
-        "\n",
-        arg.req->getPaddr(), arg.req->getVaddr(), arg.req->getPC(),
-        arg.hasCacheFillData()
+        "DMP L1 Cache FILL observed: paddr=%#x, vaddr=%#x, size=%d, pc=%#x, "
+        "hasData=%d\n",
+        arg.req->getPaddr(), arg.req->getVaddr(), arg.req->getSize(),
+        arg.req->getPC(), arg.hasCacheFillData()
     );
 }
 
