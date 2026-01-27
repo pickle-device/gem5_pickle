@@ -112,6 +112,7 @@ class DifferentialMatchingPrefetcherAtL1 : \
 
   // L1 cache data access observers
   private:
+    bool isObservable(const SimpleCacheAccessProbeArg &arg);
     void observeL1CacheHit (const SimpleCacheAccessProbeArg &arg);
     void observeL1CacheMiss(const SimpleCacheAccessProbeArg &arg);
     void observeL1CacheFill(const SimpleCacheAccessProbeArg &arg);

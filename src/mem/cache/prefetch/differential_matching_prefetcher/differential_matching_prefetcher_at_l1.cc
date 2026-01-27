@@ -187,11 +187,24 @@ DifferentialMatchingPrefetcherAtL1::regProbeListeners()
     pm->addListener("DataMovementWriteback", *(listeners.back()));
 }
 
+bool
+DifferentialMatchingPrefetcherAtL1::isObservable(
+    const SimpleCacheAccessProbeArg &arg
+)
+{
+    // We only observe data access with virtual address
+    return arg.req->hasVaddr();
+}
+
 void
 DifferentialMatchingPrefetcherAtL1::observeL1CacheHit(
     const SimpleCacheAccessProbeArg &arg
 )
 {
+    if (!isObservable(arg)) {
+        return;
+    }
+
     DMP_PREFETCHER_DEBUG(
         "DMP L1 Cache HIT observed: paddr=%#x, vaddr=%#x, pc=%#x, hasData=%d"
         "\n",
@@ -210,6 +223,10 @@ DifferentialMatchingPrefetcherAtL1::observeL1CacheMiss(
     const SimpleCacheAccessProbeArg &arg
 )
 {
+    if (!isObservable(arg)) {
+        return;
+    }
+
     DMP_PREFETCHER_DEBUG(
         "DMP L1 Cache MISS observed: paddr=%#x, vaddr=%#x, pc=%#x, hasData=%d"
         "\n",
@@ -228,6 +245,10 @@ DifferentialMatchingPrefetcherAtL1::observeL1CacheFill(
     const SimpleCacheAccessProbeArg &arg
 )
 {
+    if (!isObservable(arg)) {
+        return;
+    }
+
     DMP_PREFETCHER_DEBUG(
         "DMP L1 Cache FILL observed: paddr=%#x, vaddr=%#x, pc=%#x, hasData=%d"
         "\n",
