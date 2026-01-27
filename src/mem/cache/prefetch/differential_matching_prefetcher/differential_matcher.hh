@@ -30,10 +30,17 @@
 #define __DMP_DIFFERENTIAL_MATCHER_HH__
 
 #include <cstdint>
+#include <map>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
+#include "base/logging.hh"
 #include "base/types.hh"
+#include "debug/DifferentialMatchingPrefetcherDifferentMatcherDebug.hh"
+
+#define DMP_DIFFERENTIAL_MATCHER_DEBUG(...) \
+    DPRINTF(DifferentialMatchingPrefetcherDifferentMatcherDebug, __VA_ARGS__)
 
 namespace gem5
 {
@@ -73,6 +80,10 @@ class DifferentialMatcher
                         const uint64_t _max_num_tracked_items_per_table_entry);
     ~DifferentialMatcher() = default;
 
+    bool isFull() const;
+
+    bool hasCandidate(const Addr index_pc, const Addr target_pc) const;
+
     // Add a new candidate pair for matching.
     bool addCandidate(const Addr index_pc, const Addr target_pc);
 
@@ -83,11 +94,11 @@ class DifferentialMatcher
     // a cache miss would induce a cache fill later, so we only need to track
     // cache hit and cache misses for the target PC).
     void trackCacheHit(
-      const Addr pc, const Addr effective_address,const uint64_t data
+      const Addr pc, const Addr effective_vaddr, const uint64_t data
     );
-    void trackCacheMiss(const Addr pc, const Addr effective_address);
+    void trackCacheMiss(const Addr pc, const Addr effective_vaddr);
     void trackCacheFill(
-      const Addr pc, const Addr effective_address, const uint64_t data
+      const Addr pc, const Addr effective_vaddr, const uint64_t data
     );
 
   private:
@@ -97,9 +108,10 @@ class DifferentialMatcher
     using IndexPcTrackingEntry = TrackingEntry;
     using TargetPcTrackingEntry = TrackingEntry;
     using CandidatePcPair = std::pair<Addr, Addr>; // <index_pc, target_pc>
-    std::map<
-      CandidatePcPair, std::pair<IndexPcTrackingEntry, TargetPcTrackingEntry>
-    > candidate_index_target_pc;
+    using TrackingPair = std::pair<
+      IndexPcTrackingEntry, TargetPcTrackingEntry
+    >;
+    std::map<CandidatePcPair, TrackingPair> candidate_index_target_pc;
 };
 
 } // namespace prefetch

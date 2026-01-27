@@ -28,6 +28,9 @@
 
 #include "mem/cache/prefetch/differential_matching_prefetcher/differential_matcher.hh"
 
+#include <utility>
+
+#include "base/trace.hh"
 #include "base/types.hh"
 
 namespace gem5
@@ -45,7 +48,7 @@ TrackingEntry::TrackingEntry(
     tracked_items.reserve(max_num_tracked_items);
 }
 
-void TrackingEntry::addTrackedItem(const Addr item)
+void TrackingEntry::addItem(const Addr item)
 {
     // If we have already tracked the maximum number of items, we do not add
     // more
@@ -69,12 +72,6 @@ DifferentialMatcher::DifferentialMatcher(
     max_num_target_table_entries(_max_num_target_table_entries),
     max_num_tracked_items_per_table_entry(
         _max_num_tracked_items_per_table_entry
-    ),
-    index_table(
-        _max_num_index_table_entries, _max_num_tracked_items_per_table_entry
-    ),
-    target_table(
-        _max_num_target_table_entries, _max_num_tracked_items_per_table_entry
     )
 {
     panic_if(
@@ -82,45 +79,102 @@ DifferentialMatcher::DifferentialMatcher(
         "For simplicity, the maximum number of entries in index and target "
         "tables must be the same."
     );
-    candidate_index_target_pc.reserve(max_num_index_table_entries);
+}
+
+bool
+DifferentialMatcher::isFull() const
+{
+    return candidate_index_target_pc.size() >= max_num_index_table_entries;
+}
+
+bool
+DifferentialMatcher::hasCandidate(
+    const Addr index_pc, const Addr target_pc
+) const
+{
+    CandidatePcPair pc_pair = std::make_pair(index_pc, target_pc);
+    return candidate_index_target_pc.find(pc_pair) !=
+        candidate_index_target_pc.end();
 }
 
 bool
 DifferentialMatcher::addCandidate(const Addr index_pc, const Addr target_pc)
 {
-    if (candidate_index_target_pc.size() >= max_num_index_table_entries) {
+    if (isFull() || hasCandidate(index_pc, target_pc)) {
         return false; // Cannot add new candidate
     }
     CandidatePcPair pc_pair = std::make_pair(index_pc, target_pc);
-    candidate_index_target_pc[pc_pair] = std::make_pair(
+    TrackingPair tracking_pair = std::make_pair(
         IndexPcTrackingEntry(index_pc, max_num_tracked_items_per_table_entry),
         TargetPcTrackingEntry(target_pc, max_num_tracked_items_per_table_entry)
+    );
+    candidate_index_target_pc.emplace(pc_pair, tracking_pair);
+    DMP_DIFFERENTIAL_MATCHER_DEBUG(
+        "New candidate pair added: Index PC %#x, Target PC %#x\n",
+        index_pc, target_pc
     );
     return true;
 }
 
 void
 DifferentialMatcher::trackCacheHit(
-    const Addr pc, const Addr effective_address, const uint64_t data
+    const Addr pc, const Addr effective_vaddr, const uint64_t data
 )
 {
-    // TODO
+    // We track index PC hits with data, and target PC hits with effective
+    // virtual addresses.
+    for (
+        auto &[candidate_pair, tracking_entries] : candidate_index_target_pc
+    ) {
+        const Addr index_pc = candidate_pair.first;
+        const Addr target_pc = candidate_pair.second;
+        TrackingEntry &index_entry = tracking_entries.first;
+        TrackingEntry &target_entry = tracking_entries.second;
+        if (pc == index_pc) {
+            // This is an index PC cache hit
+            index_entry.addItem(data);
+        }
+        if (pc == target_pc) {
+            // This is a target PC cache hit
+            target_entry.addItem(effective_vaddr);
+        }
+    }
 }
 
 void
 DifferentialMatcher::trackCacheMiss(
-    const Addr pc, const Addr effective_address
+    const Addr pc, const Addr effective_vaddr
 )
 {
-    // TODO
+    // We only track target PC cache misses
+    for (
+        auto &[candidate_pair, tracking_entries] : candidate_index_target_pc
+    ) {
+        const Addr target_pc = candidate_pair.second;
+        TrackingEntry &target_entry = tracking_entries.second;
+        if (pc == target_pc) {
+            // This is a target PC cache miss
+            target_entry.addItem(effective_vaddr);
+        }
+    }
 }
 
 void
 DifferentialMatcher::trackCacheFill(
-    const Addr pc, const Addr effective_address, const uint64_t data
+    const Addr pc, const Addr effective_vaddr, const uint64_t data
 )
 {
-    // TODO
+    // We only track index PC cache fills with data
+    for (
+        auto &[candidate_pair, tracking_entries] : candidate_index_target_pc
+    ) {
+        const Addr index_pc = candidate_pair.first;
+        TrackingEntry &index_entry = tracking_entries.first;
+        if (pc == index_pc) {
+            // This is an index PC cache fill
+            index_entry.addItem(data);
+        }
+    }
 }
 
 } // namespace prefetch

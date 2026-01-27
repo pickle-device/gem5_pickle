@@ -40,12 +40,14 @@ Source('indirection_candidate_scoreboard.cc')
 Source('stride_tracker.cc')
 
 DebugFlag('DifferentialMatchingPrefetcherDebug')
+DebugFlag('DifferentialMatchingPrefetcherDifferentMatcherDebug')
 DebugFlag('DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug')
 DebugFlag('DifferentialMatchingPrefetcherStrideTrackerDebug')
 
 CompoundFlag(
     'DifferentialMatchingPrefetcherAllDebug',
     ['DifferentialMatchingPrefetcherDebug',
+     'DifferentialMatchingPrefetcherDifferentMatcherDebug',
      'DifferentialMatchingPrefetcherStrideTrackerDebug',
      'DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug']
 )
