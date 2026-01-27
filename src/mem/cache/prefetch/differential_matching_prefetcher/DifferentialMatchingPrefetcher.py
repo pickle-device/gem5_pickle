@@ -33,10 +33,10 @@ from m5.proxy import *
 from m5.SimObject import *
 
 
-class DifferentialMatchingPrefetcherAtL1(ProbeListenerObject):
-    type = "DifferentialMatchingPrefetcherAtL1"
-    cxx_class = "gem5::prefetch::DifferentialMatchingPrefetcherAtL1"
-    cxx_header = "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_at_l1.hh"
+class DifferentialMatchingPrefetcher(ProbeListenerObject):
+    type = "DifferentialMatchingPrefetcher"
+    cxx_class = "gem5::prefetch::DifferentialMatchingPrefetcher"
+    cxx_header = "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher.hh"
 
     system = Param.System(Parent.any, "System this prefetcher belongs to")
     l1_controller = Param.RubyController(

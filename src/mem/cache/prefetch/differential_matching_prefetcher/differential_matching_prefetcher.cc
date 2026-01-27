@@ -26,7 +26,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_at_l1.hh"
+#include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher.hh"
 
 #include <cassert>
 
@@ -36,7 +36,7 @@
 #include "base/trace.hh"
 #include "debug/DifferentialMatchingPrefetcherDebug.hh"
 #include "mem/cache/cache_probe_arg.hh"
-#include "params/DifferentialMatchingPrefetcherAtL1.hh"
+#include "params/DifferentialMatchingPrefetcher.hh"
 #include "sim/clocked_object.hh"
 #include "sim/probe/probe.hh"
 
@@ -46,8 +46,8 @@ namespace gem5
 namespace prefetch
 {
 
-DifferentialMatchingPrefetcherAtL1::DifferentialMatchingPrefetcherAtL1(
-    const DifferentialMatchingPrefetcherAtL1Params &p
+DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
+    const DifferentialMatchingPrefetcherParams &p
 ) : ProbeListenerObject(p), system(p.system),
     cache_line_size(p.system->cacheLineSize()),
     l1_controller(p.l1_controller),
@@ -84,14 +84,14 @@ DifferentialMatchingPrefetcherAtL1::DifferentialMatchingPrefetcherAtL1(
 }
 
 void
-DifferentialMatchingPrefetcherAtL1::processDetectionEvent()
+DifferentialMatchingPrefetcher::processDetectionEvent()
 {
     // Here, we move candidate PC around the components
     promoteIndexPcFromIqToIcs(); // IQ -> ICS
 }
 
 void
-DifferentialMatchingPrefetcherAtL1::scheduleHandleDetectionEvent()
+DifferentialMatchingPrefetcher::scheduleHandleDetectionEvent()
 {
     if (!process_detection_event.scheduled()) {
         schedule(
@@ -102,7 +102,7 @@ DifferentialMatchingPrefetcherAtL1::scheduleHandleDetectionEvent()
 }
 
 void
-DifferentialMatchingPrefetcherAtL1::promoteIndexPcFromIqToIcs()
+DifferentialMatchingPrefetcher::promoteIndexPcFromIqToIcs()
 {
     std::optional<std::vector<Addr>> pc_opt = index_queue.getHighestScorePcs();
     if (pc_opt.has_value()) {
@@ -123,7 +123,7 @@ DifferentialMatchingPrefetcherAtL1::promoteIndexPcFromIqToIcs()
 }
 
 void
-DifferentialMatchingPrefetcherAtL1::\
+DifferentialMatchingPrefetcher::\
     addIndirectionCandidateToDifferentialMatcher(
     const Addr index_pc, const Addr target_pc
 )
@@ -137,7 +137,7 @@ DifferentialMatchingPrefetcherAtL1::\
 }
 
 void
-DifferentialMatchingPrefetcherAtL1::handleNewlyDetectedStride(const Addr pc)
+DifferentialMatchingPrefetcher::handleNewlyDetectedStride(const Addr pc)
 {
     DMP_PREFETCHER_DEBUG(
         "(Stride Tracker) New stride detected: PC %#x\n", pc
@@ -147,7 +147,7 @@ DifferentialMatchingPrefetcherAtL1::handleNewlyDetectedStride(const Addr pc)
 }
 
 void
-DifferentialMatchingPrefetcherAtL1::handleNewCandidateFromIcs(
+DifferentialMatchingPrefetcher::handleNewCandidateFromIcs(
     const Addr index_pc, const Addr target_pc
 )
 {
@@ -159,36 +159,36 @@ DifferentialMatchingPrefetcherAtL1::handleNewCandidateFromIcs(
 }
 
 void
-DifferentialMatchingPrefetcherAtL1::regProbeListeners()
+DifferentialMatchingPrefetcher::regProbeListeners()
 {
     typedef ProbeListenerArg<
-        DifferentialMatchingPrefetcherAtL1, SimpleCacheAccessProbeArg
+        DifferentialMatchingPrefetcher, SimpleCacheAccessProbeArg
     > DataAccessListener;
     ProbeManager *pm = l1_controller->getProbeManager();
     listeners.push_back(new DataAccessListener(
         this,
         "DataMovementHit",
-        &DifferentialMatchingPrefetcherAtL1::observeL1CacheHit
+        &DifferentialMatchingPrefetcher::observeL1CacheHit
     ));
     pm->addListener("DataMovementHit", *(listeners.back()));
 
     listeners.push_back(new DataAccessListener(
         this,
         "DataMovementMiss",
-        &DifferentialMatchingPrefetcherAtL1::observeL1CacheMiss
+        &DifferentialMatchingPrefetcher::observeL1CacheMiss
     ));
     pm->addListener("DataMovementMiss", *(listeners.back()));
 
     listeners.push_back(new DataAccessListener(
         this,
         "DataMovementWriteback",
-        &DifferentialMatchingPrefetcherAtL1::observeL1CacheFill
+        &DifferentialMatchingPrefetcher::observeL1CacheFill
     ));
     pm->addListener("DataMovementWriteback", *(listeners.back()));
 }
 
 bool
-DifferentialMatchingPrefetcherAtL1::isObservable(
+DifferentialMatchingPrefetcher::isObservable(
     const SimpleCacheAccessProbeArg &arg
 )
 {
@@ -197,7 +197,7 @@ DifferentialMatchingPrefetcherAtL1::isObservable(
 }
 
 void
-DifferentialMatchingPrefetcherAtL1::observeL1CacheHit(
+DifferentialMatchingPrefetcher::observeL1CacheHit(
     const SimpleCacheAccessProbeArg &arg
 )
 {
@@ -219,7 +219,7 @@ DifferentialMatchingPrefetcherAtL1::observeL1CacheHit(
 }
 
 void
-DifferentialMatchingPrefetcherAtL1::observeL1CacheMiss(
+DifferentialMatchingPrefetcher::observeL1CacheMiss(
     const SimpleCacheAccessProbeArg &arg
 )
 {
@@ -241,7 +241,7 @@ DifferentialMatchingPrefetcherAtL1::observeL1CacheMiss(
 }
 
 void
-DifferentialMatchingPrefetcherAtL1::observeL1CacheFill(
+DifferentialMatchingPrefetcher::observeL1CacheFill(
     const SimpleCacheAccessProbeArg &arg
 )
 {
@@ -258,7 +258,7 @@ DifferentialMatchingPrefetcherAtL1::observeL1CacheFill(
 }
 
 Addr
-DifferentialMatchingPrefetcherAtL1::getBlockAddress(Addr addr) const
+DifferentialMatchingPrefetcher::getBlockAddress(Addr addr) const
 {
     return addr & ~((Addr)cache_line_size-1);
 }

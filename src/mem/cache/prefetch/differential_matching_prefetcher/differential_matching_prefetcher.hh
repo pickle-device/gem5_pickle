@@ -26,8 +26,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __DMP_L1_HH__
-#define __DMP_L1_HH__
+#ifndef __DMP_HH__
+#define __DMP_HH__
 
 #include <string>
 #include <unordered_map>
@@ -44,7 +44,7 @@
 #include "mem/cache/simple_cache_probe_arg.hh"
 #include "mem/packet.hh"
 #include "mem/ruby/slicc_interface/AbstractController.hh"
-#include "params/DifferentialMatchingPrefetcherAtL1.hh"
+#include "params/DifferentialMatchingPrefetcher.hh"
 #include "sim/eventq.hh"
 #include "sim/probe/probe.hh"
 #include "sim/system.hh"
@@ -69,7 +69,7 @@ namespace prefetch
  * Architecture (HPCA) (pp. 439-453). IEEE.
  */
 
-class DifferentialMatchingPrefetcherAtL1 : \
+class DifferentialMatchingPrefetcher : \
   public ProbeListenerObject, public DifferentialMatchingPrefetcherInterface
 {
   // simulation components
@@ -93,11 +93,11 @@ class DifferentialMatchingPrefetcherAtL1 : \
     IndirectionCandidateScoreboard indirection_candidate_scoreboard;
 
   public:
-    PARAMS(DifferentialMatchingPrefetcherAtL1);
-    DifferentialMatchingPrefetcherAtL1(
-      const DifferentialMatchingPrefetcherAtL1Params &p
+    PARAMS(DifferentialMatchingPrefetcher);
+    DifferentialMatchingPrefetcher(
+      const DifferentialMatchingPrefetcherParams &p
     );
-    ~DifferentialMatchingPrefetcherAtL1() override = default;
+    ~DifferentialMatchingPrefetcher() override = default;
     void regProbeListeners() override;
 
   private:
@@ -112,9 +112,13 @@ class DifferentialMatchingPrefetcherAtL1 : \
 
   // L1 cache data access observers
   private:
+    // Determine whether the prefetcher should observe this access.
     bool isObservable(const SimpleCacheAccessProbeArg &arg);
+    // Observing an L1 hit
     void observeL1CacheHit (const SimpleCacheAccessProbeArg &arg);
+    // Observing an L1 miss
     void observeL1CacheMiss(const SimpleCacheAccessProbeArg &arg);
+    // Observing an L1 fill (writeback)
     void observeL1CacheFill(const SimpleCacheAccessProbeArg &arg);
   // Events from prefetcher components
   private:
@@ -134,4 +138,4 @@ class DifferentialMatchingPrefetcherAtL1 : \
 } // namespace prefetch
 } // namespace gem5
 
-#endif  //__DMP_L1_HH__
+#endif  //__DMP_HH__

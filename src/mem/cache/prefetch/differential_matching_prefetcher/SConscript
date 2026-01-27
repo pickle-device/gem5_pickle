@@ -30,10 +30,11 @@ Import('*')
 
 SimObject(
     'DifferentialMatchingPrefetcher.py',
-    sim_objects=['DifferentialMatchingPrefetcherAtL1']
+    sim_objects=['DifferentialMatchingPrefetcher']
 )
 
-Source('differential_matching_prefetcher_at_l1.cc')
+Source('differential_matcher.cc')
+Source('differential_matching_prefetcher.cc')
 Source('index_queue.cc')
 Source('indirection_candidate_scoreboard.cc')
 Source('stride_tracker.cc')
