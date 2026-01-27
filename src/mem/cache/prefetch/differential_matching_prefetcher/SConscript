@@ -39,8 +39,8 @@ Source('indirection_candidate_scoreboard.cc')
 Source('stride_tracker.cc')
 
 DebugFlag('DifferentialMatchingPrefetcherDebug')
-DebugFlag('DifferentialMatchingPrefetcherStrideTrackerDebug')
 DebugFlag('DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug')
+DebugFlag('DifferentialMatchingPrefetcherStrideTrackerDebug')
 
 CompoundFlag(
     'DifferentialMatchingPrefetcherAllDebug',

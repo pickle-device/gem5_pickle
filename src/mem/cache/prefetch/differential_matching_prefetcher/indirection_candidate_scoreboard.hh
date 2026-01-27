@@ -32,8 +32,15 @@
 #include <cstdint>
 #include <vector>
 
+#include "base/logging.hh"
+#include "base/trace.hh"
 #include "base/types.hh"
+#include "debug/DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
+
+#define DMP_ICS_DEBUG(...) \
+    DPRINTF(DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug,\
+            __VA_ARGS__)
 
 namespace gem5
 {

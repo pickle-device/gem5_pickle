@@ -34,6 +34,7 @@
 
 #include "base/logging.hh"
 #include "base/types.hh"
+#include "debug/DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug.hh"
 
 namespace gem5
 {
@@ -145,6 +146,7 @@ IndirectionCandidateScoreboard::addEntry(const Addr index_pc)
         scoreboard.emplace_back(
             index_pc, max_num_entries, sample_window_size
         );
+        DMP_ICS_DEBUG("Added index PC %#x to ICS\n", index_pc);
         return true;
     }
     return false;

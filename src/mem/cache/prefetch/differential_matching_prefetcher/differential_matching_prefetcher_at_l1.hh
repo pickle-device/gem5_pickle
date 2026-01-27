@@ -35,6 +35,7 @@
 
 #include "base/cache/associative_cache.hh"
 #include "base/sat_counter.hh"
+#include "base/trace.hh"
 #include "base/types.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/index_queue.hh"
