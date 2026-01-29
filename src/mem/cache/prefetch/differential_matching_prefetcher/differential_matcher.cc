@@ -32,6 +32,7 @@
 
 #include "base/trace.hh"
 #include "base/types.hh"
+#include "debug/DifferentialMatchingPrefetcherDifferentMatcherDebug.hh"
 
 namespace gem5
 {
@@ -60,7 +61,7 @@ TrackingEntryWithRepetitionFilter::addItem(
     }
     if (!tracked_items.empty()) {
         // Check for repetition with the last tracked item
-        if (tracked_items.back() == item) {
+        if (tracked_items.back().first == item) {
             return; // Do not add repeated item
         }
     }
@@ -168,11 +169,11 @@ DifferentialMatcher::trackCacheHit(
     ) {
         const Addr index_pc = candidate_pair.first;
         const Addr target_pc = candidate_pair.second;
-        TrackingEntry &index_entry = tracking_entries.first;
-        TrackingEntry &target_entry = tracking_entries.second;
+        IndexPcTrackingEntry &index_entry = tracking_entries.first;
+        TargetPcTrackingEntry &target_entry = tracking_entries.second;
         if (pc == index_pc) {
             // This is an index PC cache hit
-            index_entry.addItem(data);
+            index_entry.addItem(data, request_size);
         }
         if (pc == target_pc) {
             // This is a target PC cache hit
@@ -191,7 +192,7 @@ DifferentialMatcher::trackCacheMiss(
         auto &[candidate_pair, tracking_entries] : candidate_index_target_pc
     ) {
         const Addr target_pc = candidate_pair.second;
-        TrackingEntry &target_entry = tracking_entries.second;
+        TargetPcTrackingEntry &target_entry = tracking_entries.second;
         if (pc == target_pc) {
             // This is a target PC cache miss
             target_entry.addItem(effective_vaddr, request_size);
@@ -210,7 +211,7 @@ DifferentialMatcher::trackCacheFill(
         auto &[candidate_pair, tracking_entries] : candidate_index_target_pc
     ) {
         const Addr index_pc = candidate_pair.first;
-        TrackingEntry &index_entry = tracking_entries.first;
+        IndexPcTrackingEntry &index_entry = tracking_entries.first;
         if (pc == index_pc) {
             // This is an index PC cache fill
             index_entry.addItem(data, request_size);
@@ -233,8 +234,8 @@ DifferentialMatcher::matchCandidate(
         return;
     }
     const TrackingPair &tracking_entries = it->second;
-    const TrackingEntry &index_entry = tracking_entries.first;
-    const TrackingEntry &target_entry = tracking_entries.second;
+    const IndexPcTrackingEntry &index_entry = tracking_entries.first;
+    const TargetPcTrackingEntry &target_entry = tracking_entries.second;
 
     DMP_DIFFERENTIAL_MATCHER_DEBUG(
         "Matching candidate pair: Index PC %#x, Target PC %#x\n",
@@ -275,18 +276,32 @@ DifferentialMatcher::matchCandidate(
         target_diffs.push_back(diff);
     }
 
+    DMP_DIFFERENTIAL_MATCHER_DEBUG(
+        "Index diffs: "
+    );
+    for (const auto &diff : index_diffs) {
+        DMP_DIFFERENTIAL_MATCHER_DEBUG("%lld ", diff);
+    }
+    DMP_DIFFERENTIAL_MATCHER_DEBUG("\n");
+    DMP_DIFFERENTIAL_MATCHER_DEBUG(
+        "Target diffs: "
+    );
+    for (const auto &diff : target_diffs) {
+        DMP_DIFFERENTIAL_MATCHER_DEBUG("%lld ", diff);
+    }
+    DMP_DIFFERENTIAL_MATCHER_DEBUG("\n");
+
     // For each shift amount, we form groups of 3 of index data diffs to match
     // with target diffs
     bool match_found = false;
     int64_t match_shift_amount_index = 0;
     for (const auto &shift_amount : matching_shift_amounts) {
-        std::vector<int64_t> shifted_target_diffs =
+        const std::vector<int64_t> shifted_target_diffs =
             multiplyVectorByFactor(target_diffs, 1LL << shift_amount);
         DMP_DIFFERENTIAL_MATCHER_DEBUG(
             "Matching with shift amount %llu:\n", shift_amount
         );
         // Perform matching between index_diffs and shifted_target_diffs
-        // (Matching logic to be implemented)
         for (uint64_t i = 0; i + 2 < index_diffs.size(); ++i) {
             int64_t idx_diff1 = index_diffs[i];
             int64_t idx_diff2 = index_diffs[i + 1];
@@ -324,7 +339,8 @@ DifferentialMatcher::matchCandidate(
     // TODO: notify the prefetcher of the match result, add a new interface
 }
 
-std::vector<int64_t> multiplyVectorByFactor(
+std::vector<int64_t>
+DifferentialMatcher::multiplyVectorByFactor(
       const std::vector<int64_t> &vec, const int64_t factor
     ) const
 {

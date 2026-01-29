@@ -107,11 +107,15 @@ class DifferentialMatcher
     // a cache miss would induce a cache fill later, so we only need to track
     // cache hit and cache misses for the target PC).
     void trackCacheHit(
-      const Addr pc, const Addr effective_vaddr, const uint64_t data
+      const Addr pc, const Addr effective_vaddr, const uint64_t data,
+      const uint64_t request_size
     );
-    void trackCacheMiss(const Addr pc, const Addr effective_vaddr);
+    void trackCacheMiss(
+      const Addr pc, const Addr effective_vaddr, const uint64_t request_size
+    );
     void trackCacheFill(
-      const Addr pc, const Addr effective_vaddr, const uint64_t data
+      const Addr pc, const Addr effective_vaddr, const uint64_t data,
+      const uint64_t request_size
     );
     void matchCandidate(const Addr index_pc, const Addr target_pc) const;
 
