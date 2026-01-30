@@ -36,18 +36,24 @@ SimObject(
 Source('differential_matcher.cc')
 Source('differential_matching_prefetcher.cc')
 Source('index_queue.cc')
+Source('indirect_relation_table.cc')
 Source('indirection_candidate_scoreboard.cc')
+Source('prefetch_request.cc')
 Source('stride_tracker.cc')
 
 DebugFlag('DifferentialMatchingPrefetcherDebug')
 DebugFlag('DifferentialMatchingPrefetcherDifferentMatcherDebug')
+DebugFlag('DifferentialMatchingPrefetcherIndirectRelationTableDebug')
 DebugFlag('DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug')
 DebugFlag('DifferentialMatchingPrefetcherStrideTrackerDebug')
 
 CompoundFlag(
     'DifferentialMatchingPrefetcherAllDebug',
-    ['DifferentialMatchingPrefetcherDebug',
-     'DifferentialMatchingPrefetcherDifferentMatcherDebug',
-     'DifferentialMatchingPrefetcherStrideTrackerDebug',
-     'DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug']
+    [
+        'DifferentialMatchingPrefetcherDebug',
+        'DifferentialMatchingPrefetcherDifferentMatcherDebug',
+        'DifferentialMatchingPrefetcherIndirectRelationTableDebug',
+        'DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug',
+        'DifferentialMatchingPrefetcherStrideTrackerDebug'
+    ]
 )
