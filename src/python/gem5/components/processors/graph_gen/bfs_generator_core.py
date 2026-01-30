@@ -32,9 +32,9 @@ from m5.objects import (
     VoltageDomain,
 )
 
-from .....utils.override import overrides
-from ...abstract_core import AbstractCore
-from ...abstract_generator_core import AbstractGeneratorCore
+from ....utils.override import overrides
+from ..abstract_core import AbstractCore
+from ..abstract_generator_core import AbstractGeneratorCore
 
 
 class BFSGeneratorCore(AbstractGeneratorCore):

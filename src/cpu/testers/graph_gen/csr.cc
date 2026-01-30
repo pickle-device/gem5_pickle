@@ -26,7 +26,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "cpu/testers/traffic_gen/graph_gen/csr.hh"
+#include "cpu/testers/graph_gen/csr.hh"
 
 #include <fstream>
 #include <map>

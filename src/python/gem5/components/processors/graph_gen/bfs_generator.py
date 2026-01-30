@@ -25,8 +25,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-from .....utils.override import overrides
-from ...abstract_generator import AbstractGenerator
+from ....utils.override import overrides
+from ..abstract_generator import AbstractGenerator
 from .bfs_generator_core import BFSGeneratorCore
 
 

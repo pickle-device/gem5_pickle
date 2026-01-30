@@ -31,7 +31,7 @@ from m5.proxy import *
 
 class BFSGen(ClockedObject):
     type = "BFSGen"
-    cxx_header = "cpu/testers/traffic_gen/graph_gen/bfs_gen.hh"
+    cxx_header = "cpu/testers/graph_gen/bfs_gen.hh"
     cxx_class = "gem5::BFSGen"
 
     system = Param.System(Parent.any, "System object")

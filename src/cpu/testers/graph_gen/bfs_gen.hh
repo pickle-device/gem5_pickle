@@ -37,7 +37,7 @@
 
 #include "base/logging.hh"
 #include "base/types.hh"
-#include "cpu/testers/traffic_gen/graph_gen/csr.hh"
+#include "cpu/testers/graph_gen/csr.hh"
 #include "debug/BFSGen.hh"
 #include "mem/packet.hh"
 #include "mem/port.hh"

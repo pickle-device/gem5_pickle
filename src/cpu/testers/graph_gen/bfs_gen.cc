@@ -26,7 +26,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "cpu/testers/traffic_gen/graph_gen/bfs_gen.hh"
+#include "cpu/testers/graph_gen/bfs_gen.hh"
 
 #include <algorithm>
 #include <cstdint>
