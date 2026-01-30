@@ -237,7 +237,7 @@ DifferentialMatchingPrefetcher::observeL1CacheMiss(
     const Addr block_address = getBlockAddress(arg.req->getPaddr());
     const Tick access_timestamp = curTick();
     stride_tracker.track(pc, block_address, access_timestamp);
-    indirection_candidate_scoreboard.trackCacheMiss(pc);
+    indirection_candidate_scoreboard.trackL1CacheMiss(pc);
 }
 
 void

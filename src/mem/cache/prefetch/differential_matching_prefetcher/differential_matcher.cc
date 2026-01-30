@@ -157,7 +157,7 @@ DifferentialMatcher::addCandidate(const Addr index_pc, const Addr target_pc)
 }
 
 void
-DifferentialMatcher::trackCacheHit(
+DifferentialMatcher::trackL1CacheHit(
     const Addr pc, const Addr effective_vaddr, const uint64_t data,
     const uint64_t request_size
 )
@@ -183,7 +183,7 @@ DifferentialMatcher::trackCacheHit(
 }
 
 void
-DifferentialMatcher::trackCacheMiss(
+DifferentialMatcher::trackL1CacheMiss(
     const Addr pc, const Addr effective_vaddr, const uint64_t request_size
 )
 {
@@ -201,7 +201,7 @@ DifferentialMatcher::trackCacheMiss(
 }
 
 void
-DifferentialMatcher::trackCacheFill(
+DifferentialMatcher::trackL1CacheFill(
     const Addr pc, const Addr effective_vaddr, const uint64_t data,
     const uint64_t request_size
 )

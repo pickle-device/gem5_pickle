@@ -42,22 +42,22 @@ namespace prefetch
 {
 
 CandidateEntry::CandidateEntry(
-    const Addr _pc, const uint64_t _cache_miss_count
-) : pc(_pc), cache_miss_count(_cache_miss_count)
+    const Addr _pc, const uint64_t _l1_cache_miss_count
+) : pc(_pc), l1_cache_miss_count(_l1_cache_miss_count)
 {
 }
 
 void
-CandidateEntry::profileCacheMiss()
+CandidateEntry::profileL1CacheMiss()
 {
-    cache_miss_count++;
+    l1_cache_miss_count++;
 }
 
 IndirectionCandidateScoreboardEntry::IndirectionCandidateScoreboardEntry(
   const Addr _index_pc, const uint64_t _capacity,
   const uint64_t _sample_window_size
 ) : max_num_candidates(_capacity), sample_window_size(_sample_window_size),
-    index_pc(_index_pc), candidates(), tracked_cache_miss_count(0)
+    index_pc(_index_pc), candidates(), tracked_l1_cache_miss_count(0)
 {
     candidates.reserve(max_num_candidates);
 }
@@ -69,19 +69,19 @@ IndirectionCandidateScoreboardEntry::getIndexPC() const
 }
 
 void
-IndirectionCandidateScoreboardEntry::trackCacheMiss(const Addr target_pc)
+IndirectionCandidateScoreboardEntry::trackL1CacheMiss(const Addr target_pc)
 {
     // if target_pc is the same as the index PC, ignore
     if (target_pc == index_pc) {
         return;
     }
 
-    tracked_cache_miss_count++;
+    tracked_l1_cache_miss_count++;
 
     // Check if the PC is already in the candidates list
     for (auto &candidate : candidates) {
         if (candidate.pc == target_pc) {
-            candidate.profileCacheMiss();
+            candidate.profileL1CacheMiss();
             return;
         }
     }
@@ -96,12 +96,12 @@ IndirectionCandidateScoreboardEntry::trackCacheMiss(const Addr target_pc)
 
 Addr
 IndirectionCandidateScoreboardEntry::\
-    getCandidateTargetPcWithHighestCacheMissCount() const
+    getCandidateTargetPcWithHighestL1CacheMissCount() const
 {
-    // Find the candidate with the highest cache miss count
+    // Find the candidate with the highest L1 cache miss count
     auto best_candidate_it = candidates.begin();
     for (auto it = candidates.begin(); it != candidates.end(); ++it) {
-        if (it->cache_miss_count > best_candidate_it->cache_miss_count) {
+        if (it->l1_cache_miss_count > best_candidate_it->l1_cache_miss_count) {
             best_candidate_it = it;
         }
     }
@@ -115,7 +115,7 @@ IndirectionCandidateScoreboardEntry::\
 bool
 IndirectionCandidateScoreboardEntry::isSampleWindowFull() const
 {
-    return tracked_cache_miss_count >= sample_window_size;
+    return tracked_l1_cache_miss_count >= sample_window_size;
 }
 
 IndirectionCandidateScoreboard::IndirectionCandidateScoreboard(
@@ -164,7 +164,7 @@ IndirectionCandidateScoreboard::containsEntry(const Addr index_pc) const
 }
 
 void
-IndirectionCandidateScoreboard::trackCacheMiss(const Addr target_pc)
+IndirectionCandidateScoreboard::trackL1CacheMiss(const Addr target_pc)
 {
     if (scoreboard.empty()) {
         return;
@@ -172,14 +172,14 @@ IndirectionCandidateScoreboard::trackCacheMiss(const Addr target_pc)
 
     std::vector<Addr> pcs_to_remove;
     for (auto &entry : scoreboard) {
-        entry.trackCacheMiss(target_pc);
+        entry.trackL1CacheMiss(target_pc);
         // what to do when sample window is full?
         // - first, we can notify the prefetcher of the new candidate
         // - then, we can remove the entry from the scoreboard
         if (entry.isSampleWindowFull()) {
             const Addr candidate_index_pc = entry.getIndexPC();
             const Addr candidate_target_pc =
-                entry.getCandidateTargetPcWithHighestCacheMissCount();
+                entry.getCandidateTargetPcWithHighestL1CacheMissCount();
             // Notify the prefetcher of the new candidate
             prefetcher_interface->handleNewCandidateFromIcs(
                 candidate_index_pc, candidate_target_pc

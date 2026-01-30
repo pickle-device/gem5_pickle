@@ -51,11 +51,11 @@ class CandidateEntry
 {
   public:
     Addr pc;
-    uint64_t cache_miss_count;
+    uint64_t l1_cache_miss_count;
     CandidateEntry(
-        const Addr _pc, const uint64_t _cache_miss_count
+        const Addr _pc, const uint64_t _l1_cache_miss_count
     );
-    void profileCacheMiss();
+    void profileL1CacheMiss();
 }; // class CandidateEntry
 
 class IndirectionCandidateScoreboardEntry
@@ -65,16 +65,16 @@ class IndirectionCandidateScoreboardEntry
     uint64_t sample_window_size;  // Number of cache misses to track
     Addr index_pc;
     std::vector<CandidateEntry> candidates;
-    uint64_t tracked_cache_miss_count;
+    uint64_t tracked_l1_cache_miss_count;
   public:
     IndirectionCandidateScoreboardEntry(
         const Addr index_pc, const uint64_t _capacity,
         const uint64_t _sample_window_size
     );
     Addr getIndexPC() const;
-    void trackCacheMiss(const Addr target_pc);
+    void trackL1CacheMiss(const Addr target_pc);
     // Return the candidate PC with the highest cache miss count
-    Addr getCandidateTargetPcWithHighestCacheMissCount() const;
+    Addr getCandidateTargetPcWithHighestL1CacheMissCount() const;
     bool isSampleWindowFull() const;
 }; // class IndirectionCandidateScoreboardEntry
 
@@ -100,7 +100,7 @@ class IndirectionCandidateScoreboard
     // Notify the scoreboard of a cache miss.
     // If any entry's sample window is full, notify the prefetcher interface
     // of the new candidate and remove the entry from the scoreboard.
-    void trackCacheMiss(const Addr target_pc);
+    void trackL1CacheMiss(const Addr target_pc);
 }; // class IndirectionCandidateScoreboard
 
 } // namespace gem5
