@@ -40,7 +40,7 @@ StrideTrackerEntry::StrideTrackerEntry(
     access_timestamp(_access_timestamp),
     previous_stride(0),
     previous_effective_address(_block_address),
-    confidence(4),
+    confidence(/*bits*/3, /*initial_value*/4),
     confidence_threshold(_confidence_threshold)
 {
 }
@@ -50,9 +50,10 @@ StrideTrackerEntry::update(
   const Addr block_address, const Tick access_timestamp
 )
 {
-    int64_t current_stride =
+    const int64_t current_stride =
       static_cast<int64_t>(block_address) -
       static_cast<int64_t>(previous_effective_address);
+    const int64_t previous_stride_for_debugging = this->previous_stride;
 
     // Update the timestamp and previous effective address
     this->access_timestamp = access_timestamp;
@@ -64,20 +65,20 @@ StrideTrackerEntry::update(
         return;
     }
 
-    if (current_stride == previous_stride) {
+    if (current_stride == this->previous_stride) {
         confidence++;
     } else {
         confidence--;
         if (confidence.calcSaturation() < confidence_threshold) {
-            previous_stride = current_stride;
+            this->previous_stride = current_stride;
         }
     }
 
     DMP_STRIDE_TRACKER_DEBUG(
         "PC %#x updated: previous_stride=%ld, "
         "current_stride=%ld, confidence=%f, threshold=%f\n",
-        pc, previous_stride, current_stride, confidence.calcSaturation(),
-        confidence_threshold
+        pc, previous_stride_for_debugging, current_stride,
+        confidence.calcSaturation(), confidence_threshold
     );
 }
 
