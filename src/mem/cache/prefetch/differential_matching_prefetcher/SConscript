@@ -41,12 +41,14 @@ Source('indirection_candidate_scoreboard.cc')
 Source('prefetch_request.cc')
 Source('stride_tracker.cc')
 
+DebugFlag('DifferentialMatchingPrefetcherCacheObserverDebug')
 DebugFlag('DifferentialMatchingPrefetcherDebug')
 DebugFlag('DifferentialMatchingPrefetcherDifferentMatcherDebug')
 DebugFlag('DifferentialMatchingPrefetcherIndirectRelationTableDebug')
 DebugFlag('DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug')
 DebugFlag('DifferentialMatchingPrefetcherStrideTrackerDebug')
 
+# All flags for Differential Matching Prefetcher except the cache observer
 CompoundFlag(
     'DifferentialMatchingPrefetcherAllDebug',
     [

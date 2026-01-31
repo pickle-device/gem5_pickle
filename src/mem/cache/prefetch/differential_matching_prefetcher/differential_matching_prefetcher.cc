@@ -34,6 +34,7 @@
 #include "base/logging.hh"
 #include "base/random.hh"
 #include "base/trace.hh"
+#include "debug/DifferentialMatchingPrefetcherCacheObserverDebug.hh"
 #include "debug/DifferentialMatchingPrefetcherDebug.hh"
 #include "mem/cache/cache_probe_arg.hh"
 #include "params/DifferentialMatchingPrefetcher.hh"
@@ -140,7 +141,7 @@ void
 DifferentialMatchingPrefetcher::handleNewlyDetectedStride(const Addr pc)
 {
     DMP_PREFETCHER_DEBUG(
-        "(Stride Tracker) New stride detected: PC %#x\n", pc
+        "New stride detected: PC %#x\n", pc
     );
     index_queue.add(pc, curTick());
     scheduleHandleDetectionEvent();
@@ -152,7 +153,7 @@ DifferentialMatchingPrefetcher::handleNewCandidateFromIcs(
 )
 {
     DMP_PREFETCHER_DEBUG(
-        "(ICS) New candidate pair promoted: Index PC %#x, Target PC %#x\n",
+        "New candidate pair promoted: Index PC %#x, Target PC %#x\n",
         index_pc, target_pc
     );
     // TODO: Start differential matching for this pair of PCs
@@ -205,7 +206,7 @@ DifferentialMatchingPrefetcher::observeL1CacheHit(
         return;
     }
 
-    DMP_PREFETCHER_DEBUG(
+    DMP_CACHE_OBSERVER_DEBUG(
         "DMP L1 Cache HIT observed: paddr=%#x, vaddr=%#x, size=%d, pc=%#x, "
         "hasData=%d\n",
         arg.req->getPaddr(), arg.req->getVaddr(), arg.req->getSize(),
@@ -227,7 +228,7 @@ DifferentialMatchingPrefetcher::observeL1CacheMiss(
         return;
     }
 
-    DMP_PREFETCHER_DEBUG(
+    DMP_CACHE_OBSERVER_DEBUG(
         "DMP L1 Cache MISS observed: paddr=%#x, vaddr=%#x, size=%d, pc=%#x, "
         "hasData=%d\n",
         arg.req->getPaddr(), arg.req->getVaddr(), arg.req->getSize(),
@@ -249,7 +250,7 @@ DifferentialMatchingPrefetcher::observeL1CacheFill(
         return;
     }
 
-    DMP_PREFETCHER_DEBUG(
+    DMP_CACHE_OBSERVER_DEBUG(
         "DMP L1 Cache FILL observed: paddr=%#x, vaddr=%#x, size=%d, pc=%#x, "
         "hasData=%d\n",
         arg.req->getPaddr(), arg.req->getVaddr(), arg.req->getSize(),

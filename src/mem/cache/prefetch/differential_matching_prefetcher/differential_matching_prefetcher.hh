@@ -37,6 +37,8 @@
 #include "base/sat_counter.hh"
 #include "base/trace.hh"
 #include "base/types.hh"
+#include "debug/DifferentialMatchingPrefetcherCacheObserverDebug.hh"
+#include "debug/DifferentialMatchingPrefetcherDebug.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/index_queue.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/indirection_candidate_scoreboard.hh"
@@ -52,6 +54,10 @@
 #define DMP_PREFETCHER_DEBUG(...) \
     DPRINTF(DifferentialMatchingPrefetcherDebug, \
             "(DMP) " __VA_ARGS__)
+
+#define DMP_CACHE_OBSERVER_DEBUG(...) \
+    DPRINTF(DifferentialMatchingPrefetcherCacheObserverDebug, \
+            "(Cache Observer) " __VA_ARGS__)
 
 namespace gem5
 {
