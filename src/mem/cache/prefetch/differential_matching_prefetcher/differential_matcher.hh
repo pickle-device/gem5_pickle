@@ -40,7 +40,8 @@
 #include "debug/DifferentialMatchingPrefetcherDifferentMatcherDebug.hh"
 
 #define DMP_DIFFERENTIAL_MATCHER_DEBUG(...) \
-    DPRINTF(DifferentialMatchingPrefetcherDifferentMatcherDebug, __VA_ARGS__)
+    DPRINTF(DifferentialMatchingPrefetcherDifferentMatcherDebug, \
+            "(Matcher) " __VA_ARGS__)
 
 namespace gem5
 {

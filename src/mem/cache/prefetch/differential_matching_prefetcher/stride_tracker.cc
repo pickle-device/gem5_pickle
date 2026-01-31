@@ -74,7 +74,7 @@ StrideTrackerEntry::update(
     }
 
     DMP_STRIDE_TRACKER_DEBUG(
-        "(Stride Tracker) PC %#x updated: previous_stride=%ld, "
+        "PC %#x updated: previous_stride=%ld, "
         "current_stride=%ld, confidence=%f, threshold=%f\n",
         pc, previous_stride, current_stride, confidence.calcSaturation(),
         confidence_threshold
@@ -108,7 +108,7 @@ StrideTracker::replaceLeastRecentlyUsedEntry(
             pc, block_address, access_timestamp, confidence_threshold
         );
         DMP_STRIDE_TRACKER_DEBUG(
-            "(Stride Tracker) Added new entry for PC %#x\n", pc
+            "Added new entry for PC %#x\n", pc
         );
         return;
     }
@@ -124,7 +124,7 @@ StrideTracker::replaceLeastRecentlyUsedEntry(
     *lru_it = StrideTrackerEntry(pc, block_address, access_timestamp,
                                 confidence_threshold);
     DMP_STRIDE_TRACKER_DEBUG(
-        "(Stride Tracker) Replaced LRU entry with new entry for PC %#x\n", pc
+        "Replaced LRU entry with new entry for PC %#x\n", pc
     );
 }
 
@@ -144,8 +144,7 @@ StrideTracker::track(
             if (!was_confident && it->isConfident()) {
                 prefetcher_interface->handleNewlyDetectedStride(pc);
                 DMP_STRIDE_TRACKER_DEBUG(
-                    "(Stride Tracker) PC %#x became confident with stride %ld"
-                    "\n",
+                    "PC %#x became confident with stride %ld\n",
                     pc, it->previous_stride
                 );
             }

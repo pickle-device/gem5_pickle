@@ -50,7 +50,8 @@
 #include "sim/system.hh"
 
 #define DMP_PREFETCHER_DEBUG(...) \
-    DPRINTF(DifferentialMatchingPrefetcherDebug, __VA_ARGS__)
+    DPRINTF(DifferentialMatchingPrefetcherDebug, \
+            "(DMP) " __VA_ARGS__)
 
 namespace gem5
 {

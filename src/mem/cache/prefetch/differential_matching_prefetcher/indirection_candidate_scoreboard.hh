@@ -40,7 +40,7 @@
 
 #define DMP_ICS_DEBUG(...) \
     DPRINTF(DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug,\
-            __VA_ARGS__)
+            "(ICS) " __VA_ARGS__)
 
 namespace gem5
 {

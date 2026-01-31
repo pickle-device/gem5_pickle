@@ -41,7 +41,8 @@
 #include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
 
 #define DMP_STRIDE_TRACKER_DEBUG(...) \
-    DPRINTF(DifferentialMatchingPrefetcherStrideTrackerDebug, __VA_ARGS__)
+    DPRINTF(DifferentialMatchingPrefetcherStrideTrackerDebug, \
+            "(Stride Tracker) " __VA_ARGS__)
 
 namespace gem5
 {

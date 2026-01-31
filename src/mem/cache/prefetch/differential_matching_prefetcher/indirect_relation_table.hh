@@ -40,7 +40,8 @@
 
 #define DMP_IRT_DEBUG(...) \
     DPRINTF(\
-        DifferentialMatchingPrefetcherIndirectRelationTableDebug, __VA_ARGS__)
+        DifferentialMatchingPrefetcherIndirectRelationTableDebug, \
+        "(IRT) " __VA_ARGS__)
 
 namespace gem5
 {
