@@ -36,12 +36,17 @@ class BFSGenerator(AbstractGenerator):
         graph_file: str,
         starting_node: int,
         is_directed: bool,
+        num_visitor_threads: int,
         clk_freq: str,
     ):
         super().__init__(
             cores=[
                 BFSGeneratorCore(
-                    graph_file, starting_node, is_directed, clk_freq
+                    graph_file=graph_file,
+                    starting_node=starting_node,
+                    is_directed=is_directed,
+                    num_visitor_threads=num_visitor_threads,
+                    clk_freq=clk_freq,
                 )
             ]
         )

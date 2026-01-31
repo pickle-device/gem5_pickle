@@ -43,6 +43,7 @@ class BFSGeneratorCore(AbstractGeneratorCore):
         graph_file: str,
         starting_node: int,
         is_directed: bool,
+        num_visitor_threads: int,
         clk_freq: str,
     ):
         super().__init__()
@@ -50,6 +51,7 @@ class BFSGeneratorCore(AbstractGeneratorCore):
             graph_file=graph_file,
             is_directed=is_directed,
             source_vertex=starting_node,
+            num_visitor_threads=num_visitor_threads,
         )
         clock_domain = SrcClockDomain(
             clock=clk_freq, voltage_domain=VoltageDomain()

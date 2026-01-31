@@ -158,29 +158,43 @@ class BFSGen : public ClockedObject
     ) override;
     void notifyPacketReceived(const Addr vaddr, const uint64_t vertex_id);
 
-
   private:
+    System* system;
     std::shared_ptr<CSR> csr;
     BFSGenPort port;
     RequestorID requestorId;
+    EventFunctionWrapper dataCheckEvent;
+    EventFunctionWrapper sendPendingRequestEvent;
+    EventFunctionWrapper visitorPromotionEvent;
+
   private:
+    void sendFunctionalRead(Addr addr, uint8_t *data, unsigned size);
     void sendFunctionalWrite(Addr addr, const uint8_t *data, unsigned size);
-    void sendTimingRead(
+    void addReadToPendingPackets(
       uint64_t vertex_id, Addr vaddr, Addr pc, uint64_t size
     );
-    void sendTimingWrite(
+    void addWriteToPendingPackets(
       uint64_t vertex_id, Addr vaddr, Addr pc, unsigned size,
       const uint8_t *data
     );
+    void dataCheck();
+    void scheduleDataCheckEvent();
+    void sendPendingRequest();
+    void scheduleSendPendingRequestEvent();
+    bool visitorThreadsAvailable() const;
+    void promoteVisitors();
+    void scheduleVisitorPromotionEvent();
+    void exitSimIfFinish() const;
 
   private:
     const uint64_t cache_block_size;
-
     const uint64_t source_vertex;
+    const uint64_t num_visitor_threads;
     std::vector<uint64_t> work_queue;
 
     GraphConstruct graph;
     std::vector<VisitorTracker> visitor_trackers;
+    uint64_t current_work_queue_index;
 
   public:
     // We share the following data structures with BFSGenPort

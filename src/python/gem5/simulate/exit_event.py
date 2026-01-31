@@ -110,6 +110,9 @@ class ExitEvent(Enum):
             return ExitEvent.KERNEL_PANIC
         elif exit_string == "Kernel oops in simulated system.":
             return ExitEvent.KERNEL_OOPS
+        elif exit_string.endswith("completed all work."):
+            # This is for the graph_gen exit event
+            return ExitEvent.EXIT
         elif exit_string.endswith("will terminate the simulation.\n"):
             # This is for the traffic generator exit event
             return ExitEvent.EXIT
