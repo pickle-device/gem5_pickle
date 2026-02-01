@@ -37,6 +37,8 @@
 #include <string>
 #include <vector>
 
+#include "base/logging.hh"
+#include "debug/BFSGen.hh"
 #include "sim/eventq.hh"
 #include "sim/sim_exit.hh"
 #include "sim/system.hh"
@@ -222,6 +224,7 @@ BFSGen::BFSGenPort::recvTimingResp(PacketPtr pkt)
             break;
         }
     }
+    owner->stats.numResponsesReceived++;
     delete pkt;
     if (!found) {
         BFS_GEN_DEBUG(
@@ -272,6 +275,7 @@ BFSGen::BFSGen(const BFSGenParams &p)
       cache_block_size(p.cache_block_size),
       source_vertex(p.source_vertex),
       num_visitor_threads(p.num_visitor_threads),
+      max_num_responses(p.max_num_responses),
       graph(
           p.work_queue_start_vaddr,
           p.work_queue_element_size,
@@ -286,11 +290,25 @@ BFSGen::BFSGen(const BFSGenParams &p)
           p.visited_list_element_size,
           p.visited_list_access_pc
       ),
-      current_work_queue_index(0)
+      current_work_queue_index(0),
+      stats(this)
 {
     BFS_GEN_DEBUG(
       "BFSGen started up with cache block size: %lu\n", cache_block_size
     );
+
+    if (num_visitor_threads == 0) {
+        fatal("Number of visitor threads must be greater than 0\n");
+    }
+
+    if (max_num_responses == 0) {
+        max_num_responses = UINT64_MAX;
+    } else {
+        inform(
+            "Maximum number of responses to process: %lu\n",
+            max_num_responses
+        );
+    }
 }
 
 BFSGen::~BFSGen()
@@ -674,13 +692,17 @@ BFSGen::exitSimIfFinish() const
         current_work_queue_index >= work_queue.size();
     const bool no_active_visitors = visitor_trackers.empty();
     const bool no_pending_packets = pending_packets.empty();
+    const bool max_responses_reached =
+        stats.numResponsesReceived.value() >= max_num_responses;
     const bool no_inflight_packets = inflight_packets.empty();
     BFS_GEN_DEBUG(
         "Exit check: work queue exhausted: %d, no active visitors: %d, "
-        "no pending packets: %d, no inflight packets: %d\n",
+        "no pending packets: %d, max responses reached: %d, "
+        "no inflight packets: %d\n",
         current_work_queue_exhausted,
         no_active_visitors,
         no_pending_packets,
+        max_responses_reached,
         no_inflight_packets
     );
     if (
@@ -693,10 +715,29 @@ BFSGen::exitSimIfFinish() const
         // && no_inflight_packets
     ) {
         BFS_GEN_DEBUG("BFSGen completed all work, exiting sim loop.\n");
-        std::string words_to_automagically_generate_a_normal_exit_event = \
+        std::string words_to_automagically_generate_a_normal_exit_event =
             "BFSGen completed all work.";
         exitSimLoop(words_to_automagically_generate_a_normal_exit_event);
     }
+
+    if (max_responses_reached) {
+        BFS_GEN_DEBUG(
+            "BFSGen reached maximum number of responses to process (%lu), "
+            "exiting sim loop.\n",
+            max_num_responses
+        );
+        std::string other_words_to_automagically_generate_a_normal_exit_event =
+            "BFSGen reached maximum number of responses to process.";
+        exitSimLoop(other_words_to_automagically_generate_a_normal_exit_event);
+    }
+}
+
+BFSGen::BFSGenStats::BFSGenStats(BFSGen* _owner)
+  : statistics::Group(_owner),
+    owner(_owner),
+    ADD_STAT(numResponsesReceived, statistics::units::Count::get(),
+        "Number of responses received from memory.")
+{
 }
 
 } // namespace gem5

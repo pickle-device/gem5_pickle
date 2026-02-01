@@ -37,6 +37,7 @@ class BFSGenerator(AbstractGenerator):
         starting_node: int,
         is_directed: bool,
         num_visitor_threads: int,
+        max_num_responses: int,
         clk_freq: str,
     ):
         super().__init__(
@@ -46,6 +47,7 @@ class BFSGenerator(AbstractGenerator):
                     starting_node=starting_node,
                     is_directed=is_directed,
                     num_visitor_threads=num_visitor_threads,
+                    max_num_responses=max_num_responses,
                     clk_freq=clk_freq,
                 )
             ]

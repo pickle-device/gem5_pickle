@@ -47,6 +47,9 @@ class BFSGen(ClockedObject):
     )
     source_vertex = Param.Unsigned("Source vertex for BFS traversal")
     num_visitor_threads = Param.Unsigned(1, "Number of visitor threads")
+    max_num_responses = Param.Unsigned(
+        0, "Maximum number of responses to process (0 for no limit)"
+    )
 
     work_queue_start_vaddr = Param.Addr(
         0x1000_0000, "Virtual address where the work queue starts"

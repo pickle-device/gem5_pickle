@@ -113,6 +113,11 @@ class ExitEvent(Enum):
         elif exit_string.endswith("completed all work."):
             # This is for the graph_gen exit event
             return ExitEvent.EXIT
+        elif exit_string.endswith(
+            "has reached the maximum number of responses to process."
+        ):
+            # This is for the graph_gen exit event
+            return ExitEvent.EXIT
         elif exit_string.endswith("will terminate the simulation.\n"):
             # This is for the traffic generator exit event
             return ExitEvent.EXIT

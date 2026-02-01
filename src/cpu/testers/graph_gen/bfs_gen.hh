@@ -190,11 +190,22 @@ class BFSGen : public ClockedObject
     const uint64_t cache_block_size;
     const uint64_t source_vertex;
     const uint64_t num_visitor_threads;
+    uint64_t max_num_responses;
+
     std::vector<uint64_t> work_queue;
 
     GraphConstruct graph;
     std::vector<VisitorTracker> visitor_trackers;
     uint64_t current_work_queue_index;
+
+    struct BFSGenStats: public statistics::Group
+    {
+        BFSGen* owner;
+
+        statistics::Scalar numResponsesReceived;
+
+        BFSGenStats(BFSGen* _owner);
+    } stats;
 
   public:
     // We share the following data structures with BFSGenPort
