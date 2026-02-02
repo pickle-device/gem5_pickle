@@ -46,6 +46,11 @@ class DifferentialMatchingPrefetcherInterface
     virtual void handleNewCandidateFromIcs(
       const Addr index_pc, const Addr target_pc
     ) = 0;
+    // Called when a differential matching result is available for a candidate
+    // pair of PCs.
+    virtual void handleDifferentialMatchResult(
+      const Addr index_pc, const Addr target_pc, const bool successful_match
+    ) = 0;
 };
 
 } // namespace prefetch

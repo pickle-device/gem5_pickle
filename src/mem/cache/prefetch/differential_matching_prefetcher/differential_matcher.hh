@@ -38,6 +38,7 @@
 #include "base/logging.hh"
 #include "base/types.hh"
 #include "debug/DifferentialMatchingPrefetcherDifferentMatcherDebug.hh"
+#include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
 
 #define DMP_DIFFERENTIAL_MATCHER_DEBUG(...) \
     DPRINTF(DifferentialMatchingPrefetcherDifferentMatcherDebug, \
@@ -82,6 +83,7 @@ class DifferentialMatcher
     const uint64_t max_num_target_table_entries;
     const uint64_t max_num_tracked_items_per_table_entry;
     const std::vector<int64_t> matching_shift_amounts;
+    DifferentialMatchingPrefetcherInterface *prefetcher_interface;
   public:
     DifferentialMatcher(
       const uint64_t _max_num_index_table_entries,
@@ -90,7 +92,8 @@ class DifferentialMatcher
       const uint64_t _max_num_tracked_items_per_table_entry,
       // Shifting amounts for differential matching
       // A shift amount of \alpha means we match a[i] with (b[i] >> \alpha)
-      const std::vector<int64_t> &_matching_shift_amounts
+      const std::vector<int64_t> &_matching_shift_amounts,
+      DifferentialMatchingPrefetcherInterface *_prefetcher_interface
     );
     ~DifferentialMatcher() = default;
 

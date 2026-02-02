@@ -141,6 +141,11 @@ class DifferentialMatchingPrefetcher : \
     void handleNewCandidateFromIcs(
       const Addr index_pc, const Addr target_pc
     ) override;
+    // Here, we receive a differential matching result for a candidate pair of
+    // PCs from the Differential Matcher.
+    void handleDifferentialMatchResult(
+      const Addr index_pc, const Addr target_pc, const bool successful_match
+    ) override;
     // Helpers
     Addr getBlockAddress(Addr addr) const;
     uint64_t getDataFromProbe(const SimpleCacheAccessProbeArg &arg) const;

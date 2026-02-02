@@ -92,7 +92,9 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
         /*_max_num_tracked_items_per_table_entry*/
         p.tracked_items_per_table_entry,
         /*_matching_shift_amounts*/
-        p.matching_shift_amounts
+        p.matching_shift_amounts,
+        /*_prefetcher_interface*/
+        this
     )
 {
     panic_if(l1_controller == nullptr,
@@ -184,6 +186,22 @@ DifferentialMatchingPrefetcher::handleNewCandidateFromIcs(
     );
     addIndirectionCandidateToDifferentialMatcher(index_pc, target_pc);
 }
+
+void
+DifferentialMatchingPrefetcher::handleDifferentialMatchResult(
+    const Addr index_pc, const Addr target_pc, const bool successful_match
+)
+{
+    DMP_PREFETCHER_DEBUG(
+        "Differential match result for candidate pair: Index PC %#x, "
+        "Target PC %#x, Successful Match %d\n",
+        index_pc, target_pc, successful_match
+    );
+    if (!successful_match) {
+        indirection_candidate_scoreboard.
+            markPreviouslyUnsuccessfulMatch(index_pc, target_pc);
+    }
+};
 
 void
 DifferentialMatchingPrefetcher::regProbeListeners()

@@ -34,6 +34,7 @@
 #include "base/trace.hh"
 #include "base/types.hh"
 #include "debug/DifferentialMatchingPrefetcherDifferentMatcherDebug.hh"
+#include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
 
 namespace gem5
 {
@@ -103,13 +104,15 @@ DifferentialMatcher::DifferentialMatcher(
     const uint64_t _max_num_index_table_entries,
     const uint64_t _max_num_target_table_entries,
     const uint64_t _max_num_tracked_items_per_table_entry,
-    const std::vector<int64_t> &_matching_shift_amounts
+    const std::vector<int64_t> &_matching_shift_amounts,
+    DifferentialMatchingPrefetcherInterface *_prefetcher_interface
 ) : max_num_index_table_entries(_max_num_index_table_entries),
     max_num_target_table_entries(_max_num_target_table_entries),
     max_num_tracked_items_per_table_entry(
         _max_num_tracked_items_per_table_entry
     ),
-    matching_shift_amounts(_matching_shift_amounts)
+    matching_shift_amounts(_matching_shift_amounts),
+    prefetcher_interface(_prefetcher_interface)
 {
     panic_if(
         max_num_index_table_entries != max_num_target_table_entries,
@@ -379,6 +382,9 @@ DifferentialMatcher::matchCandidate(
     }
 
     // TODO: notify the prefetcher of the match result, add a new interface
+    prefetcher_interface->handleDifferentialMatchResult(
+        index_pc, target_pc, match_found
+    );
 }
 
 std::vector<int64_t>
