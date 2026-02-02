@@ -33,7 +33,14 @@
 #include <optional>
 #include <vector>
 
+#include "base/logging.hh"
+#include "base/trace.hh"
 #include "base/types.hh"
+#include "debug/DifferentialMatchingPrefetcherIndexQueueDebug.hh"
+
+#define DMP_INDEX_QUEUE_DEBUG(...) \
+    DPRINTF(DifferentialMatchingPrefetcherIndexQueueDebug, \
+            "(Index Queue) " __VA_ARGS__)
 
 namespace gem5
 {

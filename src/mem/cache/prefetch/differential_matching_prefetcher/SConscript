@@ -44,6 +44,7 @@ Source('stride_tracker.cc')
 DebugFlag('DifferentialMatchingPrefetcherCacheObserverDebug')
 DebugFlag('DifferentialMatchingPrefetcherDebug')
 DebugFlag('DifferentialMatchingPrefetcherDifferentMatcherDebug')
+DebugFlag('DifferentialMatchingPrefetcherIndexQueueDebug')
 DebugFlag('DifferentialMatchingPrefetcherIndirectRelationTableDebug')
 DebugFlag('DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug')
 DebugFlag('DifferentialMatchingPrefetcherStrideTrackerDebug')
@@ -54,6 +55,7 @@ CompoundFlag(
     [
         'DifferentialMatchingPrefetcherDebug',
         'DifferentialMatchingPrefetcherDifferentMatcherDebug',
+        'DifferentialMatchingPrefetcherIndexQueueDebug',
         'DifferentialMatchingPrefetcherIndirectRelationTableDebug',
         'DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug',
         'DifferentialMatchingPrefetcherStrideTrackerDebug'

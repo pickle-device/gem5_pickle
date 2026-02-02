@@ -39,6 +39,7 @@
 #include "base/types.hh"
 #include "debug/DifferentialMatchingPrefetcherCacheObserverDebug.hh"
 #include "debug/DifferentialMatchingPrefetcherDebug.hh"
+#include "mem/cache/prefetch/differential_matching_prefetcher/differential_matcher.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/index_queue.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/indirection_candidate_scoreboard.hh"
@@ -92,12 +93,14 @@ class DifferentialMatchingPrefetcher : \
     const uint64_t indirection_candidate_scoreboard_num_entries;
     const uint64_t indirection_candidate_scoreboard_num_candidates_per_entry;
     const uint64_t sample_window_size;
+    const bool ics_deprioritize_on_unsuccessful_matching_patch;
 
   // prefetcher components
   private:
     StrideTracker stride_tracker;
     IndexQueue index_queue;
     IndirectionCandidateScoreboard indirection_candidate_scoreboard;
+    DifferentialMatcher differential_matcher;
 
   public:
     PARAMS(DifferentialMatchingPrefetcher);
@@ -138,8 +141,9 @@ class DifferentialMatchingPrefetcher : \
     void handleNewCandidateFromIcs(
       const Addr index_pc, const Addr target_pc
     ) override;
-  // Helpers
+    // Helpers
     Addr getBlockAddress(Addr addr) const;
+    uint64_t getDataFromProbe(const SimpleCacheAccessProbeArg &arg) const;
 };
 
 } // namespace prefetch

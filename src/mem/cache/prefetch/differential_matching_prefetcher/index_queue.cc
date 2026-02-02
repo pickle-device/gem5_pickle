@@ -29,8 +29,11 @@
 #include "mem/cache/prefetch/differential_matching_prefetcher/index_queue.hh"
 
 #include <optional>
+#include <sstream>
 
 #include "base/logging.hh"
+#include "base/trace.hh"
+#include "debug/DifferentialMatchingPrefetcherIndexQueueDebug.hh"
 
 namespace gem5
 {
@@ -146,6 +149,10 @@ IndexQueue::add(const Addr pc, const Tick access_timestamp)
     } else {
         panic("Unknown IndexQueue replacement policy!");
     }
+
+    DMP_INDEX_QUEUE_DEBUG(
+        "Added PC: %#x, Timestamp: %d\n", pc, access_timestamp
+    );
 }
 
 bool
@@ -177,6 +184,15 @@ IndexQueue::getHighestScorePcs() const
             highest_score_pcs.push_back(entry.pc);
         }
     }
+
+    std::stringstream strm;
+    strm << "Highest score: " << highest_score << "; PCs: ";
+
+    for (const auto &pc : highest_score_pcs) {
+        strm << " 0x" << std::hex << pc << std::dec;
+    }
+    strm << "\n";
+    DMP_INDEX_QUEUE_DEBUG("%s", strm.str().c_str());
 
     return highest_score_pcs;
 }

@@ -81,7 +81,7 @@ class DifferentialMatcher
     const uint64_t max_num_index_table_entries;
     const uint64_t max_num_target_table_entries;
     const uint64_t max_num_tracked_items_per_table_entry;
-    const std::vector<uint64_t> matching_shift_amounts;
+    const std::vector<int64_t> matching_shift_amounts;
   public:
     DifferentialMatcher(
       const uint64_t _max_num_index_table_entries,
@@ -90,10 +90,11 @@ class DifferentialMatcher
       const uint64_t _max_num_tracked_items_per_table_entry,
       // Shifting amounts for differential matching
       // A shift amount of \alpha means we match a[i] with (b[i] >> \alpha)
-      const std::vector<uint64_t> &_matching_shift_amounts
+      const std::vector<int64_t> &_matching_shift_amounts
     );
     ~DifferentialMatcher() = default;
 
+    bool isEmpty() const;
     bool isFull() const;
 
     bool hasCandidate(const Addr index_pc, const Addr target_pc) const;
@@ -135,6 +136,7 @@ class DifferentialMatcher
     std::vector<int64_t> multiplyVectorByFactor(
       const std::vector<int64_t> &vec, const int64_t factor
     ) const;
+    void tryMatchingCandidates();
 };
 
 } // namespace prefetch

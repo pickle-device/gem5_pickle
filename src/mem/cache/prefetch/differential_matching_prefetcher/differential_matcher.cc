@@ -28,6 +28,7 @@
 
 #include "mem/cache/prefetch/differential_matching_prefetcher/differential_matcher.hh"
 
+#include <sstream>
 #include <utility>
 
 #include "base/trace.hh"
@@ -102,7 +103,7 @@ DifferentialMatcher::DifferentialMatcher(
     const uint64_t _max_num_index_table_entries,
     const uint64_t _max_num_target_table_entries,
     const uint64_t _max_num_tracked_items_per_table_entry,
-    const std::vector<uint64_t> &_matching_shift_amounts
+    const std::vector<int64_t> &_matching_shift_amounts
 ) : max_num_index_table_entries(_max_num_index_table_entries),
     max_num_target_table_entries(_max_num_target_table_entries),
     max_num_tracked_items_per_table_entry(
@@ -119,6 +120,12 @@ DifferentialMatcher::DifferentialMatcher(
         matching_shift_amounts.empty(),
         "At least one matching shift amount must be provided."
     );
+}
+
+bool
+DifferentialMatcher::isEmpty() const
+{
+    return candidate_index_target_pc.empty();
 }
 
 bool
@@ -162,6 +169,8 @@ DifferentialMatcher::trackL1CacheHit(
     const uint64_t request_size
 )
 {
+    bool has_full_target_entry = false;
+
     // We track index PC hits with data, and target PC hits with effective
     // virtual addresses.
     for (
@@ -178,7 +187,15 @@ DifferentialMatcher::trackL1CacheHit(
         if (pc == target_pc) {
             // This is a target PC cache hit
             target_entry.addItem(effective_vaddr, request_size);
+            if (target_entry.isFull()) {
+                has_full_target_entry = true;
+            }
         }
+    }
+
+    // If any target entry is full, we try to match candidates
+    if (has_full_target_entry) {
+        tryMatchingCandidates();
     }
 }
 
@@ -187,6 +204,8 @@ DifferentialMatcher::trackL1CacheMiss(
     const Addr pc, const Addr effective_vaddr, const uint64_t request_size
 )
 {
+    bool has_full_target_entry = false;
+
     // We only track target PC cache misses
     for (
         auto &[candidate_pair, tracking_entries] : candidate_index_target_pc
@@ -196,7 +215,15 @@ DifferentialMatcher::trackL1CacheMiss(
         if (pc == target_pc) {
             // This is a target PC cache miss
             target_entry.addItem(effective_vaddr, request_size);
+            if (target_entry.isFull()) {
+                has_full_target_entry = true;
+            }
         }
+    }
+
+    // If any target entry is full, we try to match candidates
+    if (has_full_target_entry) {
+        tryMatchingCandidates();
     }
 }
 
@@ -276,30 +303,45 @@ DifferentialMatcher::matchCandidate(
         target_diffs.push_back(diff);
     }
 
-    DMP_DIFFERENTIAL_MATCHER_DEBUG(
-        "Index diffs: "
-    );
+    std::stringstream index_strm;
+    index_strm << "Index tracked items: ";
+    for (const auto &item : index_entry.tracked_items) {
+        index_strm << std::hex << "0x" << item.first << " " << std::dec;
+    }
+    DMP_DIFFERENTIAL_MATCHER_DEBUG("%s\n", index_strm.str().c_str());
+
+    std::stringstream target_strm;
+    target_strm << "Target tracked items: ";
+    for (const auto &item : target_filtered_items) {
+        target_strm << std::hex << "0x" << item.first << " " << std::dec;
+    }
+    DMP_DIFFERENTIAL_MATCHER_DEBUG("%s\n", target_strm.str().c_str());
+
+    std::stringstream index_diff_strm;
+    index_diff_strm << "Index diffs: ";
     for (const auto &diff : index_diffs) {
-        DMP_DIFFERENTIAL_MATCHER_DEBUG("%lld ", diff);
+        index_diff_strm << diff << " ";
     }
-    DMP_DIFFERENTIAL_MATCHER_DEBUG("\n");
-    DMP_DIFFERENTIAL_MATCHER_DEBUG(
-        "Target diffs: "
-    );
+    DMP_DIFFERENTIAL_MATCHER_DEBUG("%s\n", index_diff_strm.str().c_str());
+
+    std::stringstream target_diff_strm;
+    target_diff_strm << "Target diffs: ";
     for (const auto &diff : target_diffs) {
-        DMP_DIFFERENTIAL_MATCHER_DEBUG("%lld ", diff);
+        target_diff_strm << diff << " ";
     }
-    DMP_DIFFERENTIAL_MATCHER_DEBUG("\n");
+    DMP_DIFFERENTIAL_MATCHER_DEBUG("%s\n", target_diff_strm.str().c_str());
 
     // For each shift amount, we form groups of 3 of index data diffs to match
     // with target diffs
     bool match_found = false;
     int64_t match_shift_amount_index = 0;
     for (const auto &shift_amount : matching_shift_amounts) {
-        const std::vector<int64_t> shifted_target_diffs =
-            multiplyVectorByFactor(target_diffs, 1LL << shift_amount);
+
+        const std::vector<int64_t> shifted_target_diffs = (shift_amount > 0) ?
+            multiplyVectorByFactor(target_diffs, 1LL << shift_amount) : \
+            multiplyVectorByFactor(target_diffs, (-1LL) << shift_amount);
         DMP_DIFFERENTIAL_MATCHER_DEBUG(
-            "Matching with shift amount %llu:\n", shift_amount
+            "Matching with shift amount %lld:\n", shift_amount
         );
         // Perform matching between index_diffs and shifted_target_diffs
         for (uint64_t i = 0; i + 2 < index_diffs.size(); ++i) {
@@ -350,6 +392,35 @@ DifferentialMatcher::multiplyVectorByFactor(
         result.push_back(val * factor);
     }
     return result;
+}
+
+void
+DifferentialMatcher::tryMatchingCandidates()
+{
+    // We attempt to match when the target entry is full
+    std::vector<CandidatePcPair> candidates_to_remove;
+    for (
+        auto &[candidate_pair, tracking_entries] : candidate_index_target_pc
+    ) {
+        const Addr index_pc = candidate_pair.first;
+        const Addr target_pc = candidate_pair.second;
+        TargetPcTrackingEntry &target_entry = tracking_entries.second;
+        if (target_entry.isFull()) {
+            // Attempt to match this candidate pair
+            matchCandidate(index_pc, target_pc);
+            // After matching, we remove this candidate pair from tracking
+            candidates_to_remove.push_back(candidate_pair);
+        }
+    }
+
+    // Remove the matched candidates from tracking
+    for (const auto &candidate_pair : candidates_to_remove) {
+        candidate_index_target_pc.erase(candidate_pair);
+        DMP_DIFFERENTIAL_MATCHER_DEBUG(
+            "Removed candidate pair: (%#x, %#x)\n",
+            candidate_pair.first, candidate_pair.second
+        );
+    }
 }
 
 } // namespace prefetch

@@ -63,6 +63,9 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
         p.indirection_candidate_scoreboard_num_candidates_per_entry
     ),
     sample_window_size(p.sample_window_size),
+    ics_deprioritize_on_unsuccessful_matching_patch(
+        p.ics_deprioritize_on_unsuccessful_matching_patch
+    ),
     stride_tracker(
         /*capacity*/ p.index_queue_size,
         /*_confidence_threshold*/ 0.5,
@@ -76,8 +79,20 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
         p.indirection_candidate_scoreboard_num_candidates_per_entry,
         /*_sample_window_size*/
         p.sample_window_size,
+        /*_deprioritize_previously_unsuccessful_match*/
+        p.ics_deprioritize_on_unsuccessful_matching_patch,
         /*_prefetcher_interface*/
         this
+    ),
+    differential_matcher(
+        /*_max_num_index_table_entries*/
+        p.index_table_num_entries,
+        /*_max_num_target_table_entries*/
+        p.target_table_num_entries,
+        /*_max_num_tracked_items_per_table_entry*/
+        p.tracked_items_per_table_entry,
+        /*_matching_shift_amounts*/
+        p.matching_shift_amounts
     )
 {
     panic_if(l1_controller == nullptr,
@@ -129,7 +144,18 @@ DifferentialMatchingPrefetcher::\
     const Addr index_pc, const Addr target_pc
 )
 {
-    // TODO: implement the differential matching logic here
+    bool successfully_added = differential_matcher.addCandidate(
+        index_pc, target_pc
+    );
+    // TODO: Handle the case when we cannot add the candidate
+    if (!successfully_added) {
+        DMP_PREFETCHER_DEBUG(
+            "Failed to add indirection candidate to Differential Matcher: "
+            "Index PC %#x, Target PC %#x\n",
+            index_pc, target_pc
+        );
+        return;
+    }
     DMP_PREFETCHER_DEBUG(
         "Adding indirection candidate to Differential Matcher: Index PC %#x, "
         "Target PC %#x\n",
@@ -156,7 +182,7 @@ DifferentialMatchingPrefetcher::handleNewCandidateFromIcs(
         "New candidate pair promoted: Index PC %#x, Target PC %#x\n",
         index_pc, target_pc
     );
-    // TODO: Start differential matching for this pair of PCs
+    addIndirectionCandidateToDifferentialMatcher(index_pc, target_pc);
 }
 
 void
@@ -206,6 +232,12 @@ DifferentialMatchingPrefetcher::observeL1CacheHit(
         return;
     }
 
+    if (!arg.hasCacheFillData()) {
+        // We only care about cache hits with data
+        warn("DMP Prefetcher observed L1 cache hit without data");
+        return;
+    }
+
     DMP_CACHE_OBSERVER_DEBUG(
         "DMP L1 Cache HIT observed: paddr=%#x, vaddr=%#x, size=%d, pc=%#x, "
         "hasData=%d\n",
@@ -217,6 +249,14 @@ DifferentialMatchingPrefetcher::observeL1CacheHit(
     const Addr block_address = getBlockAddress(arg.req->getPaddr());
     const Tick access_timestamp = curTick();
     stride_tracker.track(pc, block_address, access_timestamp);
+    if (!differential_matcher.isEmpty()) {
+        differential_matcher.trackL1CacheHit(
+            pc,
+            block_address,
+            getDataFromProbe(arg),
+            arg.req->getSize()
+        );
+    }
 }
 
 void
@@ -239,6 +279,13 @@ DifferentialMatchingPrefetcher::observeL1CacheMiss(
     const Tick access_timestamp = curTick();
     stride_tracker.track(pc, block_address, access_timestamp);
     indirection_candidate_scoreboard.trackL1CacheMiss(pc);
+    if (!differential_matcher.isEmpty()) {
+        differential_matcher.trackL1CacheMiss(
+            pc,
+            block_address,
+            arg.req->getSize()
+        );
+    }
 }
 
 void
@@ -250,18 +297,48 @@ DifferentialMatchingPrefetcher::observeL1CacheFill(
         return;
     }
 
+    if (!arg.hasCacheFillData()) {
+        // We only care about cache fills with data
+        warn("DMP Prefetcher observed L1 cache fill without data");
+        return;
+    }
+
     DMP_CACHE_OBSERVER_DEBUG(
         "DMP L1 Cache FILL observed: paddr=%#x, vaddr=%#x, size=%d, pc=%#x, "
         "hasData=%d\n",
         arg.req->getPaddr(), arg.req->getVaddr(), arg.req->getSize(),
         arg.req->getPC(), arg.hasCacheFillData()
     );
+
+    if (!differential_matcher.isEmpty()) {
+
+        differential_matcher.trackL1CacheFill(
+            arg.req->getPC(),
+            getBlockAddress(arg.req->getPaddr()),
+            getDataFromProbe(arg),
+            arg.req->getSize()
+        );
+
+    }
 }
 
 Addr
 DifferentialMatchingPrefetcher::getBlockAddress(Addr addr) const
 {
     return addr & ~((Addr)cache_line_size-1);
+}
+
+uint64_t
+DifferentialMatchingPrefetcher::getDataFromProbe(
+    const SimpleCacheAccessProbeArg &arg
+) const
+{
+    uint64_t pkt_data = 0;
+    const uint8_t* pkt_data_ptr = arg.cache_fill_data.data();
+    for (unsigned i = 0; i < arg.req->getSize(); ++i) {
+        pkt_data |= static_cast<uint64_t>(pkt_data_ptr[i]) << (i*8);
+    }
+    return pkt_data;
 }
 
 } // namespace prefetch

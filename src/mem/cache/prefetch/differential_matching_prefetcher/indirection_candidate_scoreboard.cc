@@ -30,6 +30,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 #include "base/logging.hh"
@@ -77,6 +78,12 @@ IndirectionCandidateScoreboardEntry::trackL1CacheMiss(const Addr target_pc)
     }
 
     tracked_l1_cache_miss_count++;
+    //DMP_ICS_DEBUG(
+    //    "Tracking L1 cache miss for Index PC %#x: Target PC %#x, "
+    //    "Total tracked L1 cache misses: %lu/%lu\n",
+    //    index_pc, target_pc, tracked_l1_cache_miss_count,
+    //    sample_window_size
+    //);
 
     // Check if the PC is already in the candidates list
     for (auto &candidate : candidates) {
@@ -94,22 +101,16 @@ IndirectionCandidateScoreboardEntry::trackL1CacheMiss(const Addr target_pc)
     }
 }
 
-Addr
-IndirectionCandidateScoreboardEntry::\
-    getCandidateTargetPcWithHighestL1CacheMissCount() const
+std::vector<std::pair<Addr, uint64_t>>
+IndirectionCandidateScoreboardEntry::getCandidatesWithL1CacheMissCount() const
 {
-    // Find the candidate with the highest L1 cache miss count
-    auto best_candidate_it = candidates.begin();
-    for (auto it = candidates.begin(); it != candidates.end(); ++it) {
-        if (it->l1_cache_miss_count > best_candidate_it->l1_cache_miss_count) {
-            best_candidate_it = it;
-        }
+    std::vector<std::pair<Addr, uint64_t>> candidate_miss_counts;
+    for (const auto &candidate : candidates) {
+        candidate_miss_counts.emplace_back(
+            candidate.pc, candidate.l1_cache_miss_count
+        );
     }
-
-    // Record the candidate PC to return
-    Addr candidate_pc = best_candidate_it->pc;
-
-    return candidate_pc;
+    return candidate_miss_counts;
 }
 
 bool
@@ -121,10 +122,14 @@ IndirectionCandidateScoreboardEntry::isSampleWindowFull() const
 IndirectionCandidateScoreboard::IndirectionCandidateScoreboard(
   const uint64_t _max_num_entries, const uint64_t _max_num_candidates,
   const uint64_t _sample_window_size,
+  const bool _deprioritize_previously_unsuccessful_match,
   DifferentialMatchingPrefetcherInterface *_prefetcher_interface
 ) : max_num_entries(_max_num_entries),
     max_num_candidates(_max_num_candidates),
     sample_window_size(_sample_window_size),
+    deprioritize_previously_unsuccessful_match(
+        _deprioritize_previously_unsuccessful_match
+    ),
     scoreboard(),
     prefetcher_interface(_prefetcher_interface)
 {
@@ -179,13 +184,24 @@ IndirectionCandidateScoreboard::trackL1CacheMiss(const Addr target_pc)
         if (entry.isSampleWindowFull()) {
             const Addr candidate_index_pc = entry.getIndexPC();
             const Addr candidate_target_pc =
-                entry.getCandidateTargetPcWithHighestL1CacheMissCount();
+                deprioritize_previously_unsuccessful_match ?
+                getTargetPcWithHighestL1ScoreAfterDeprioritization(
+                    candidate_index_pc
+                ) :
+                getTargetPcWithHighestL1CacheMissCount(
+                    candidate_index_pc
+                );
             // Notify the prefetcher of the new candidate
             prefetcher_interface->handleNewCandidateFromIcs(
                 candidate_index_pc, candidate_target_pc
             );
             // Mark the entry for removal
             pcs_to_remove.push_back(entry.getIndexPC());
+            DMP_ICS_DEBUG(
+                "Index PC %#x sample window full. New candidate to track: "
+                "Index PC %#x, Target PC %#x\n",
+                candidate_index_pc, candidate_index_pc, candidate_target_pc
+            );
         }
     }
 
@@ -215,6 +231,82 @@ IndirectionCandidateScoreboard::trackL1CacheMiss(const Addr target_pc)
                   "processing cache misses.", entry.getIndexPC());
         }
     }
+}
+
+void
+IndirectionCandidateScoreboard::markPreviouslyUnsuccessfulMatch(
+    const Addr index_pc, const Addr target_pc
+)
+{
+    previously_unsuccessful_matches[{index_pc, target_pc}]++;
+}
+
+Addr
+IndirectionCandidateScoreboard::getTargetPcWithHighestL1CacheMissCount(
+    const Addr index_pc
+) const
+{
+    for (const auto &entry : scoreboard) {
+        if (entry.getIndexPC() == index_pc) {
+            Addr best_candidate_pc = 0;
+            uint64_t highest_miss_count = 0;
+            for (const auto &candidate_pair :
+                 entry.getCandidatesWithL1CacheMissCount()) {
+                if (candidate_pair.second > highest_miss_count) {
+                    best_candidate_pc = candidate_pair.first;
+                    highest_miss_count = candidate_pair.second;
+                }
+                DMP_ICS_DEBUG(
+                    "Index PC %#x Candidate PC %#x L1 Cache Miss Count %lu\n",
+                    index_pc, candidate_pair.first, candidate_pair.second
+                );
+            }
+            return best_candidate_pc;
+        }
+    }
+    return 0;
+}
+
+Addr
+IndirectionCandidateScoreboard::\
+    getTargetPcWithHighestL1ScoreAfterDeprioritization(
+    const Addr index_pc
+) const
+{
+    for (const auto &entry : scoreboard) {
+        if (entry.getIndexPC() == index_pc) {
+            Addr best_candidate_pc = 0;
+            std::vector<std::pair<Addr, uint64_t>> candidate_scores =
+                entry.getCandidatesWithL1CacheMissCount();
+            // Deprioritize previously unsuccessful matches by scaling down
+            // their scores by the number of times they were unsuccessful
+            uint64_t highest_adjusted_score = 0;
+            for (const auto &candidate_pair : candidate_scores) {
+                Addr candidate_pc = candidate_pair.first;
+                uint64_t original_score = candidate_pair.second;
+                uint64_t adjusted_score = original_score;
+                auto it =
+                    previously_unsuccessful_matches.find(
+                        {index_pc, candidate_pc}
+                    );
+                if (it != previously_unsuccessful_matches.end()) {
+                    uint64_t unsuccess_count = it->second;
+                    adjusted_score = original_score / (1 + unsuccess_count);
+                }
+                DMP_ICS_DEBUG(
+                    "Index PC %#x Candidate PC %#x Original Score %lu "
+                    "Adjusted Score %lu\n",
+                    index_pc, candidate_pc, original_score, adjusted_score
+                );
+                if (adjusted_score > highest_adjusted_score) {
+                    highest_adjusted_score = adjusted_score;
+                    best_candidate_pc = candidate_pc;
+                }
+            }
+            return best_candidate_pc;
+        }
+    }
+    return 0;
 }
 
 } // namespace prefetch

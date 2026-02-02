@@ -58,3 +58,32 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
     sample_window_size = Param.Unsigned(
         64, "Number of accesses in the sample window"
     )
+    index_table_num_entries = Param.Unsigned(
+        16, "Number of entries in the index table"
+    )
+    target_table_num_entries = Param.Unsigned(
+        16, "Number of entries in the target table"
+    )
+    tracked_items_per_table_entry = Param.Unsigned(
+        16, "Number of tracked items per table entry"
+    )
+    matching_shift_amounts = VectorParam.Int64(
+        [-4, -3, -2, -1, 1, 2, 3, 4],
+        "Shifting amounts for differential matching. A shift amount of "
+        "\alpha means we match a[i] with (b[i] >> \alpha). Negative shift "
+        "amounts are also supported, meaning a[i] is matched with "
+        "(-b[i] << \alpha).",
+    )
+
+    # Patches for fixing some parts of the paper
+    ics_deprioritize_on_unsuccessful_matching_patch = Param.Bool(
+        True,
+        "ICS proposes the PC with the most cache misses over the sample "
+        "windows, then the pair of index and target PCs is sent to the "
+        "matcher. However, we observe that the ICS keeps proposing the same "
+        "PC pair even when the matching is not successful. E.g., in BFS, the "
+        "work_queue access PC is kept being matched with the visited access "
+        "PC. With this patch, when the proposed target PC is not successful, "
+        "we lower the score that target PC the next time, allowing the ICS to "
+        "allow other PCs to be proposed.",
+    )

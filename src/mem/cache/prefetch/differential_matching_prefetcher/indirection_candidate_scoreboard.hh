@@ -30,6 +30,7 @@
 #define __DMP_INDIRECTION_CANDIDATE_SCOREBOARD_HH__
 
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 #include "base/logging.hh"
@@ -73,23 +74,40 @@ class IndirectionCandidateScoreboardEntry
     );
     Addr getIndexPC() const;
     void trackL1CacheMiss(const Addr target_pc);
-    // Return the candidate PC with the highest cache miss count
-    Addr getCandidateTargetPcWithHighestL1CacheMissCount() const;
+    // Return the candidate PCs with their L1 cache miss counts
+    std::vector<std::pair<Addr, uint64_t>> \
+      getCandidatesWithL1CacheMissCount() const;
     bool isSampleWindowFull() const;
 }; // class IndirectionCandidateScoreboardEntry
+
+struct PcPairHash
+{
+    std::size_t operator () (const std::pair<Addr, Addr> &p) const {
+        return p.first ^ p.second;
+    }
+};
 
 class IndirectionCandidateScoreboard
 {
   public:
-    uint64_t max_num_entries; // Maximum number of entries in the scoreboard
-    uint64_t max_num_candidates; // Maximum number of candidates per entry
-    uint64_t sample_window_size; // Number of cache misses to track per entry
+    // Maximum number of entries in the scoreboard
+    const uint64_t max_num_entries;
+    // Maximum number of candidates per entry
+    const uint64_t max_num_candidates;
+    // Number of cache misses to track per entry
+    const uint64_t sample_window_size;
+    // This is my patch preventing previously unsuccessful matches from being
+    // prioritized when adding new candidates
+    const bool deprioritize_previously_unsuccessful_match;
+    std::unordered_map<std::pair<Addr, Addr>, uint64_t, PcPairHash>
+        previously_unsuccessful_matches;
     std::vector<IndirectionCandidateScoreboardEntry> scoreboard;
     DifferentialMatchingPrefetcherInterface *prefetcher_interface;
 
     IndirectionCandidateScoreboard(
       const uint64_t _max_num_entries, const uint64_t _max_num_candidates,
       const uint64_t _sample_window_size,
+      bool _deprioritize_previously_unsuccessful_match,
       DifferentialMatchingPrefetcherInterface *_prefetcher_interface
     );
     // Add a new entry for the given index PC. Return true if added
@@ -101,6 +119,19 @@ class IndirectionCandidateScoreboard
     // If any entry's sample window is full, notify the prefetcher interface
     // of the new candidate and remove the entry from the scoreboard.
     void trackL1CacheMiss(const Addr target_pc);
+    // Handle the update of previously unsuccessful matches
+    void markPreviouslyUnsuccessfulMatch(
+        const Addr index_pc, const Addr target_pc
+    );
+    // Get the candidate target PC with the highest L1 cache miss count
+    Addr getTargetPcWithHighestL1CacheMissCount(
+        const Addr index_pc
+    ) const;
+    // Get the candidate target PC with the deprioritized scoring scheme,
+    // i.e., previously unsuccessful matches are deprioritized.
+    Addr getTargetPcWithHighestL1ScoreAfterDeprioritization(
+        const Addr index_pc
+    ) const;
 }; // class IndirectionCandidateScoreboard
 
 } // namespace gem5
