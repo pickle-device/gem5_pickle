@@ -119,6 +119,10 @@ class IndirectionCandidateScoreboard
     // If any entry's sample window is full, notify the prefetcher interface
     // of the new candidate and remove the entry from the scoreboard.
     void trackL1CacheMiss(const Addr target_pc);
+    // Handle the update of previously successful matches
+    void markPreviouslySuccessfulMatch(
+        const Addr index_pc, const Addr target_pc
+    );
     // Handle the update of previously unsuccessful matches
     void markPreviouslyUnsuccessfulMatch(
         const Addr index_pc, const Addr target_pc

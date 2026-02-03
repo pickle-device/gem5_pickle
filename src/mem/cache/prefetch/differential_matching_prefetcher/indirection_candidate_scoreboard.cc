@@ -234,6 +234,18 @@ IndirectionCandidateScoreboard::trackL1CacheMiss(const Addr target_pc)
 }
 
 void
+IndirectionCandidateScoreboard::markPreviouslySuccessfulMatch(
+    const Addr index_pc, const Addr target_pc
+)
+{
+    // Remove the entry from the previously unsuccessful matches map
+    auto it = previously_unsuccessful_matches.find({index_pc, target_pc});
+    if (it != previously_unsuccessful_matches.end()) {
+        previously_unsuccessful_matches.erase(it);
+    }
+}
+
+void
 IndirectionCandidateScoreboard::markPreviouslyUnsuccessfulMatch(
     const Addr index_pc, const Addr target_pc
 )
