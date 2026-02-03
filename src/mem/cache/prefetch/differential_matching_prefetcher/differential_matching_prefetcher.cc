@@ -95,6 +95,9 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
         p.matching_shift_amounts,
         /*_prefetcher_interface*/
         this
+    ),
+    indirect_relation_table(
+        /*_max_num_entries*/ p.indirect_relation_table_num_entries
     )
 {
     panic_if(l1_controller == nullptr,
@@ -184,12 +187,22 @@ DifferentialMatchingPrefetcher::handleNewCandidateFromIcs(
         "New candidate pair promoted: Index PC %#x, Target PC %#x\n",
         index_pc, target_pc
     );
+    if (indirect_relation_table.containsEntry(index_pc, target_pc)) {
+        DMP_PREFETCHER_DEBUG(
+            "Candidate pair already exists in Indirect Relation Table: "
+            "Index PC %#x, Target PC %#x\n",
+            index_pc, target_pc
+        );
+        return;
+    }
     addIndirectionCandidateToDifferentialMatcher(index_pc, target_pc);
 }
 
 void
 DifferentialMatchingPrefetcher::handleDifferentialMatchResult(
-    const Addr index_pc, const Addr target_pc, const bool successful_match
+    const Addr index_pc, const Addr target_pc, const bool successful_match,
+    const Addr target_base_vaddr, const int64_t shift_amount,
+    const AccessType index_access_type, const AccessType target_access_type
 )
 {
     DMP_PREFETCHER_DEBUG(
@@ -200,6 +213,13 @@ DifferentialMatchingPrefetcher::handleDifferentialMatchResult(
     if (!successful_match) {
         indirection_candidate_scoreboard.
             markPreviouslyUnsuccessfulMatch(index_pc, target_pc);
+    } else {
+        indirection_candidate_scoreboard.
+            markPreviouslySuccessfulMatch(index_pc, target_pc);
+        indirect_relation_table.addEntry(
+            index_pc, target_pc, target_base_vaddr, shift_amount,
+            index_access_type, target_access_type
+        );
     }
 };
 

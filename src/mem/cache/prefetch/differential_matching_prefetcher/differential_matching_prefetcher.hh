@@ -42,6 +42,7 @@
 #include "mem/cache/prefetch/differential_matching_prefetcher/differential_matcher.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/index_queue.hh"
+#include "mem/cache/prefetch/differential_matching_prefetcher/indirect_relation_table.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/indirection_candidate_scoreboard.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/stride_tracker.hh"
 #include "mem/cache/simple_cache_probe_arg.hh"
@@ -101,6 +102,7 @@ class DifferentialMatchingPrefetcher : \
     IndexQueue index_queue;
     IndirectionCandidateScoreboard indirection_candidate_scoreboard;
     DifferentialMatcher differential_matcher;
+    IndirectRelationTable indirect_relation_table;
 
   public:
     PARAMS(DifferentialMatchingPrefetcher);
@@ -144,7 +146,9 @@ class DifferentialMatchingPrefetcher : \
     // Here, we receive a differential matching result for a candidate pair of
     // PCs from the Differential Matcher.
     void handleDifferentialMatchResult(
-      const Addr index_pc, const Addr target_pc, const bool successful_match
+      const Addr index_pc, const Addr target_pc, const bool successful_match,
+      const Addr target_base_vaddr, const int64_t shift_amount,
+      const AccessType index_access_type, const AccessType target_access_type
     ) override;
     // Helpers
     Addr getBlockAddress(Addr addr) const;

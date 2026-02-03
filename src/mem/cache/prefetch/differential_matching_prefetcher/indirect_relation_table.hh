@@ -36,6 +36,7 @@
 #include "base/logging.hh"
 #include "base/types.hh"
 #include "debug/DifferentialMatchingPrefetcherIndirectRelationTableDebug.hh"
+#include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_request.hh"
 
 #define DMP_IRT_DEBUG(...) \
@@ -48,12 +49,6 @@ namespace gem5
 
 namespace prefetch
 {
-
-enum class AccessType
-{
-    Single,
-    Range
-};
 
 class IndirectRelationTableEntry
 {
@@ -100,6 +95,7 @@ class IndirectRelationTable
         const AccessType index_access_type,
         const AccessType target_access_type
     );
+    bool containsEntry(const Addr index_pc, const Addr target_pc) const;
     std::optional<std::vector<DMPPrefetchRequest>> queryEntryByIndexPc(
         const Addr index_pc, const int64_t data_from_index_pc
     );

@@ -34,6 +34,12 @@ namespace gem5
 namespace prefetch
 {
 
+enum class AccessType
+{
+    Single,
+    Range
+};
+
 class DifferentialMatchingPrefetcherInterface
 {
   public:
@@ -49,7 +55,9 @@ class DifferentialMatchingPrefetcherInterface
     // Called when a differential matching result is available for a candidate
     // pair of PCs.
     virtual void handleDifferentialMatchResult(
-      const Addr index_pc, const Addr target_pc, const bool successful_match
+      const Addr index_pc, const Addr target_pc, const bool successful_match,
+      const Addr target_base_vaddr, const int64_t shift_amount,
+      const AccessType index_access_type, const AccessType target_access_type
     ) = 0;
 };
 

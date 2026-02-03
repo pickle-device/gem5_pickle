@@ -135,6 +135,15 @@ IndirectRelationTable::addEntry(
   const AccessType target_access_type
 )
 {
+    if (containsEntry(index_pc, target_pc)) {
+        DMP_IRT_DEBUG(
+            "IndirectRelationTable already contains entry: Index PC %#x, "
+            "Target PC %#x\n",
+            index_pc, target_pc
+        );
+        return;
+    }
+
     if (isFull()) {
         replaceLeastRecentlyUsedEntry(
             index_pc, target_pc, target_base_vaddr, shift_amount,
@@ -147,25 +156,36 @@ IndirectRelationTable::addEntry(
         );
     }
 
-    for (const auto &entry : entries) {
-        DMP_IRT_DEBUG(
-            "Added IndirectRelationTableEntry ID %llu: Index PC %#x, "
-            "Target PC %#x, Target Base Vaddr %#x, Shift Amount %llu, "
-            "Index Access Type %s, Target Access Type %s, "
-            "Previous Access Tick %llu\n",
-            entry.getId(),
-            entry.index_pc,
-            entry.target_pc,
-            entry.target_base_vaddr,
-            entry.shift_amount,
-            (entry.index_access_type == AccessType::Single) ?
-                                                            "Single" : "Range",
-            (entry.target_access_type == AccessType::Single) ?
-                                                            "Single" : "Range",
-            entry.prev_access_tick
-        );
-    }
+    const IndirectRelationTableEntry &entry = entries.back();
+    DMP_IRT_DEBUG(
+        "Added IndirectRelationTableEntry ID %llu: Index PC %#x, "
+        "Target PC %#x, Target Base Vaddr %#x, Shift Amount %llu, "
+        "Index Access Type %s, Target Access Type %s, "
+        "Previous Access Tick %llu\n",
+        entry.getId(),
+        entry.index_pc,
+        entry.target_pc,
+        entry.target_base_vaddr,
+        entry.shift_amount,
+        (entry.index_access_type == AccessType::Single) ?
+                                                        "Single" : "Range",
+        (entry.target_access_type == AccessType::Single) ?
+                                                        "Single" : "Range",
+        entry.prev_access_tick
+    );
+}
 
+bool
+IndirectRelationTable::containsEntry(
+    const Addr index_pc, const Addr target_pc
+) const
+{
+    for (const auto &entry : entries) {
+        if (entry.index_pc == index_pc && entry.target_pc == target_pc) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool
