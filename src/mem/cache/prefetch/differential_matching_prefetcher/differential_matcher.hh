@@ -62,34 +62,51 @@ class TrackingEntryWithRepetitionFilter
     uint64_t max_num_tracked_items;
     // Tracked items: pair of <item, size>
     // For index PC, item is data value, and size is data size (in bytes)
-    // For target PC, item is effective address, and size is request size
-    // (in bytes)
     std::vector<std::pair<Addr, uint64_t>> tracked_items;
     TrackingEntryWithRepetitionFilter(
       const Addr _pc, const uint64_t _max_num_tracked_items
     );
     void addItem(const Addr item, const uint64_t size);
     bool isFull() const;
-    // Return the tracked items after applying range filtering
-    // Returned items are pairs of <first_item_in_range, range_size>
-    std::vector<std::pair<Addr, uint64_t>> getRangeFilteredItems() const;
 }; // class TrackingEntryWithRepetitionFilter
+
+// We track target PC accesses with both repetition filter and range filter
+// E.g., (0x1000, size=4), (0x1000, size=4),(0x1004, size=4), (0x1008, size=4)
+// will be stored as one entry: (0x1000, range_size=3, item_size=4)
+class TrackingEntryWithRepetitionFilterAndRangeFilter
+{
+  public:
+    Addr pc;
+    uint64_t max_num_tracked_items;
+    Addr previous_tracked_item;
+    Addr previous_size;
+    // Tracked items: pair of <item, size>
+    // For target PC, the item is effective virtual address, and size is the
+    // range size (in number of items).
+    std::vector<std::pair<Addr, uint64_t>> tracked_items;
+    TrackingEntryWithRepetitionFilterAndRangeFilter(
+      const Addr _pc, const uint64_t _max_num_tracked_items
+    );
+    void addItem(const Addr item, const uint64_t size);
+    bool isFull() const;
+}; // class TrackingEntryWithRepetitionFilterAndRangeFilter
 
 class DifferentialMatcher
 {
   private:
     // Parameters
     const uint64_t max_num_index_table_entries;
+    const uint64_t max_num_tracked_items_per_index_table_entry;
     const uint64_t max_num_target_table_entries;
-    const uint64_t max_num_tracked_items_per_table_entry;
+    const uint64_t max_num_tracked_items_per_target_table_entry;
     const std::vector<int64_t> matching_shift_amounts;
     DifferentialMatchingPrefetcherInterface *prefetcher_interface;
   public:
     DifferentialMatcher(
       const uint64_t _max_num_index_table_entries,
+      const uint64_t _max_num_tracked_items_per_index_table_entry,
       const uint64_t _max_num_target_table_entries,
-      // How many data/addresses to track per index/target PC
-      const uint64_t _max_num_tracked_items_per_table_entry,
+      const uint64_t _max_num_tracked_items_per_target_table_entry,
       // Shifting amounts for differential matching
       // A shift amount of \alpha means we match a[i] with (b[i] >> \alpha)
       const std::vector<int64_t> &_matching_shift_amounts,
@@ -129,7 +146,8 @@ class DifferentialMatcher
     // For each candidate pair, we have two tracking entries, one for index PC
     // and one for target PC.
     using IndexPcTrackingEntry = TrackingEntryWithRepetitionFilter;
-    using TargetPcTrackingEntry = TrackingEntryWithRepetitionFilter;
+    using TargetPcTrackingEntry = \
+      TrackingEntryWithRepetitionFilterAndRangeFilter;
     using CandidatePcPair = std::pair<Addr, Addr>; // <index_pc, target_pc>
     using TrackingPair = std::pair<
       IndexPcTrackingEntry, TargetPcTrackingEntry

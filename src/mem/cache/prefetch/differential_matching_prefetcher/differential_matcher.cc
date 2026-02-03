@@ -76,40 +76,71 @@ TrackingEntryWithRepetitionFilter::isFull() const
     return tracked_items.size() >= max_num_tracked_items;
 }
 
-std::vector<std::pair<Addr, uint64_t>>
-TrackingEntryWithRepetitionFilter::getRangeFilteredItems() const
+TrackingEntryWithRepetitionFilterAndRangeFilter::\
+    TrackingEntryWithRepetitionFilterAndRangeFilter (
+    const Addr _pc,
+    const uint64_t _max_num_tracked_items
+) : pc(_pc),
+    max_num_tracked_items(_max_num_tracked_items),
+    previous_tracked_item(0),
+    previous_size(0)
 {
-    std::vector<std::pair<Addr, uint64_t>> filtered_items;
-    if (tracked_items.empty()) {
-        return filtered_items;
+    tracked_items.reserve(max_num_tracked_items);
+}
+
+void
+TrackingEntryWithRepetitionFilterAndRangeFilter::addItem(
+    const Addr item, const uint64_t size
+)
+{
+    // If we have already tracked the maximum number of items, we do not add
+    // more
+    if (tracked_items.size() >= max_num_tracked_items) {
+        return;
     }
-    // Apply range filtering to the tracked items
-    Addr range_start = tracked_items.front().first;
-    uint64_t range_size = 0;
-    for (const auto &[item, size] : tracked_items) {
-        if (item == range_start + range_size) {
-            range_size += 1; // Extend the current range
-        } else {
-            filtered_items.emplace_back(range_start, range_size);
-            range_start = item;
-            range_size = 1; // Start a new range
+    if (!tracked_items.empty()) {
+        // If the new item is exactly the same as the previous tracked item,
+        // we do not add it (repetition filter)
+        if (tracked_items.back().first == item) {
+            return;
+        }
+        // If the new item is exactly after the previous tracked item, we
+        // update the size of the last tracked item (range filter)
+        if (previous_tracked_item + previous_size == item) {
+            // The previous_size should be equal to size
+            // assert(previous_size == size);
+            // Increase the range size of the last tracked item
+            tracked_items.back().second += 1;
+            previous_tracked_item = item;
+            return;
         }
     }
-    // Add the last range
-    filtered_items.emplace_back(range_start, range_size);
-    return filtered_items;
+    tracked_items.emplace_back(item, 1);
+    previous_tracked_item = item;
+    previous_size = size;
 }
+
+bool
+TrackingEntryWithRepetitionFilterAndRangeFilter::isFull() const
+{
+    return tracked_items.size() >= max_num_tracked_items;
+}
+
 
 DifferentialMatcher::DifferentialMatcher(
     const uint64_t _max_num_index_table_entries,
+    const uint64_t _max_num_tracked_items_per_index_table_entry,
     const uint64_t _max_num_target_table_entries,
-    const uint64_t _max_num_tracked_items_per_table_entry,
+    const uint64_t _max_num_tracked_items_per_target_table_entry,
     const std::vector<int64_t> &_matching_shift_amounts,
     DifferentialMatchingPrefetcherInterface *_prefetcher_interface
 ) : max_num_index_table_entries(_max_num_index_table_entries),
+    max_num_tracked_items_per_index_table_entry(
+        _max_num_tracked_items_per_index_table_entry
+    ),
     max_num_target_table_entries(_max_num_target_table_entries),
-    max_num_tracked_items_per_table_entry(
-        _max_num_tracked_items_per_table_entry
+    max_num_tracked_items_per_target_table_entry(
+        _max_num_tracked_items_per_target_table_entry
     ),
     matching_shift_amounts(_matching_shift_amounts),
     prefetcher_interface(_prefetcher_interface)
@@ -118,6 +149,11 @@ DifferentialMatcher::DifferentialMatcher(
         max_num_index_table_entries != max_num_target_table_entries,
         "For simplicity, the maximum number of entries in index and target "
         "tables must be the same."
+    );
+    panic_if(
+        _max_num_tracked_items_per_target_table_entry <= 3,
+        "We expecet to have minimum 4 tracked items per target table entry "
+        "to produce at least 3 diffs."
     );
     panic_if(
         matching_shift_amounts.empty(),
@@ -155,8 +191,12 @@ DifferentialMatcher::addCandidate(const Addr index_pc, const Addr target_pc)
     }
     CandidatePcPair pc_pair = std::make_pair(index_pc, target_pc);
     TrackingPair tracking_pair = std::make_pair(
-        IndexPcTrackingEntry(index_pc, max_num_tracked_items_per_table_entry),
-        TargetPcTrackingEntry(target_pc, max_num_tracked_items_per_table_entry)
+        IndexPcTrackingEntry(
+            index_pc, max_num_tracked_items_per_index_table_entry
+        ),
+        TargetPcTrackingEntry(
+            target_pc, max_num_tracked_items_per_target_table_entry
+        )
     );
     candidate_index_target_pc.emplace(pc_pair, tracking_pair);
     DMP_DIFFERENTIAL_MATCHER_DEBUG(
@@ -286,8 +326,7 @@ DifferentialMatcher::matchCandidate(
     }
 
     std::vector<int64_t> target_diffs;
-    std::vector<std::pair<Addr, uint64_t>> target_filtered_items =
-        target_entry.getRangeFilteredItems();
+    const auto &target_filtered_items = target_entry.tracked_items;
     const size_t max_range_counter = std::max_element(
         target_filtered_items.begin(),
         target_filtered_items.end(),
@@ -316,7 +355,8 @@ DifferentialMatcher::matchCandidate(
     std::stringstream target_strm;
     target_strm << "Target tracked items: ";
     for (const auto &item : target_filtered_items) {
-        target_strm << std::hex << "0x" << item.first << " " << std::dec;
+        target_strm << std::hex << "(0x" << item.first << ", " << std::dec <<
+            item.second << ") ";
     }
     DMP_DIFFERENTIAL_MATCHER_DEBUG("%s\n", target_strm.str().c_str());
 
@@ -338,6 +378,7 @@ DifferentialMatcher::matchCandidate(
     // with target diffs
     bool match_found = false;
     int64_t match_shift_amount_index = 0;
+    Addr target_base_vaddr = 0xBADC0FFEE; // Placeholder
     for (const auto &shift_amount : matching_shift_amounts) {
 
         const std::vector<int64_t> shifted_index_diffs = (shift_amount > 0) ?
@@ -366,6 +407,9 @@ DifferentialMatcher::matchCandidate(
                     );
                     match_found = true;
                     match_shift_amount_index = shift_amount;
+                    target_base_vaddr =
+                        target_filtered_items[j].first -
+                        shifted_index_diffs[i];
                     break;
                 }
             }
@@ -390,7 +434,7 @@ DifferentialMatcher::matchCandidate(
     prefetcher_interface->handleDifferentialMatchResult(
         /*index_pc*/ index_pc, /*target_pc*/ target_pc,
         /*match_found*/ match_found,
-        /*target_base_vaddr*/ 0xBADC0FFEE, // Placeholder
+        /*target_base_vaddr*/ target_base_vaddr,
         /*shift_amount*/ match_found ? match_shift_amount_index : 0,
         /*index_access_type*/ AccessType::Single,
         /*target_access_type*/ (max_range_counter == 1) ?

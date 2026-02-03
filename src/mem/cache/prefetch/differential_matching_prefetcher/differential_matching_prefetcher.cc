@@ -87,10 +87,12 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
     differential_matcher(
         /*_max_num_index_table_entries*/
         p.index_table_num_entries,
+        /*_max_num_tracked_items_per_index_table_entry*/
+        p.tracked_items_per_index_table_entry,
         /*_max_num_target_table_entries*/
         p.target_table_num_entries,
         /*_max_num_tracked_items_per_table_entry*/
-        p.tracked_items_per_table_entry,
+        p.tracked_items_per_target_table_entry,
         /*_matching_shift_amounts*/
         p.matching_shift_amounts,
         /*_prefetcher_interface*/

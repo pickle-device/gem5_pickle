@@ -61,11 +61,14 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
     index_table_num_entries = Param.Unsigned(
         16, "Number of entries in the index table"
     )
+    tracked_items_per_index_table_entry = Param.Unsigned(
+        32, "Number of tracked items per index table entry"
+    )
     target_table_num_entries = Param.Unsigned(
         16, "Number of entries in the target table"
     )
-    tracked_items_per_table_entry = Param.Unsigned(
-        16, "Number of tracked items per table entry"
+    tracked_items_per_target_table_entry = Param.Unsigned(
+        8, "Number of tracked items per target table entry"
     )
     matching_shift_amounts = VectorParam.Int64(
         [-4, -3, -2, -1, 1, 2, 3, 4],
