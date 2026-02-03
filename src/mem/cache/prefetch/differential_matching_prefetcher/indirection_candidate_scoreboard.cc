@@ -284,14 +284,16 @@ IndirectionCandidateScoreboard::\
             for (const auto &candidate_pair : candidate_scores) {
                 Addr candidate_pc = candidate_pair.first;
                 uint64_t original_score = candidate_pair.second;
-                uint64_t adjusted_score = original_score;
+                double adjusted_score = original_score;
                 auto it =
                     previously_unsuccessful_matches.find(
                         {index_pc, candidate_pc}
                     );
                 if (it != previously_unsuccessful_matches.end()) {
                     uint64_t unsuccess_count = it->second;
-                    adjusted_score = original_score / (1 + unsuccess_count);
+                    const double weight = getWeightedScore(unsuccess_count);
+                    adjusted_score = \
+                        static_cast<double>(original_score) * weight;
                 }
                 DMP_ICS_DEBUG(
                     "Index PC %#x Candidate PC %#x Original Score %lu "
@@ -308,6 +310,22 @@ IndirectionCandidateScoreboard::\
     }
     return 0;
 }
+
+double
+IndirectionCandidateScoreboard::getWeightedScore(
+    const uint64_t num_unsuccessful_attempts
+) const
+{
+    if (num_unsuccessful_attempts == 0) {
+        return 1.0;
+    } else if (num_unsuccessful_attempts < 8) {
+        const double x = static_cast<double>(num_unsuccessful_attempts);
+        return  ((1.0 - 1.0 / (9.0 - x)) - 0.4375) * 2.2;
+    } else {
+        return 1.0 / (2.0 * static_cast<double>(num_unsuccessful_attempts));
+    }
+}
+
 
 } // namespace prefetch
 } // namespace gem5

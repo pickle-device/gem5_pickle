@@ -85,5 +85,6 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
         "work_queue access PC is kept being matched with the visited access "
         "PC. With this patch, when the proposed target PC is not successful, "
         "we lower the score that target PC the next time, allowing the ICS to "
-        "allow other PCs to be proposed.",
+        "allow other PCs to be proposed. This is done by decreasing the "
+        "weight of the unsuccessful target PC in the ICS.",
     )

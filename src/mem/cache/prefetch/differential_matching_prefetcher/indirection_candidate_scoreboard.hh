@@ -128,10 +128,59 @@ class IndirectionCandidateScoreboard
         const Addr index_pc
     ) const;
     // Get the candidate target PC with the deprioritized scoring scheme,
-    // i.e., previously unsuccessful matches are deprioritized.
+    // i.e., previously unsuccessful matches are deprioritized by scaling down
+    // their scores by the number of times they were unsuccessful.
     Addr getTargetPcWithHighestL1ScoreAfterDeprioritization(
         const Addr index_pc
     ) const;
+    // Weighting scheme: we want a function that decays slowly at first, then
+    // decays faster as the number of unsuccessful attempts increases. Though,
+    // we want the scoring scheme to be simple so if the number of unsuccessful
+    // attempts is very high, we pretty much give up on the candidate.
+    // Here's what I came up with:
+    //     adjusted_score = original_score * w
+    // where w = ((1-1/(9-x))-0.4375)*2.2 if (x<8) else 1/(2*x)
+    // and x is the number of times the candidate was previously unsuccessful.
+    // x | w
+    // --+----------------
+    // 1 0.9625000000000001
+    // 2 0.9232142857142859
+    // 3 0.8708333333333335
+    // 4 0.7975000000000002
+    // 5 0.6875
+    // 6 0.5041666666666669
+    // 7 0.1375
+    // 8 0.0625
+    // 9 0.05555555555555555
+    // 10 0.05
+    // 11 0.045454545454545456
+    // 12 0.041666666666666664
+    // 13 0.038461538461538464
+    // 14 0.03571428571428571
+    // 15 0.03333333333333333
+    // 16 0.03125
+    // 17 0.029411764705882353
+    // 18 0.027777777777777776
+    // 19 0.02631578947368421
+    // 20 0.025
+    // Why?
+    //   - We want w to be in the range of (0, 1] so that the adjusted score
+    //     is always less than or equal to the original score.
+    //   - Initially, we pick the giving up threshold to be 8 unsuccessful
+    //     attempts. This means that if a candidate was previously unsuccessful
+    //     8 times, its score is scaled down to 6.25% of the original score.
+    //   - For the first 7 unsuccessful attempts,
+    //       + Initially, we pick w = 1-1/(9-x), which decays faster as x
+    //         increases. However, w ranges is [0.5, 0.875]. While at x = 8,
+    //         w drops to 1/2*8=0.0625, which is a big drop. Also, at x = 0,
+    //         w = 1, which also causes a big jump from x = 0 to x = 1.
+    //       + We rescale w to be in the range of [0.1375, 0.9625] to smoothen
+    //         the transition (0.1375 is picked because it's double of 0.0625,
+    //         the value at x = 8; and 0.9625 is picked to keep the drop from
+    //         x = 0 to x = 1 smaller than x = 1 to x = 2).
+    //       + This rescaling is done by:
+    //           w = (w - (0.5 - 0.0625)) * (0.9625 - 0.1375) / (0.875 - 0.5)
+    double getWeightedScore(uint64_t num_unsuccessful_attempts) const;
 }; // class IndirectionCandidateScoreboard
 
 } // namespace gem5
