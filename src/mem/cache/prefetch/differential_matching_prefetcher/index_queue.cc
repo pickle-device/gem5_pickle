@@ -198,11 +198,22 @@ IndexQueue::getHighestScorePcs() const
 }
 
 void
-IndexQueue::increaseTriedCount(const Addr pc)
+IndexQueue::profileTriedCount(const Addr index_pc)
 {
     for (auto &entry : index_queue) {
-        if (entry.pc == pc) {
+        if (entry.pc == index_pc) {
             entry.profileTried();
+            return;
+        }
+    }
+}
+
+void
+IndexQueue::profileMatchedPc(const Addr index_pc)
+{
+    for (auto &entry : index_queue) {
+        if (entry.pc == index_pc) {
+            entry.profileMatched();
             return;
         }
     }

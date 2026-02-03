@@ -133,7 +133,7 @@ DifferentialMatchingPrefetcher::promoteIndexPcFromIqToIcs()
                 indirection_candidate_scoreboard.addEntry(pc);
             if (successfully_added) {
                 // We increase the tried count in the IQ
-                index_queue.increaseTriedCount(pc);
+                index_queue.profileTriedCount(pc);
                 DMP_PREFETCHER_DEBUG(
                     "Index PC %#x promoted from IQ to ICS\n", pc
                 );
@@ -211,11 +211,20 @@ DifferentialMatchingPrefetcher::handleDifferentialMatchResult(
         index_pc, target_pc, successful_match
     );
     if (!successful_match) {
+        // Tell ICS that this candidate pair was unsuccessful so the ICS
+        // records this unsuccessful attempt
         indirection_candidate_scoreboard.
             markPreviouslyUnsuccessfulMatch(index_pc, target_pc);
     } else {
+        // Tell IQ that this index PC has a successful match and add th
+        // target_pc to IQ
+        index_queue.add(target_pc, curTick());
+        // Tell ICS that this candidate pair was successful so the ICS clears
+        // any negative history about this pair
         indirection_candidate_scoreboard.
             markPreviouslySuccessfulMatch(index_pc, target_pc);
+        // Tell Indirect Relation Table about this successful match so that
+        // it can be used for future prefetches
         indirect_relation_table.addEntry(
             index_pc, target_pc, target_base_vaddr, shift_amount,
             index_access_type, target_access_type

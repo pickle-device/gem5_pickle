@@ -96,7 +96,9 @@ class IndexQueue
     // prefetcher to pick a different PC that is not in the ICS yet.
     std::optional<std::vector<Addr>> getHighestScorePcs() const;
     // If the PC is inserted to the ICS, we increase its tried count.
-    void increaseTriedCount(const Addr pc);
+    void profileTriedCount(const Addr index_pc);
+    // Profile a successful match for the given index PC.
+    void profileMatchedPc(const Addr index_pc);
 };
 
 } // namespace prefetch
