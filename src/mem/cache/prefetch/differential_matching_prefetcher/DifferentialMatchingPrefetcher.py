@@ -74,6 +74,12 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
         "amounts are also supported, meaning a[i] is matched with "
         "(-b[i] << \alpha).",
     )
+    indirect_relation_table_num_entries = Param.Unsigned(
+        16, "Number of entries in the indirect relation table (IRT)"
+    )
+    range_table_num_entries = Param.Unsigned(
+        4, "Number of entries in the range table"
+    )
 
     # Patches for fixing some parts of the paper
     ics_deprioritize_on_unsuccessful_matching_patch = Param.Bool(
