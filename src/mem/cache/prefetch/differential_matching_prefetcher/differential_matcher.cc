@@ -340,21 +340,21 @@ DifferentialMatcher::matchCandidate(
     int64_t match_shift_amount_index = 0;
     for (const auto &shift_amount : matching_shift_amounts) {
 
-        const std::vector<int64_t> shifted_target_diffs = (shift_amount > 0) ?
-            multiplyVectorByFactor(target_diffs, 1LL << shift_amount) : \
-            multiplyVectorByFactor(target_diffs, (-1LL) << shift_amount);
+        const std::vector<int64_t> shifted_index_diffs = (shift_amount > 0) ?
+            multiplyVectorByFactor(index_diffs, 1LL << shift_amount) : \
+            multiplyVectorByFactor(index_diffs, (-1LL) << shift_amount);
         DMP_DIFFERENTIAL_MATCHER_DEBUG(
             "Matching with shift amount %lld:\n", shift_amount
         );
         // Perform matching between index_diffs and shifted_target_diffs
-        for (uint64_t i = 0; i + 2 < index_diffs.size(); ++i) {
-            int64_t idx_diff1 = index_diffs[i];
-            int64_t idx_diff2 = index_diffs[i + 1];
-            int64_t idx_diff3 = index_diffs[i + 2];
-            for (uint64_t j = 0; j + 2 < shifted_target_diffs.size(); ++j) {
-                int64_t tgt_diff1 = shifted_target_diffs[j];
-                int64_t tgt_diff2 = shifted_target_diffs[j + 1];
-                int64_t tgt_diff3 = shifted_target_diffs[j + 2];
+        for (uint64_t i = 0; i + 2 < shifted_index_diffs.size(); ++i) {
+            int64_t idx_diff1 = shifted_index_diffs[i];
+            int64_t idx_diff2 = shifted_index_diffs[i + 1];
+            int64_t idx_diff3 = shifted_index_diffs[i + 2];
+            for (uint64_t j = 0; j + 2 < target_diffs.size(); ++j) {
+                int64_t tgt_diff1 = target_diffs[j];
+                int64_t tgt_diff2 = target_diffs[j + 1];
+                int64_t tgt_diff3 = target_diffs[j + 2];
                 if (idx_diff1 == tgt_diff1 &&
                     idx_diff2 == tgt_diff2 &&
                     idx_diff3 == tgt_diff3) {
