@@ -88,11 +88,11 @@ TrackingEntryWithRepetitionFilter::getRangeFilteredItems() const
     uint64_t range_size = 0;
     for (const auto &[item, size] : tracked_items) {
         if (item == range_start + range_size) {
-            range_size += size;
+            range_size += 1; // Extend the current range
         } else {
             filtered_items.emplace_back(range_start, range_size);
             range_start = item;
-            range_size = size;
+            range_size = 1; // Start a new range
         }
     }
     // Add the last range
@@ -381,9 +381,20 @@ DifferentialMatcher::matchCandidate(
         DMP_DIFFERENTIAL_MATCHER_DEBUG("No match found.\n");
     }
 
-    // TODO: notify the prefetcher of the match result, add a new interface
+    DMP_DIFFERENTIAL_MATCHER_DEBUG(
+        "Max range counter for target PC %#x: %llu\n",
+        target_pc, max_range_counter
+    );
+
+    // Notify the prefetcher of the match result,
     prefetcher_interface->handleDifferentialMatchResult(
-        index_pc, target_pc, match_found
+        /*index_pc*/ index_pc, /*target_pc*/ target_pc,
+        /*match_found*/ match_found,
+        /*target_base_vaddr*/ 0xBADC0FFEE, // Placeholder
+        /*shift_amount*/ match_found ? match_shift_amount_index : 0,
+        /*index_access_type*/ AccessType::Single,
+        /*target_access_type*/ (max_range_counter == 1) ?
+            AccessType::Single : AccessType::Range
     );
 }
 
