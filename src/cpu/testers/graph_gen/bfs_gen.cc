@@ -109,16 +109,19 @@ VisitorTracker::VisitorTracker(
     // 2. Access neighbor pointers to get start and end of neighbor list
     const Addr neighbor_ptr_addr = graph->neighbor_ptr_start_vaddr +
         vertex_id * graph->neighbor_ptr_element_size;
+    // Access start pointer
     expected_accesses.push(
         DataAccess(
           neighbor_ptr_addr, graph->neighbor_ptr_access_pc,
           graph->neighbor_ptr_element_size, true
         )
     );
+    // Access end pointer with a different PC
     expected_accesses.push(
         DataAccess(
             neighbor_ptr_addr + graph->neighbor_ptr_element_size,
-            graph->neighbor_ptr_access_pc, graph->neighbor_ptr_element_size,
+            graph->neighbor_ptr_access_pc + 4,
+            graph->neighbor_ptr_element_size,
             true
         )
     );
