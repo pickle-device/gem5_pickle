@@ -270,7 +270,7 @@ DifferentialMatchingPrefetcher::observeL1CacheHit(
     if (!differential_matcher.isEmpty()) {
         differential_matcher.trackL1CacheHit(
             pc,
-            block_address,
+            arg.req->getVaddr(), // matcher tracks effective virtual address
             getDataFromProbe(arg),
             arg.req->getSize()
         );
@@ -300,7 +300,7 @@ DifferentialMatchingPrefetcher::observeL1CacheMiss(
     if (!differential_matcher.isEmpty()) {
         differential_matcher.trackL1CacheMiss(
             pc,
-            block_address,
+            arg.req->getVaddr(), // matcher tracks effective virtual address
             arg.req->getSize()
         );
     }
@@ -332,7 +332,7 @@ DifferentialMatchingPrefetcher::observeL1CacheFill(
 
         differential_matcher.trackL1CacheFill(
             arg.req->getPC(),
-            getBlockAddress(arg.req->getPaddr()),
+            arg.req->getVaddr(), // matcher tracks effective virtual address
             getDataFromProbe(arg),
             arg.req->getSize()
         );
