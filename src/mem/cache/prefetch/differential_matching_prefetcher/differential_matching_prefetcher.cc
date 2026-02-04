@@ -99,7 +99,10 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
         this
     ),
     indirect_relation_table(
-        /*_max_num_entries*/ p.indirect_relation_table_num_entries
+        /*_max_num_indirect_relation_entries*/
+        p.indirect_relation_table_num_entries,
+        /*_max_num_range_table_entries*/
+        p.range_table_num_entries
     )
 {
     panic_if(l1_controller == nullptr,
@@ -306,6 +309,11 @@ DifferentialMatchingPrefetcher::observeL1CacheHit(
             arg.req->getSize()
         );
     }
+    indirect_relation_table.trackL1CacheAccess(
+        arg.req->getPC(),
+        arg.req->getVaddr(),
+        arg.req->getSize()
+    );
 }
 
 void
@@ -335,6 +343,11 @@ DifferentialMatchingPrefetcher::observeL1CacheMiss(
             arg.req->getSize()
         );
     }
+    indirect_relation_table.trackL1CacheAccess(
+        arg.req->getPC(),
+        arg.req->getVaddr(),
+        arg.req->getSize()
+    );
 }
 
 void

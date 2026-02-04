@@ -36,6 +36,7 @@
 #include "base/logging.hh"
 #include "base/types.hh"
 #include "debug/DifferentialMatchingPrefetcherIndirectRelationTableDebug.hh"
+#include "debug/DifferentialMatchingPrefetcherRangeTableDebug.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_request.hh"
 
@@ -44,11 +45,38 @@
         DifferentialMatchingPrefetcherIndirectRelationTableDebug, \
         "(IRT) " __VA_ARGS__)
 
+#define DMP_RT_DEBUG(...) \
+    DPRINTF(\
+        DifferentialMatchingPrefetcherRangeTableDebug, \
+        "(RT) " __VA_ARGS__)
+
 namespace gem5
 {
 
 namespace prefetch
 {
+
+class RangeTableEntry
+{
+  public:
+    Addr target_pc;
+    uint64_t total_count;
+    std::array<uint64_t, 9> range_counters;
+    Addr prev_effective_address;
+    Addr prev_access_size;
+    uint64_t current_range_count;
+  public:
+    RangeTableEntry(const Addr _target_pc);
+    void profileL1CacheAccess(
+        const Addr effective_address, const Addr size
+    );
+    uint64_t getPredictedRangeSize() const;
+  private:
+    void sampleRange(const uint64_t range_size);
+    uint64_t getRangeBinWithMaxCount() const;
+    uint64_t rangeSizeToBin(const uint64_t range_size) const;
+    uint64_t binToPredictedRangeSize(const uint64_t bin) const;
+};  // class RangeTableEntry
 
 class IndirectRelationTableEntry
 {
@@ -62,7 +90,7 @@ class IndirectRelationTableEntry
     uint64_t shift_amount;
     AccessType index_access_type;
     AccessType target_access_type;
-    // std::shared_ptr<RangeTable> range_table; // TODO: implement RangeTable
+    RangeTableEntry range_table_entry;
     Tick prev_access_tick;
   public:
     IndirectRelationTableEntry(
@@ -83,10 +111,14 @@ class IndirectRelationTableEntry
 class IndirectRelationTable
 {
   private:
-    const uint64_t max_num_entries;
+    const uint64_t max_num_indirect_relation_entries;
+    const uint64_t max_num_range_table_entries;
     std::vector<IndirectRelationTableEntry> entries;
   public:
-    IndirectRelationTable(const uint64_t _max_num_entries);
+    IndirectRelationTable(
+      const uint64_t _max_num_indirect_relation_entries,
+      const uint64_t _max_num_range_table_entries
+    );
     void addEntry(
         const Addr index_pc,
         const Addr target_pc,
@@ -99,8 +131,21 @@ class IndirectRelationTable
     std::optional<std::vector<DMPPrefetchRequest>> queryEntryByIndexPc(
         const Addr index_pc, const int64_t data_from_index_pc
     );
+    // Track L1 cache hit or miss accesses for tracking range accesses.
+    void trackL1CacheAccess(
+        const Addr target_pc, const Addr effective_address, const Addr size
+    );
   private:
     bool isFull() const;
+    uint64_t getCurrentNumRangeTableEntries() const;
+    // Replace the least recently used entry in the table.
+    // Note that, we have a small number of range table entries (which are part
+    // of the indirect relation table entries), we use LRU as the replacement
+    // policy with a small modification:
+    //   - If we hit the capacity of range table entries, and the new entry
+    // is a range type, we only replace an existing range type entry.
+    //   - If the new entry is a single type, we can replace any existing
+    // entry.
     void replaceLeastRecentlyUsedEntry(
         const Addr index_pc,
         const Addr target_pc,

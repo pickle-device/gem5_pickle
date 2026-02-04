@@ -46,6 +46,139 @@ namespace gem5
 namespace prefetch
 {
 
+RangeTableEntry::RangeTableEntry(
+  const Addr _target_pc
+) : target_pc(_target_pc),
+    total_count(0),
+    prev_effective_address(0),
+    prev_access_size(0),
+    current_range_count(0)
+{
+    range_counters.fill(0);
+}
+
+void
+RangeTableEntry::profileL1CacheAccess(
+    const Addr effective_address, const Addr size
+)
+{
+    if (effective_address == prev_effective_address) {
+        // Duplicate access, ignore
+        return;
+    }
+    if (effective_address == prev_effective_address +
+        prev_access_size) {
+        // Continuing the current range
+        current_range_count += 1;
+    } else {
+        // New range detected
+        if (current_range_count > 0) {
+            sampleRange(current_range_count);
+        }
+        current_range_count = 1;
+    }
+    prev_effective_address = effective_address;
+    prev_access_size = size;
+}
+
+uint64_t
+RangeTableEntry::getPredictedRangeSize() const
+{
+    const uint64_t max_bin = getRangeBinWithMaxCount();
+    return binToPredictedRangeSize(max_bin);
+}
+
+void
+RangeTableEntry::sampleRange(const uint64_t range_size)
+{
+    total_count++;
+    range_counters[rangeSizeToBin(range_size)]++;
+    DMP_RT_DEBUG(
+        "RangeTableEntry Target PC %#x: Starting from vaddr %#x, "
+        "sampled range size %lu, updated bin %lu count to %lu\n",
+        target_pc,
+        prev_effective_address - prev_access_size * (current_range_count - 1),
+        range_size,
+        rangeSizeToBin(range_size),
+        range_counters[rangeSizeToBin(range_size)]
+    );
+}
+
+uint64_t
+RangeTableEntry::getRangeBinWithMaxCount() const
+{
+    uint64_t max_count = 0;
+    uint64_t max_bin = 0;
+    for (uint64_t bin = 0; bin < range_counters.size(); bin++) {
+        // pick the highest bin in case of tie
+        if (range_counters[bin] >= max_count) {
+            max_count = range_counters[bin];
+            max_bin = bin;
+        }
+    }
+    return max_bin;
+}
+
+uint64_t
+RangeTableEntry::rangeSizeToBin(const uint64_t range_size) const
+{
+    switch (range_size) {
+        case 1:
+        case 2:
+            return 0;
+        case 3:
+        case 4:
+            return 1;
+        case 5:
+        case 6:
+            return 2;
+        case 7:
+        case 8:
+            return 3;
+        case 9:
+        case 10:
+            return 4;
+        case 11:
+        case 12:
+            return 5;
+        case 13:
+        case 14:
+            return 6;
+        case 15:
+        case 16:
+            return 7;
+        default:
+            return 8;
+    }
+    return 8; // Should not reach here
+}
+
+uint64_t
+RangeTableEntry::binToPredictedRangeSize(const uint64_t bin) const
+{
+    switch (bin) {
+        case 0:
+            return 2;
+        case 1:
+            return 4;
+        case 2:
+            return 6;
+        case 3:
+            return 8;
+        case 4:
+            return 10;
+        case 5:
+            return 12;
+        case 6:
+            return 14;
+        case 7:
+            return 16;
+        default:
+            return 32; // For bin 8 and above
+    }
+    return 32; // Should not reach here
+}
+
 IndirectRelationTableEntry::IndirectRelationTableEntry(
   const Addr _index_pc,
   const Addr _target_pc,
@@ -60,6 +193,7 @@ IndirectRelationTableEntry::IndirectRelationTableEntry(
     shift_amount(_shift_amount),
     index_access_type(_index_access_type),
     target_access_type(_target_access_type),
+    range_table_entry(_target_pc),
     prev_access_tick(curTick())
 {
 }
@@ -101,11 +235,13 @@ IndirectRelationTableEntry::getPrefetchesIfIndexPcMatches(
 }
 
 IndirectRelationTable::IndirectRelationTable(
-  const uint64_t _max_num_entries
-) : max_num_entries(_max_num_entries),
+  const uint64_t _max_num_indirect_relation_entries,
+  const uint64_t _max_num_range_table_entries
+) : max_num_indirect_relation_entries(_max_num_indirect_relation_entries),
+    max_num_range_table_entries(_max_num_range_table_entries),
     entries()
 {
-    entries.reserve(max_num_entries);
+    entries.reserve(max_num_indirect_relation_entries);
 }
 
 uint64_t IndirectRelationTableEntry::next_id = 0;
@@ -144,7 +280,12 @@ IndirectRelationTable::addEntry(
         return;
     }
 
-    if (isFull()) {
+    // If the table is full, we need to replace an existing entry.
+    // If we have reached the capacity of range table entries, and the new
+    // entry is a range type, we only consider replacing existing range type
+    // entries.
+    if (isFull() || (target_access_type == AccessType::Range &&
+        getCurrentNumRangeTableEntries() >= max_num_range_table_entries)) {
         replaceLeastRecentlyUsedEntry(
             index_pc, target_pc, target_base_vaddr, shift_amount,
             index_access_type, target_access_type
@@ -188,10 +329,38 @@ IndirectRelationTable::containsEntry(
     return false;
 }
 
+void
+IndirectRelationTable::trackL1CacheAccess(
+    const Addr target_pc, const Addr effective_address, const Addr size
+)
+{
+    for (auto &entry : entries) {
+        if (entry.target_pc == target_pc &&
+            entry.target_access_type == AccessType::Range) {
+            // For range type entries, we track L1 cache accesses
+            entry.range_table_entry.profileL1CacheAccess(
+                effective_address, size
+            );
+        }
+    }
+}
+
 bool
 IndirectRelationTable::isFull() const
 {
-    return entries.size() >= max_num_entries;
+    return entries.size() >= max_num_indirect_relation_entries;
+}
+
+uint64_t
+IndirectRelationTable::getCurrentNumRangeTableEntries() const
+{
+    uint64_t count = 0;
+    for (const auto &entry : entries) {
+        if (entry.target_access_type == AccessType::Range) {
+            count++;
+        }
+    }
+    return count;
 }
 
 void
@@ -204,14 +373,32 @@ IndirectRelationTable::replaceLeastRecentlyUsedEntry(
   const AccessType target_access_type
 )
 {
+    // If we have reached the capacity of range table entries, and the new
+    // entry is a range type, we only consider replacing existing range type
+    // entries.
     // Find the least recently used entry
-    auto lru_it = std::min_element(
-        entries.begin(), entries.end(),
-        [](const IndirectRelationTableEntry &a,
-           const IndirectRelationTableEntry &b) {
-            return a.prev_access_tick < b.prev_access_tick;
+    auto lru_it = entries.begin();
+
+    if (getCurrentNumRangeTableEntries() >= max_num_range_table_entries &&
+        target_access_type == AccessType::Range) {
+        Tick min_prev_access_tick = std::numeric_limits<Tick>::max();
+        for (auto it = entries.begin(); it != entries.end(); ++it) {
+            if (it->target_access_type == AccessType::Range &&
+                it->prev_access_tick < min_prev_access_tick) {
+                min_prev_access_tick = it->prev_access_tick;
+                lru_it = it;
+            }
         }
-    );
+    } else {
+        // Otherwise, we can replace any entry
+        lru_it = std::min_element(
+            entries.begin(), entries.end(),
+            [](const IndirectRelationTableEntry &a,
+               const IndirectRelationTableEntry &b) {
+                return a.prev_access_tick < b.prev_access_tick;
+            }
+        );
+    }
     if (lru_it != entries.end()) {
         DMP_IRT_DEBUG(
             "Replacing least recently used IndirectRelationTableEntry: "

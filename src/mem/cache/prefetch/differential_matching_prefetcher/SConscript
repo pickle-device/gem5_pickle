@@ -40,6 +40,7 @@ Source('indirect_relation_table.cc')
 Source('indirection_candidate_scoreboard.cc')
 Source('prefetch_request.cc')
 Source('stride_tracker.cc')
+Source('tracking_entry_with_filters.cc')
 
 DebugFlag('DifferentialMatchingPrefetcherCacheObserverDebug')
 DebugFlag('DifferentialMatchingPrefetcherDebug')
@@ -47,6 +48,7 @@ DebugFlag('DifferentialMatchingPrefetcherDifferentMatcherDebug')
 DebugFlag('DifferentialMatchingPrefetcherIndexQueueDebug')
 DebugFlag('DifferentialMatchingPrefetcherIndirectRelationTableDebug')
 DebugFlag('DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug')
+DebugFlag('DifferentialMatchingPrefetcherRangeTableDebug')
 DebugFlag('DifferentialMatchingPrefetcherStrideTrackerDebug')
 
 # All flags for Differential Matching Prefetcher except the cache observer
@@ -58,6 +60,7 @@ CompoundFlag(
         'DifferentialMatchingPrefetcherIndexQueueDebug',
         'DifferentialMatchingPrefetcherIndirectRelationTableDebug',
         'DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug',
+        'DifferentialMatchingPrefetcherRangeTableDebug',
         'DifferentialMatchingPrefetcherStrideTrackerDebug'
     ]
 )
