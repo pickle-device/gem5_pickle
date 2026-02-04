@@ -407,9 +407,19 @@ DifferentialMatcher::matchCandidate(
                     );
                     match_found = true;
                     match_shift_amount_index = shift_amount;
-                    target_base_vaddr =
-                        target_filtered_items[j].first -
-                        shifted_index_diffs[i];
+                    if (shift_amount >= 0) {
+                        // Pixel wrote this:
+                        // w3222222222.l;[p;p
+                        target_base_vaddr =
+                            target_filtered_items[j].first -
+                            (index_entry.tracked_items[i].first <<
+                             shift_amount);
+                    } else {
+                        target_base_vaddr =
+                            target_filtered_items[j].first +
+                            (index_entry.tracked_items[i].first <<
+                             shift_amount);
+                    }
                     break;
                 }
             }
