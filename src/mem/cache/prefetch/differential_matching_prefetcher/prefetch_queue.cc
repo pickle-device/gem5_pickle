@@ -43,7 +43,9 @@ namespace prefetch
 namespace dmp
 {
 
-PrefetchQueue::PrefetchQueue(const PrefetchQueueParams& params)
+PrefetchQueue::PrefetchQueue(
+    const DifferentialMatchingPrefetcherPrefetchQueueParams& params
+)
   : ProbeListenerObject(params),
     queue_size(params.queue_size),
     cache_block_size(params.system->cacheLineSize()),

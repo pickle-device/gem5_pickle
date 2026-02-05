@@ -32,8 +32,8 @@ from m5.SimObject import *
 
 # The backend of the Differential Matching Prefetcher that handles
 # prefetch request issuance and tracking.
-class PrefetchQueue(ProbeListenerObject):
-    type = "PrefetchQueue"
+class DifferentialMatchingPrefetcherPrefetchQueue(ProbeListenerObject):
+    type = "DifferentialMatchingPrefetcherPrefetchQueue"
     cxx_class = "gem5::prefetch::dmp::PrefetchQueue"
     cxx_header = (
         "mem/cache/prefetch/differential_matching_prefetcher/prefetch_queue.hh"
@@ -43,10 +43,10 @@ class PrefetchQueue(ProbeListenerObject):
     l2_controller = Param.RubyController(
         "L2 cache controller associated with this prefetcher"
     )
+    mmu = Param.BaseMMU("The MMU of the associated core")
 
     # Prefetch queue parameters
     queue_size = Param.Int(64, "Number of entries in the prefetch queue")
-    mmu = Param.BaseMMU("The MMU of the associated core")
     request_propagation_delay = Param.Cycles(
         "Delay for prefetch requests to propagate to prefetch queue"
     )

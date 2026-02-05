@@ -40,7 +40,7 @@
 #include "mem/cache/prefetch/differential_matching_prefetcher/memory_request_manager.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_request.hh"
 #include "mem/ruby/slicc_interface/AbstractController.hh"
-#include "params/PrefetchQueue.hh"
+#include "params/DifferentialMatchingPrefetcherPrefetchQueue.hh"
 #include "sim/probe/probe.hh"
 #include "sim/system.hh"
 
@@ -82,6 +82,7 @@ class PrefetchQueue: public ProbeListenerObject
     // useful when using traffic generators that already generate physical
     // addresses
     const bool skip_address_translation;
+
     // Mapping cache block vaddr to prefetch requests
     // According to the DMP paper, each PSHR has a bitmap (per cache block) to
     // track prefetch data to use as index for the next prefetch generation.
@@ -93,8 +94,10 @@ class PrefetchQueue: public ProbeListenerObject
     MemoryRequestManager memory_request_manager;
 
   public:
-    PARAMS(PrefetchQueue);
-    PrefetchQueue(const PrefetchQueueParams& params);
+    PARAMS(DifferentialMatchingPrefetcherPrefetchQueue);
+    PrefetchQueue(
+      const DifferentialMatchingPrefetcherPrefetchQueueParams& params
+    );
     bool enqueuePendingRequest(PrefetchRequest prefetch_request);
     bool isFull() const;
     void notifyRequestCompleted(
