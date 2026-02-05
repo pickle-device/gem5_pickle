@@ -30,32 +30,44 @@
 
 namespace gem5
 {
+
 namespace prefetch
 {
 
-DMPPrefetchRequest::DMPPrefetchRequest(
+namespace dmp
+{
+
+PrefetchRequest::PrefetchRequest(
     const Addr _target_pc, const Addr _prefetch_vaddr,
     const uint64_t _size, const uint64_t _irt_id
-) : target_pc(_target_pc),
+) : response(0xBADC0DE),
+    queue_entering_tick(0),
+    start_address_translation_tick(0),
+    end_address_translation_tick(0),
+    memory_request_issued_tick(0),
+    memory_request_complete_tick(0),
+    target_pc(_target_pc),
     prefetch_vaddr(_prefetch_vaddr),
     size(_size),
-    irt_id(_irt_id),
-    response(0xBADC0DE)
+    irt_id(_irt_id)
 {
 }
 
 void
-DMPPrefetchRequest::setResponse(const uint64_t _response)
+PrefetchRequest::setResponse(const uint64_t _response)
 {
     response = _response;
 
 }
 
 uint64_t
-DMPPrefetchRequest::getResponse() const
+PrefetchRequest::getResponse() const
 {
     return response;
 }
 
+} // namespace dmp
+
 } // namespace prefetch
+
 } // namespace gem5

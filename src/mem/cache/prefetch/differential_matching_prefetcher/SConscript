@@ -33,11 +33,18 @@ SimObject(
     sim_objects=['DifferentialMatchingPrefetcher']
 )
 
+SimObject(
+    'PrefetchQueue.py',
+    sim_objects=['PrefetchQueue']
+)
+
 Source('differential_matcher.cc')
 Source('differential_matching_prefetcher.cc')
 Source('index_queue.cc')
 Source('indirect_relation_table.cc')
 Source('indirection_candidate_scoreboard.cc')
+Source('memory_request_manager.cc')
+Source('prefetch_queue.cc')
 Source('prefetch_request.cc')
 Source('stride_tracker.cc')
 Source('tracking_entry_with_filters.cc')
@@ -48,6 +55,8 @@ DebugFlag('DifferentialMatchingPrefetcherDifferentMatcherDebug')
 DebugFlag('DifferentialMatchingPrefetcherIndexQueueDebug')
 DebugFlag('DifferentialMatchingPrefetcherIndirectRelationTableDebug')
 DebugFlag('DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug')
+DebugFlag('DifferentialMatchingPrefetcherMemoryRequestManagerDebug')
+DebugFlag('DifferentialMatchingPrefetcherPrefetchQueueDebug')
 DebugFlag('DifferentialMatchingPrefetcherRangeTableDebug')
 DebugFlag('DifferentialMatchingPrefetcherStrideTrackerDebug')
 
@@ -60,6 +69,8 @@ CompoundFlag(
         'DifferentialMatchingPrefetcherIndexQueueDebug',
         'DifferentialMatchingPrefetcherIndirectRelationTableDebug',
         'DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug',
+        'DifferentialMatchingPrefetcherMemoryRequestManagerDebug',
+        'DifferentialMatchingPrefetcherPrefetchQueueDebug',
         'DifferentialMatchingPrefetcherRangeTableDebug',
         'DifferentialMatchingPrefetcherStrideTrackerDebug'
     ]
