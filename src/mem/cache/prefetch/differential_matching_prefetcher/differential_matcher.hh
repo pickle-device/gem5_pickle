@@ -51,6 +51,9 @@ namespace gem5
 namespace prefetch
 {
 
+namespace dmp
+{
+
 /*
  * Data structures and methods for performing differential matching between
  * index PC and target PC.
@@ -125,7 +128,10 @@ class DifferentialMatcher
     void tryMatchingCandidates();
 };
 
+} // namespace dmp
+
 } // namespace prefetch
+
 } // namespace gem5
 
 #endif // __DMP_DIFFERENTIAL_MATCHER_HH__

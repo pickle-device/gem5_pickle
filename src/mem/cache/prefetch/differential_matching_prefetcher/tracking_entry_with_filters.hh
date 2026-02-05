@@ -41,6 +41,9 @@ namespace gem5
 namespace prefetch
 {
 
+namespace dmp
+{
+
 class TrackingEntryWithRepetitionFilter
 {
   public:
@@ -76,6 +79,8 @@ class TrackingEntryWithRepetitionFilterAndRangeFilter
     void addItem(const Addr item, const uint64_t size);
     bool isFull() const;
 }; // class TrackingEntryWithRepetitionFilterAndRangeFilter
+
+} // namespace dmp
 
 } // namespace prefetch
 

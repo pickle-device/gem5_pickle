@@ -67,6 +67,9 @@ namespace gem5
 namespace prefetch
 {
 
+namespace dmp
+{
+
 /**
  * Implementation of the Differential-Matching Prefetcher (DMP).
  *
@@ -155,7 +158,10 @@ class DifferentialMatchingPrefetcher : \
     uint64_t getDataFromProbe(const SimpleCacheAccessProbeArg &arg) const;
 };
 
+} // namespace dmp
+
 } // namespace prefetch
+
 } // namespace gem5
 
 #endif  //__DMP_HH__

@@ -45,7 +45,11 @@
 
 namespace gem5
 {
+
 namespace prefetch
+{
+
+namespace dmp
 {
 
 class CandidateEntry
@@ -187,7 +191,10 @@ class IndirectionCandidateScoreboard
     double getWeightedScore(uint64_t num_unsuccessful_attempts) const;
 }; // class IndirectionCandidateScoreboard
 
+} // namespace dmp
+
 } // namespace gem5
+
 } // namespace prefetch
 
 #endif // __DMP_INDIRECTION_CANDIDATE_SCOREBOARD_HH__

@@ -41,6 +41,9 @@ namespace gem5
 namespace prefetch
 {
 
+namespace dmp
+{
+
 IndexQueueEntry::IndexQueueEntry(Addr _pc, Tick _access_timestamp)
   : pc(_pc), access_timestamp(_access_timestamp),
     tried_count(0), matched_count(0)
@@ -218,6 +221,8 @@ IndexQueue::profileMatchedPc(const Addr index_pc)
         }
     }
 }
+
+} // namespace dmp
 
 } // namespace prefetch
 

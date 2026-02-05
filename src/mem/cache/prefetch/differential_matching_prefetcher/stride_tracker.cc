@@ -30,7 +30,11 @@
 
 namespace gem5
 {
+
 namespace prefetch
+{
+
+namespace dmp
 {
 
 StrideTrackerEntry::StrideTrackerEntry(
@@ -157,5 +161,8 @@ StrideTracker::track(
     replaceLeastRecentlyUsedEntry(pc, block_address, access_timestamp);
 }
 
+} // namespace dmp
+
 } // namespace prefetch
+
 } // namespace gem5

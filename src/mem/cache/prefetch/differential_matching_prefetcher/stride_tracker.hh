@@ -50,6 +50,9 @@ namespace gem5
 namespace prefetch
 {
 
+namespace dmp
+{
+
 class StrideTrackerEntry
 {
   public:
@@ -91,6 +94,8 @@ class StrideTracker
       const Addr pc, const Addr block_address, const Tick access_timestamp
     );
 };
+
+} // namespace dmp
 
 } // namespace prefetch
 

@@ -46,6 +46,9 @@ namespace gem5
 namespace prefetch
 {
 
+namespace dmp
+{
+
 RangeTableEntry::RangeTableEntry(
   const Addr _target_pc
 ) : target_pc(_target_pc),
@@ -204,14 +207,14 @@ IndirectRelationTableEntry::getId() const
     return id;
 }
 
-std::optional<std::vector<DMPPrefetchRequest>>
+std::optional<std::vector<PrefetchRequest>>
 IndirectRelationTableEntry::getPrefetchesIfIndexPcMatches(
     const Addr index_pc, const int64_t data_from_index_pc
 )
 {
     if (index_pc == this->index_pc) {
         prev_access_tick = curTick();
-        std::vector<DMPPrefetchRequest> prefetch_requests;
+        std::vector<PrefetchRequest> prefetch_requests;
         // Generate prefetch requests based on data_from_index_pc
         if (target_access_type == AccessType::Single) {
             Addr prefetch_vaddr = target_base_vaddr +
@@ -246,7 +249,7 @@ IndirectRelationTable::IndirectRelationTable(
 
 uint64_t IndirectRelationTableEntry::next_id = 0;
 
-std::optional<std::vector<DMPPrefetchRequest>>
+std::optional<std::vector<PrefetchRequest>>
 IndirectRelationTable::queryEntryByIndexPc(
     const Addr index_pc, const int64_t data_from_index_pc
 )
@@ -314,6 +317,17 @@ IndirectRelationTable::addEntry(
                                                         "Single" : "Range",
         entry.prev_access_tick
     );
+}
+
+bool
+IndirectRelationTable::containsIndexPc(const Addr index_pc) const
+{
+    for (const auto &entry : entries) {
+        if (entry.index_pc == index_pc) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool
@@ -412,6 +426,7 @@ IndirectRelationTable::replaceLeastRecentlyUsedEntry(
     }
 }
 
+} // namespace dmp
 
 } // namespace prefetch
 

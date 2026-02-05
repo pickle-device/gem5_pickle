@@ -47,6 +47,9 @@ namespace gem5
 namespace prefetch
 {
 
+namespace dmp
+{
+
 DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
     const DifferentialMatchingPrefetcherParams &p
 ) : ProbeListenerObject(p), system(p.system),
@@ -403,5 +406,8 @@ DifferentialMatchingPrefetcher::getDataFromProbe(
     return pkt_data;
 }
 
+} // namespace dmp
+
 } // namespace prefetch
+
 } // namespace gem5

@@ -48,6 +48,9 @@ namespace gem5
 namespace prefetch
 {
 
+namespace dmp
+{
+
 class IndexQueueEntry
 {
   public:
@@ -100,6 +103,8 @@ class IndexQueue
     // Profile a successful match for the given index PC.
     void profileMatchedPc(const Addr index_pc);
 };
+
+} // namespace dmp
 
 } // namespace prefetch
 

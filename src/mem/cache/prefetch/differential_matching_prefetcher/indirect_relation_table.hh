@@ -56,6 +56,9 @@ namespace gem5
 namespace prefetch
 {
 
+namespace dmp
+{
+
 class RangeTableEntry
 {
   public:
@@ -102,7 +105,7 @@ class IndirectRelationTableEntry
         const AccessType _target_access_type
     );
     uint64_t getId() const;
-    std::optional<std::vector<DMPPrefetchRequest>> \
+    std::optional<std::vector<PrefetchRequest>> \
         getPrefetchesIfIndexPcMatches(
         const Addr index_pc, const int64_t data_from_index_pc
     );
@@ -127,8 +130,9 @@ class IndirectRelationTable
         const AccessType index_access_type,
         const AccessType target_access_type
     );
+    bool containsIndexPc(const Addr index_pc) const;
     bool containsEntry(const Addr index_pc, const Addr target_pc) const;
-    std::optional<std::vector<DMPPrefetchRequest>> queryEntryByIndexPc(
+    std::optional<std::vector<PrefetchRequest>> queryEntryByIndexPc(
         const Addr index_pc, const int64_t data_from_index_pc
     );
     // Track L1 cache hit or miss accesses for tracking range accesses.
@@ -155,6 +159,8 @@ class IndirectRelationTable
         const AccessType target_access_type
     );
 };
+
+} // namespace dmp
 
 } // namespace prefetch
 

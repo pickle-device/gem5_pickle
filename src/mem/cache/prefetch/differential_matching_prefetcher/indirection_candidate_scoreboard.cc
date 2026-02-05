@@ -39,7 +39,11 @@
 
 namespace gem5
 {
+
 namespace prefetch
+{
+
+namespace dmp
 {
 
 CandidateEntry::CandidateEntry(
@@ -338,6 +342,8 @@ IndirectionCandidateScoreboard::getWeightedScore(
     }
 }
 
+} // namespace dmp
 
 } // namespace prefetch
+
 } // namespace gem5

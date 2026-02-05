@@ -38,6 +38,9 @@ namespace gem5
 namespace prefetch
 {
 
+namespace dmp
+{
+
 TrackingEntryWithRepetitionFilter::TrackingEntryWithRepetitionFilter(
     const Addr _pc,
     const uint64_t _max_num_tracked_items
@@ -122,5 +125,8 @@ TrackingEntryWithRepetitionFilterAndRangeFilter::isFull() const
     return tracked_items.size() >= max_num_tracked_items;
 }
 
+} // namespace dmp
+
 } // namespace prefetch
+
 } // namespace gem5

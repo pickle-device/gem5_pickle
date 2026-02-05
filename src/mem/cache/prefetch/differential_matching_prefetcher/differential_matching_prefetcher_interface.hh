@@ -31,7 +31,11 @@
 
 namespace gem5
 {
+
 namespace prefetch
+{
+
+namespace dmp
 {
 
 enum class AccessType
@@ -61,7 +65,10 @@ class DifferentialMatchingPrefetcherInterface
     ) = 0;
 };
 
+} // namespace dmp
+
 } // namespace prefetch
+
 } // namespace gem5
 
 #endif // __DMP_INTERFACE_HH__

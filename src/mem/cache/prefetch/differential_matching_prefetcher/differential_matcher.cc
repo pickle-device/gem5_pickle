@@ -42,6 +42,9 @@ namespace gem5
 namespace prefetch
 {
 
+namespace dmp
+{
+
 DifferentialMatcher::DifferentialMatcher(
     const uint64_t _max_num_index_table_entries,
     const uint64_t _max_num_tracked_items_per_index_table_entry,
@@ -408,6 +411,8 @@ DifferentialMatcher::tryMatchingCandidates()
         );
     }
 }
+
+} // namespace dmp
 
 } // namespace prefetch
 

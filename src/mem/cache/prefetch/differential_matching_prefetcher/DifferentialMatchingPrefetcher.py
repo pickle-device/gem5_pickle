@@ -24,10 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from m5.objects.IndexingPolicies import *
 from m5.objects.Probe import ProbeListenerObject
-from m5.objects.ReplacementPolicies import *
-from m5.objects.Tags import *
 from m5.params import *
 from m5.proxy import *
 from m5.SimObject import *
@@ -35,7 +32,7 @@ from m5.SimObject import *
 
 class DifferentialMatchingPrefetcher(ProbeListenerObject):
     type = "DifferentialMatchingPrefetcher"
-    cxx_class = "gem5::prefetch::DifferentialMatchingPrefetcher"
+    cxx_class = "gem5::prefetch::dmp::DifferentialMatchingPrefetcher"
     cxx_header = "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher.hh"
 
     system = Param.System(Parent.any, "System this prefetcher belongs to")
