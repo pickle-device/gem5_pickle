@@ -54,6 +54,7 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
     const DifferentialMatchingPrefetcherParams &p
 ) : ProbeListenerObject(p), system(p.system),
     cache_line_size(p.system->cacheLineSize()),
+    prefetch_queue(p.prefetch_queue),
     l1_controller(p.l1_controller),
     process_detection_event(
         [this]{processDetectionEvent();}, name() + ".process_detection_event"
@@ -110,6 +111,7 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
 {
     panic_if(l1_controller == nullptr,
             "L1 controller pointer passed to DMP prefetcher is null");
+    prefetch_queue->setIndirectRelationTable(&indirect_relation_table);
 }
 
 void

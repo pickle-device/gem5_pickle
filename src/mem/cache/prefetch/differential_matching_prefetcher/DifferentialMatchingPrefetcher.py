@@ -36,6 +36,9 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
     cxx_header = "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher.hh"
 
     system = Param.System(Parent.any, "System this prefetcher belongs to")
+    prefetch_queue = Param.DifferentialMatchingPrefetcherPrefetchQueue(
+        "The prefetch queue serving as the backend of this prefetcher"
+    )
     l1_controller = Param.RubyController(
         "L1 cache controller associated with this prefetcher"
     )

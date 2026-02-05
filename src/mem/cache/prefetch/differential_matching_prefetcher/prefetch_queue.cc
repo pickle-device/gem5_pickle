@@ -55,8 +55,15 @@ PrefetchQueue::PrefetchQueue(
     memory_request_manager(
         this, params.system->getRequestorId(this), params.mmu,
         request_propagation_delay
-    )
+    ),
+    indirect_relation_table(nullptr)
 {
+}
+
+void
+PrefetchQueue::setIndirectRelationTable(IndirectRelationTable* irt)
+{
+    indirect_relation_table = irt;
 }
 
 bool

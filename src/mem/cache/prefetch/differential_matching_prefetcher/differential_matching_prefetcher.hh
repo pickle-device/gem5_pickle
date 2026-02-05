@@ -44,6 +44,7 @@
 #include "mem/cache/prefetch/differential_matching_prefetcher/index_queue.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/indirect_relation_table.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/indirection_candidate_scoreboard.hh"
+#include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_queue.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/stride_tracker.hh"
 #include "mem/cache/simple_cache_probe_arg.hh"
 #include "mem/packet.hh"
@@ -88,6 +89,7 @@ class DifferentialMatchingPrefetcher : \
   private:
     System *system;
     const uint64_t cache_line_size;
+    PrefetchQueue *prefetch_queue;
     ruby::AbstractController *l1_controller;
     EventFunctionWrapper process_detection_event;
 

@@ -37,6 +37,7 @@
 #include "base/logging.hh"
 #include "base/types.hh"
 #include "debug/DifferentialMatchingPrefetcherPrefetchQueueDebug.hh"
+#include "mem/cache/prefetch/differential_matching_prefetcher/indirect_relation_table.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/memory_request_manager.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_request.hh"
 #include "mem/ruby/slicc_interface/AbstractController.hh"
@@ -92,12 +93,18 @@ class PrefetchQueue: public ProbeListenerObject
     std::unordered_map<Addr, std::list<PrefetchRequest>> prefetch_requests;
 
     MemoryRequestManager memory_request_manager;
+    // The Indirect Relation Table (IRT) is shared between the prefetch queue
+    // and the differential prefetcher. The prefetch queue needs to access the
+    // IRT to generate prefetch addresses based on the matching results from
+    // the differential matcher.
+    IndirectRelationTable* indirect_relation_table;
 
   public:
     PARAMS(DifferentialMatchingPrefetcherPrefetchQueue);
     PrefetchQueue(
       const DifferentialMatchingPrefetcherPrefetchQueueParams& params
     );
+    void setIndirectRelationTable(IndirectRelationTable* irt);
     bool enqueuePendingRequest(PrefetchRequest prefetch_request);
     bool isFull() const;
     void notifyRequestCompleted(
