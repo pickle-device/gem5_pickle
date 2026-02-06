@@ -31,6 +31,7 @@
 #include "arch/generic/mmu.hh"
 #include "base/logging.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_queue.hh"
+#include "mem/packet.hh"
 #include "mem/request.hh"
 #include "sim/clock_domain.hh"
 #include "sim/eventq.hh"
@@ -54,6 +55,13 @@ MemoryRequestBookkeeper::MemoryRequestBookkeeper(
     earliest_issue_tick(_earliest_issue_tick), request(nullptr),
     has_physical_address(has_physical_address)
 {
+}
+
+MemoryRequestBookkeeper::~MemoryRequestBookkeeper()
+{
+    if (packet != nullptr) {
+        delete packet;
+    }
 }
 
 MemoryRequestBookkeeper*
@@ -112,11 +120,24 @@ MemoryRequestBookkeeper::getRequest()
             /* context id */ 0,
             /* atomic op */ nullptr
         );
+        request->taskId(context_switch_task_id::Prefetcher);
         if (has_physical_address) {
             request->setPaddr(request_paddr);
         }
     }
     return request;
+}
+
+PacketPtr
+MemoryRequestBookkeeper::getPacket()
+{
+    if (packet != nullptr) {
+        return packet;
+    }
+    RequestPtr req = getRequest();
+    packet = new Packet(req, MemCmd::HardPFReq);
+    packet->allocate();
+    return packet;
 }
 
 bool
@@ -137,10 +158,6 @@ MemoryRequestManager::MemoryRequestManager(
     processPendingTranslationQueueEvent(
         [this]{ processPendingTranslationQueue(); },
         "DMP MemoryRequestManager Process Pending Translation Queue Event"
-    ),
-    processPendingMemoryQueueEvent(
-        [this]{ processPendingMemoryQueue(); },
-        "DMP MemoryRequestManager Process Pending Memory Queue Event"
     ),
     processCompletedRequestEvent(
         [this]{ processCompletedRequestQueue(); },
@@ -234,26 +251,49 @@ MemoryRequestManager::enqueuePrefetchRequestUsingPhysicalAddr(
     outstanding_requests[block_aligned_paddr] = bookkeeper;
     pending_memory_queue.push(bookkeeper);
 
-    scheduleSendMemoryRequestsEvent();
+    // The ruby prefetch proxy will check the pending memory queue and send out
+    // requests when they are ready, so we don't need to schedule an event
+    // here.
     return true;
+}
+
+bool
+MemoryRequestManager::hasPendingMemoryRequests() const
+{
+    return !pending_memory_queue.empty();
+}
+
+Tick
+MemoryRequestManager::getNextReadyRequestTick() const
+{
+    if (!hasPendingMemoryRequests()) {
+        return MaxTick;
+    }
+    return pending_memory_queue.front()->earliest_issue_tick;
+}
+
+PacketPtr
+MemoryRequestManager::getNextRequestPacket()
+{
+    if (!hasPendingMemoryRequests()) {
+        return nullptr;
+    }
+    // We don't check if the request is ready to be issued here, as the
+    // prefetcher proxy will check that before calling getNextRequestPacket.
+    // We just return the packet of the next request to be issued.
+    return pending_memory_queue.front()->getPacket();
 }
 
 void
 MemoryRequestManager::processPendingTranslationQueue()
 {
-
-}
-
-void
-MemoryRequestManager::processPendingMemoryQueue()
-{
-
+    // TODO
 }
 
 void
 MemoryRequestManager::processCompletedRequestQueue()
 {
-
+    // TODO
 }
 
 void
@@ -269,22 +309,6 @@ MemoryRequestManager::scheduleSendAddressTranslationRequestsEvent()
                 curTick() + clock_domain->cyclesToTicks(Cycles(1))
             );
         owner->schedule(processPendingTranslationQueueEvent, scheduled_tick);
-    }
-}
-
-void
-MemoryRequestManager::scheduleSendMemoryRequestsEvent()
-{
-    const bool event_already_scheduled =
-        processPendingMemoryQueueEvent.scheduled();
-    const bool has_pending_memory_request = !pending_memory_queue.empty();
-    if (!event_already_scheduled && has_pending_memory_request) {
-        const Tick scheduled_tick =
-            std::max(
-                pending_translation_queue.front()->earliest_issue_tick,
-                curTick() + clock_domain->cyclesToTicks(Cycles(1))
-            );
-        owner->schedule(processPendingMemoryQueueEvent, scheduled_tick);
     }
 }
 

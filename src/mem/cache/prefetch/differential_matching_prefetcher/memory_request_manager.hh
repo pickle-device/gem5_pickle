@@ -38,6 +38,7 @@
 #include "base/types.hh"
 #include "debug/DifferentialMatchingPrefetcherMemoryRequestManagerDebug.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_request.hh"
+#include "mem/packet.hh"
 #include "mem/request.hh"
 #include "sim/clock_domain.hh"
 #include "sim/eventq.hh"
@@ -75,7 +76,7 @@ class MemoryRequestBookkeeper
       const Addr _pc, const Tick _earliest_issue_tick,
       const bool has_physical_address
     );
-    ~MemoryRequestBookkeeper() = default;
+    ~MemoryRequestBookkeeper();
     // Factory method to create a MemoryRequestBookkeeper
     static MemoryRequestBookkeeper* createPrefetchRequestUsingVirtualAddr(
       const Addr _request_vaddr, const uint64_t _request_size,
@@ -88,9 +89,11 @@ class MemoryRequestBookkeeper
       const Tick _earliest_issue_tick
     );
     RequestPtr getRequest();
+    PacketPtr getPacket();
     bool hasPhysicalAddress() const;
   private:
     RequestPtr request;
+    PacketPtr packet;
     bool has_physical_address;
 };  // class MemoryRequestBookkeeper
 
@@ -133,7 +136,6 @@ class MemoryRequestManager
 
     // Event handlers
     EventFunctionWrapper processPendingTranslationQueueEvent;
-    EventFunctionWrapper processPendingMemoryQueueEvent;
     EventFunctionWrapper processCompletedRequestEvent;
 
   public:
@@ -154,12 +156,15 @@ class MemoryRequestManager
       Addr block_aligned_paddr, Addr pc
     );
 
+    bool hasPendingMemoryRequests() const;
+    Tick getNextReadyRequestTick() const;
+    PacketPtr getNextRequestPacket();
+
+  private:
     // Event handlers
     void processPendingTranslationQueue();
-    void processPendingMemoryQueue();
     void processCompletedRequestQueue();
     void scheduleSendAddressTranslationRequestsEvent();
-    void scheduleSendMemoryRequestsEvent();
     void scheduleProcessCompletedRequestQueueEvent();
 };  // class MemoryRequestManager
 

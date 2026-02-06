@@ -24,15 +24,14 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from m5.objects.Probe import ProbeListenerObject
+from m5.objects.ClockedObject import ClockedObject
 from m5.params import *
 from m5.proxy import *
-from m5.SimObject import *
 
 
 # The backend of the Differential Matching Prefetcher that handles
 # prefetch request issuance and tracking.
-class DifferentialMatchingPrefetcherPrefetchQueue(ProbeListenerObject):
+class DifferentialMatchingPrefetcherPrefetchQueue(ClockedObject):
     type = "DifferentialMatchingPrefetcherPrefetchQueue"
     cxx_class = "gem5::prefetch::dmp::PrefetchQueue"
     cxx_header = (
@@ -42,9 +41,6 @@ class DifferentialMatchingPrefetcherPrefetchQueue(ProbeListenerObject):
     system = Param.System(Parent.any, "System this prefetcher belongs to")
     clock_domain = Param.ClockDomain(
         Parent.any, "Clock domain for this prefetcher"
-    )
-    l2_controller = Param.RubyController(
-        "L2 cache controller associated with this prefetcher"
     )
     mmu = Param.BaseMMU("The MMU of the associated core")
 

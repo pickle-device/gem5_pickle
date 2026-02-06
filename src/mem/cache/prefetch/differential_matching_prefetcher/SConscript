@@ -38,12 +38,18 @@ SimObject(
     sim_objects=['DifferentialMatchingPrefetcherPrefetchQueue']
 )
 
+SimObject(
+    'PrefetchAgent.py',
+    sim_objects=['PrefetchAgent']
+)
+
 Source('differential_matcher.cc')
 Source('differential_matching_prefetcher.cc')
 Source('index_queue.cc')
 Source('indirect_relation_table.cc')
 Source('indirection_candidate_scoreboard.cc')
 Source('memory_request_manager.cc')
+Source('prefetch_agent.cc')
 Source('prefetch_queue.cc')
 Source('prefetch_request.cc')
 Source('stride_tracker.cc')
@@ -59,6 +65,8 @@ DebugFlag('DifferentialMatchingPrefetcherMemoryRequestManagerDebug')
 DebugFlag('DifferentialMatchingPrefetcherPrefetchQueueDebug')
 DebugFlag('DifferentialMatchingPrefetcherRangeTableDebug')
 DebugFlag('DifferentialMatchingPrefetcherStrideTrackerDebug')
+
+DebugFlag('DifferentialMatchingPrefetcherPrefetchAgentDebug')
 
 # All flags for Differential Matching Prefetcher except the cache observer
 CompoundFlag(

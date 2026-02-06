@@ -46,10 +46,8 @@ namespace dmp
 PrefetchQueue::PrefetchQueue(
     const DifferentialMatchingPrefetcherPrefetchQueueParams& params
 )
-  : ProbeListenerObject(params),
+  : ClockedObject(params),
     system(params.system),
-    clock_domain(params.clock_domain),
-    l2_controller(params.l2_controller),
     queue_size(params.queue_size),
     cache_block_size(params.system->cacheLineSize()),
     block_shift(log2(params.system->cacheLineSize())),
@@ -57,7 +55,7 @@ PrefetchQueue::PrefetchQueue(
     skip_address_translation(params.mmu != nullptr),
     memory_request_manager(
         /*owner*/ this,
-        /*clock_domain*/ clock_domain,
+        /*clock_domain*/ params.clock_domain,
         /*cache_block_size*/ cache_block_size,
         /*requestor_id*/ params.system->getRequestorId(this),
         /*mmu*/ params.mmu,
@@ -130,6 +128,24 @@ PrefetchQueue::isFull() const
 {
     const uint64_t current_size = prefetch_requests.size();
     return current_size >= queue_size;
+}
+
+bool
+PrefetchQueue::hasPendingMemoryRequests() const
+{
+    return memory_request_manager.hasPendingMemoryRequests();
+}
+
+Tick
+PrefetchQueue::getNextReadyRequestTick() const
+{
+    return memory_request_manager.getNextReadyRequestTick();
+}
+
+PacketPtr
+PrefetchQueue::getNextRequestPacket()
+{
+    return memory_request_manager.getNextRequestPacket();
 }
 
 }; // namespace dmp
