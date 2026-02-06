@@ -58,23 +58,38 @@ class PrefetchQueue;
 class MemoryRequestBookkeeper
 {
   public:
-    const Addr vaddr;
-    const Addr paddr;
+    const Addr request_vaddr;
+    const Addr request_paddr;
+    const uint64_t request_size;
+    const RequestorID requestor_id;
+    const Addr pc;
     // The earliest time when the memory request can be issued
     const Tick earliest_issue_tick;
     // Don't use the constructor directly.
     // Use the factory method in MemoryRequestManager instead.
     MemoryRequestBookkeeper(
-      const Addr _vaddr, const Addr _paddr, const Tick _earliest_issue_tick
+      const Addr _request_vaddr, const Addr _request_paddr,
+      const uint64_t _request_size, const RequestorID _requestor_id,
+      const Addr _pc, const Tick _earliest_issue_tick,
+      const bool has_physical_address
     );
     ~MemoryRequestBookkeeper() = default;
     // Factory method to create a MemoryRequestBookkeeper
     static MemoryRequestBookkeeper* createPrefetchRequestUsingVirtualAddr(
-        const Addr _vaddr, const Tick _earliest_issue_tick
+      const Addr _request_vaddr, const uint64_t _request_size,
+      const RequestorID _requestor_id, const Addr _pc,
+      const Tick _earliest_issue_tick
     );
     static MemoryRequestBookkeeper* createPrefetchRequestUsingPhysicalAddr(
-        const Addr _paddr, const Tick _earliest_issue_tick
+      const Addr _request_paddr, const uint64_t _request_size,
+      const RequestorID _requestor_id, const Addr _pc,
+      const Tick _earliest_issue_tick
     );
+    RequestPtr getRequest();
+    bool hasPhysicalAddress() const;
+  private:
+    RequestPtr request;
+    bool has_physical_address;
 };  // class MemoryRequestBookkeeper
 
 // This class manages memory requests for the DMP prefetcher.

@@ -47,6 +47,8 @@ PrefetchQueue::PrefetchQueue(
     const DifferentialMatchingPrefetcherPrefetchQueueParams& params
 )
   : ProbeListenerObject(params),
+    system(params.system),
+    l2_controller(params.l2_controller),
     queue_size(params.queue_size),
     cache_block_size(params.system->cacheLineSize()),
     block_shift(log2(params.system->cacheLineSize())),

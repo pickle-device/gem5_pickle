@@ -70,7 +70,7 @@ class PrefetchQueue: public ProbeListenerObject
 {
   private:
     System* system;
-    ruby::AbstractController *l1_controller;
+    ruby::AbstractController *l2_controller;
     const uint64_t queue_size;
     const Addr cache_block_size;
     const Addr block_shift;

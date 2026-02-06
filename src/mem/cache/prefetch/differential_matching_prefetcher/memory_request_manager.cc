@@ -43,29 +43,84 @@ namespace dmp
 {
 
 MemoryRequestBookkeeper::MemoryRequestBookkeeper(
-    const Addr _vaddr, const Addr _paddr, const Tick _earliest_issue_tick
-) : vaddr(_vaddr), paddr(_paddr), earliest_issue_tick(_earliest_issue_tick)
+    const Addr _request_vaddr, const Addr _request_paddr,
+    const uint64_t _request_size, const RequestorID _requestor_id,
+    const Addr _pc, const Tick _earliest_issue_tick,
+    const bool has_physical_address
+) : request_vaddr(_request_vaddr), request_paddr(_request_paddr),
+    request_size(_request_size), requestor_id(_requestor_id), pc(_pc),
+    earliest_issue_tick(_earliest_issue_tick), request(nullptr),
+    has_physical_address(has_physical_address)
 {
 }
 
 MemoryRequestBookkeeper*
 MemoryRequestBookkeeper::createPrefetchRequestUsingVirtualAddr(
-    const Addr vaddr, const Tick earliest_issue_tick
+    const Addr _request_vaddr, const uint64_t _request_size,
+    const RequestorID _requestor_id, const Addr _pc,
+    const Tick _earliest_issue_tick
 )
 {
     // We don't have the physical address in this case, so we use a dummy
     // value, signifying that the physical address is not known yet.
-    return new MemoryRequestBookkeeper(vaddr, 0xBADC0DE, earliest_issue_tick);
+    return new MemoryRequestBookkeeper(
+        /*request_vaddr*/ _request_vaddr,
+        /*request_paddr*/ 0xBADC0DE,
+        /*request_size*/ _request_size,
+        /*requestor_id*/ _requestor_id,
+        /*pc*/ _pc,
+        /*earliest_issue_tick*/ _earliest_issue_tick,
+        /*has_physical_address*/ false
+    );
 }
 
 MemoryRequestBookkeeper*
 MemoryRequestBookkeeper::createPrefetchRequestUsingPhysicalAddr(
-    const Addr paddr, const Tick earliest_issue_tick
+    const Addr _request_paddr, const uint64_t _request_size,
+    const RequestorID _requestor_id, const Addr _pc,
+    const Tick _earliest_issue_tick
 )
 {
     // We don't have the virtual address in this case, so we use the physical
     // address for both virtual and physical addresses.
-    return new MemoryRequestBookkeeper(paddr, paddr, earliest_issue_tick);
+    return new MemoryRequestBookkeeper(
+        /*request_vaddr*/ _request_paddr,
+        /*request_paddr*/ _request_paddr,
+        /*request_size*/ _request_size,
+        /*requestor_id*/ _requestor_id,
+        /*pc*/ _pc,
+        /*earliest_issue_tick*/ _earliest_issue_tick,
+        /*has_physical_address*/ true
+    );
+}
+
+RequestPtr
+MemoryRequestBookkeeper::getRequest()
+{
+    if (request == nullptr) {
+        // Create the request if it doesn't exist yet
+        request = std::make_shared<Request>(
+            /* vaddr */ request_vaddr,
+            /* size */ request_size,
+            // We set the prefetch flag so that the request can be treated as a
+            // prefetch request by the cache and memory system
+            /* flags */ Request::PREFETCH,
+            /* id */ requestor_id,
+            /* pc */ pc,
+            /* context id */ 0,
+            /* atomic op */ nullptr
+        );
+        if (has_physical_address) {
+            request->setPaddr(request_paddr);
+        }
+    }
+    return request;
+}
+
+bool
+MemoryRequestBookkeeper::hasPhysicalAddress() const
+{
+    return has_physical_address;
 }
 
 MemoryRequestManager::MemoryRequestManager(
