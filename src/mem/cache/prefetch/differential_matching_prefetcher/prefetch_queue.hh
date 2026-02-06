@@ -42,6 +42,7 @@
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_request.hh"
 #include "mem/ruby/slicc_interface/AbstractController.hh"
 #include "params/DifferentialMatchingPrefetcherPrefetchQueue.hh"
+#include "sim/clock_domain.hh"
 #include "sim/probe/probe.hh"
 #include "sim/system.hh"
 
@@ -70,6 +71,7 @@ class PrefetchQueue: public ProbeListenerObject
 {
   private:
     System* system;
+    ClockDomain* clock_domain;
     ruby::AbstractController *l2_controller;
     const uint64_t queue_size;
     const Addr cache_block_size;

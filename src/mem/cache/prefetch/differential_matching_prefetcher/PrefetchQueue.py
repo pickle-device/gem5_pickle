@@ -40,6 +40,9 @@ class DifferentialMatchingPrefetcherPrefetchQueue(ProbeListenerObject):
     )
 
     system = Param.System(Parent.any, "System this prefetcher belongs to")
+    clock_domain = Param.ClockDomain(
+        Parent.any, "Clock domain for this prefetcher"
+    )
     l2_controller = Param.RubyController(
         "L2 cache controller associated with this prefetcher"
     )

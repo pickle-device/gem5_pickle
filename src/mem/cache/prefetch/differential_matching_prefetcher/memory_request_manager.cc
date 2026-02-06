@@ -32,6 +32,8 @@
 #include "base/logging.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_queue.hh"
 #include "mem/request.hh"
+#include "sim/clock_domain.hh"
+#include "sim/eventq.hh"
 
 namespace gem5
 {
@@ -124,17 +126,32 @@ MemoryRequestBookkeeper::hasPhysicalAddress() const
 }
 
 MemoryRequestManager::MemoryRequestManager(
-    PrefetchQueue* _owner, const RequestorID _requestor_id, BaseMMU* _mmu,
+    PrefetchQueue* _owner, ClockDomain* _clock_domain,
+    uint64_t _cache_block_size, const RequestorID _requestor_id, BaseMMU* _mmu,
     const Cycles _request_propagation_delay
-) : owner(_owner), requestor_id(_requestor_id), mmu(_mmu),
-    request_propagation_delay(_request_propagation_delay),
-    skip_address_translation(_mmu != nullptr)
+) : owner(_owner), clock_domain(_clock_domain),
+    cache_block_size(_cache_block_size),
+    requestor_id(_requestor_id), mmu(_mmu),
+    request_propagation_delay_in_cycles(_request_propagation_delay),
+    skip_address_translation(_mmu != nullptr),
+    processPendingTranslationQueueEvent(
+        [this]{ processPendingTranslationQueue(); },
+        "DMP MemoryRequestManager Process Pending Translation Queue Event"
+    ),
+    processPendingMemoryQueueEvent(
+        [this]{ processPendingMemoryQueue(); },
+        "DMP MemoryRequestManager Process Pending Memory Queue Event"
+    ),
+    processCompletedRequestEvent(
+        [this]{ processCompletedRequestQueue(); },
+        "DMP MemoryRequestManager Process Completed Request Queue Event"
+    )
 {
 }
 
 bool
 MemoryRequestManager::enqueuePrefetchRequestUsingVirtualAddr(
-    Addr block_aligned_vaddr
+    Addr block_aligned_vaddr, Addr pc
 )
 {
     panic_if(
@@ -145,7 +162,9 @@ MemoryRequestManager::enqueuePrefetchRequestUsingVirtualAddr(
     DMP_MEMORY_MANAGER_DEBUG(
         "Enqueue prefetch request using vaddr 0x%llx, "
         "earliest issue tick %lld\n", block_aligned_vaddr,
-        curTick() + request_propagation_delay
+        curTick() + clock_domain->cyclesToTicks(
+            request_propagation_delay_in_cycles
+        )
     );
 
     // Check if there is already an outstanding request for this address
@@ -162,25 +181,33 @@ MemoryRequestManager::enqueuePrefetchRequestUsingVirtualAddr(
     // Create a bookkeeper for this prefetch request
     MemoryRequestBookkeeper* bookkeeper =
         MemoryRequestBookkeeper::createPrefetchRequestUsingVirtualAddr(
-            block_aligned_vaddr,
-            curTick() + request_propagation_delay
+            /*_request_vaddr*/ block_aligned_vaddr,
+            /*_request_size*/ cache_block_size,
+            /*_requestor_id*/ requestor_id,
+            /*_pc*/ pc,
+            /*_earliest_issue_tick*/ curTick() + clock_domain->cyclesToTicks(
+                request_propagation_delay_in_cycles
+            )
         );
     outstanding_requests[block_aligned_vaddr] = bookkeeper;
     pending_translation_queue.push(bookkeeper);
 
-    // TODO: schedule sending request
+    scheduleSendAddressTranslationRequestsEvent();
     return true;
 }
 
 bool
 MemoryRequestManager::enqueuePrefetchRequestUsingPhysicalAddr(
-    Addr block_aligned_paddr
+    Addr block_aligned_paddr, Addr pc
 )
 {
     DMP_MEMORY_MANAGER_DEBUG(
         "Enqueue prefetch request using paddr 0x%llx, "
         "earliest issue tick %lld\n",
-        block_aligned_paddr, curTick() + request_propagation_delay
+        block_aligned_paddr,
+        curTick() + clock_domain->cyclesToTicks(
+            request_propagation_delay_in_cycles
+        )
     );
     // Check if there is already an outstanding request for this address
     if (outstanding_requests.find(block_aligned_paddr) !=
@@ -196,14 +223,85 @@ MemoryRequestManager::enqueuePrefetchRequestUsingPhysicalAddr(
     // Create a bookkeeper for this prefetch request
     MemoryRequestBookkeeper* bookkeeper =
         MemoryRequestBookkeeper::createPrefetchRequestUsingPhysicalAddr(
-            block_aligned_paddr,
-            curTick() + request_propagation_delay
+            /*_request_vaddr*/ block_aligned_paddr,
+            /*_request_size*/ cache_block_size,
+            /*_requestor_id*/ requestor_id,
+            /*_pc*/ pc,
+            /*_earliest_issue_tick*/ curTick() + clock_domain->cyclesToTicks(
+                request_propagation_delay_in_cycles
+            )
         );
     outstanding_requests[block_aligned_paddr] = bookkeeper;
     pending_memory_queue.push(bookkeeper);
 
-    // TODO: schedule sending request
+    scheduleSendMemoryRequestsEvent();
     return true;
+}
+
+void
+MemoryRequestManager::processPendingTranslationQueue()
+{
+
+}
+
+void
+MemoryRequestManager::processPendingMemoryQueue()
+{
+
+}
+
+void
+MemoryRequestManager::processCompletedRequestQueue()
+{
+
+}
+
+void
+MemoryRequestManager::scheduleSendAddressTranslationRequestsEvent()
+{
+    const bool event_already_scheduled =
+        processPendingTranslationQueueEvent.scheduled();
+    const bool has_pending_translation = !pending_translation_queue.empty();
+    if (!event_already_scheduled && has_pending_translation) {
+        const Tick scheduled_tick =
+            std::max(
+                pending_translation_queue.front()->earliest_issue_tick,
+                curTick() + clock_domain->cyclesToTicks(Cycles(1))
+            );
+        owner->schedule(processPendingTranslationQueueEvent, scheduled_tick);
+    }
+}
+
+void
+MemoryRequestManager::scheduleSendMemoryRequestsEvent()
+{
+    const bool event_already_scheduled =
+        processPendingMemoryQueueEvent.scheduled();
+    const bool has_pending_memory_request = !pending_memory_queue.empty();
+    if (!event_already_scheduled && has_pending_memory_request) {
+        const Tick scheduled_tick =
+            std::max(
+                pending_translation_queue.front()->earliest_issue_tick,
+                curTick() + clock_domain->cyclesToTicks(Cycles(1))
+            );
+        owner->schedule(processPendingMemoryQueueEvent, scheduled_tick);
+    }
+}
+
+void
+MemoryRequestManager::scheduleProcessCompletedRequestQueueEvent()
+{
+    const bool event_already_scheduled =
+        processCompletedRequestEvent.scheduled();
+    const bool has_completed_request = !completed_request_queue.empty();
+    if (!event_already_scheduled && has_completed_request) {
+        const Tick scheduled_tick =
+            std::max(
+                pending_translation_queue.front()->earliest_issue_tick,
+                curTick() + clock_domain->cyclesToTicks(Cycles(1))
+            );
+        owner->schedule(processCompletedRequestEvent, scheduled_tick);
+    }
 }
 
 } // namespace dmp

@@ -48,6 +48,7 @@ PrefetchQueue::PrefetchQueue(
 )
   : ProbeListenerObject(params),
     system(params.system),
+    clock_domain(params.clock_domain),
     l2_controller(params.l2_controller),
     queue_size(params.queue_size),
     cache_block_size(params.system->cacheLineSize()),
@@ -55,8 +56,12 @@ PrefetchQueue::PrefetchQueue(
     request_propagation_delay(params.request_propagation_delay),
     skip_address_translation(params.mmu != nullptr),
     memory_request_manager(
-        this, params.system->getRequestorId(this), params.mmu,
-        request_propagation_delay
+        /*owner*/ this,
+        /*clock_domain*/ clock_domain,
+        /*cache_block_size*/ cache_block_size,
+        /*requestor_id*/ params.system->getRequestorId(this),
+        /*mmu*/ params.mmu,
+        /*request_propagation_delay*/ request_propagation_delay
     ),
     indirect_relation_table(nullptr)
 {
@@ -78,6 +83,7 @@ PrefetchQueue::enqueuePendingRequest(PrefetchRequest prefetch_request)
     auto prefetch_request_it = prefetch_requests.find(
         prefetch_vaddr_block_aligned
     );
+    const Addr prefetch_pc = prefetch_request.target_pc;
     can_coalesce = (prefetch_request_it != prefetch_requests.end());
 
     if (can_coalesce) {
@@ -108,11 +114,11 @@ PrefetchQueue::enqueuePendingRequest(PrefetchRequest prefetch_request)
         );
         if (skip_address_translation) {
             memory_request_manager.enqueuePrefetchRequestUsingPhysicalAddr(
-                prefetch_vaddr_block_aligned
+                prefetch_vaddr_block_aligned, prefetch_pc
             );
         } else {
             memory_request_manager.enqueuePrefetchRequestUsingVirtualAddr(
-                prefetch_vaddr_block_aligned
+                prefetch_vaddr_block_aligned, prefetch_pc
             );
         }
     }

@@ -39,6 +39,8 @@
 #include "debug/DifferentialMatchingPrefetcherMemoryRequestManagerDebug.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_request.hh"
 #include "mem/request.hh"
+#include "sim/clock_domain.hh"
+#include "sim/eventq.hh"
 
 #define DMP_MEMORY_MANAGER_DEBUG(...) \
     DPRINTF(DifferentialMatchingPrefetcherMemoryRequestManagerDebug,\
@@ -105,9 +107,11 @@ class MemoryRequestManager
 {
   private:
     PrefetchQueue* owner;
+    ClockDomain* clock_domain;
+    uint64_t cache_block_size;
     RequestorID requestor_id;
     BaseMMU* mmu;
-    Cycles request_propagation_delay;
+    Cycles request_propagation_delay_in_cycles;
     const bool skip_address_translation;
     // Mapping from block-aligned address to outstanding memory request
     // bookkeeper. When skip_address_translation is false, the key is the
@@ -123,18 +127,40 @@ class MemoryRequestManager
     // Requests that are ready to be issued to the memory system, but have not
     // yet been issued.
     std::queue<MemoryRequestBookkeeper*> pending_memory_queue;
+    // Requests that have been completed (either successfully or
+    // unsuccessfully), but the prefetch queue has not yet been notified.
+    std::queue<MemoryRequestBookkeeper*> completed_request_queue;
+
+    // Event handlers
+    EventFunctionWrapper processPendingTranslationQueueEvent;
+    EventFunctionWrapper processPendingMemoryQueueEvent;
+    EventFunctionWrapper processCompletedRequestEvent;
+
   public:
     MemoryRequestManager(
-        PrefetchQueue* _owner, const RequestorID _requestor_id, BaseMMU* _mmu,
-        const Cycles _request_propagation_delay
+      PrefetchQueue* _owner, ClockDomain* _clock_domain,
+      uint64_t _cache_block_size, const RequestorID _requestor_id,
+      BaseMMU* _mmu, const Cycles _request_propagation_delay
     );
 
     // Return:
     // - true if the prefetch request is successfully enqueued,
     // - false if the request manager already has an outstanding request
     //   for the same cache block address.
-    bool enqueuePrefetchRequestUsingVirtualAddr(Addr block_aligned_vaddr);
-    bool enqueuePrefetchRequestUsingPhysicalAddr(Addr block_aligned_paddr);
+    bool enqueuePrefetchRequestUsingVirtualAddr(
+      Addr block_aligned_vaddr, Addr pc
+    );
+    bool enqueuePrefetchRequestUsingPhysicalAddr(
+      Addr block_aligned_paddr, Addr pc
+    );
+
+    // Event handlers
+    void processPendingTranslationQueue();
+    void processPendingMemoryQueue();
+    void processCompletedRequestQueue();
+    void scheduleSendAddressTranslationRequestsEvent();
+    void scheduleSendMemoryRequestsEvent();
+    void scheduleProcessCompletedRequestQueueEvent();
 };  // class MemoryRequestManager
 
 } // namespace dmp
