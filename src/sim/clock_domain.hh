@@ -108,6 +108,14 @@ class ClockDomain : public SimObject
     Tick clockPeriod() const { return _clockPeriod; }
 
     /**
+     * Convert the number of cycles to the equivalent number of ticks in this
+     * clock domain.
+     * @param cycles The number of cycles to convert.
+     * @return The equivalent number of ticks in this clock domain.
+     */
+    Tick cyclesToTicks(Cycles cycles) const { return cycles * clockPeriod(); }
+
+    /**
      * Register a Clocked object with this ClockDomain.
      *
      * @param Clocked to add as a member
