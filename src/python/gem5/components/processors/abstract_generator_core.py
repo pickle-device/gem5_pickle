@@ -29,6 +29,7 @@ from abc import abstractmethod
 from typing import Optional
 
 from m5.objects import (
+    BaseMMU,
     Port,
     PortTerminator,
 )
@@ -63,6 +64,18 @@ class AbstractGeneratorCore(AbstractCore):
     @overrides(AbstractCore)
     def get_isa(self) -> ISA:
         return ISA.NULL
+
+    def has_mmu(self) -> bool:
+        """
+        Generator cores do not have MMU, so just return False here.
+
+        :return: False
+        """
+        return False
+
+    @overrides(AbstractCore)
+    def get_mmu(self) -> Optional[BaseMMU]:
+        return None
 
     @overrides(AbstractCore)
     def connect_icache(self, port: Port) -> None:
