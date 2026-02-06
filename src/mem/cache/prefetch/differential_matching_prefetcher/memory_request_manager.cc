@@ -46,13 +46,12 @@ namespace dmp
 {
 
 MemoryRequestBookkeeper::MemoryRequestBookkeeper(
-    const Addr _request_vaddr, const Addr _request_paddr,
-    const uint64_t _request_size, const RequestorID _requestor_id,
-    const Addr _pc, const Tick _earliest_issue_tick,
-    const bool has_physical_address
+      const Addr _request_vaddr, const Addr _request_paddr,
+      const uint64_t _request_size, const RequestorID _requestor_id,
+      const Addr _pc, const Tick _ready_tick, const bool has_physical_address
 ) : request_vaddr(_request_vaddr), request_paddr(_request_paddr),
     request_size(_request_size), requestor_id(_requestor_id), pc(_pc),
-    earliest_issue_tick(_earliest_issue_tick), request(nullptr),
+    ready_tick(_ready_tick), request(nullptr),
     has_physical_address(has_physical_address)
 {
 }
@@ -67,8 +66,7 @@ MemoryRequestBookkeeper::~MemoryRequestBookkeeper()
 MemoryRequestBookkeeper*
 MemoryRequestBookkeeper::createPrefetchRequestUsingVirtualAddr(
     const Addr _request_vaddr, const uint64_t _request_size,
-    const RequestorID _requestor_id, const Addr _pc,
-    const Tick _earliest_issue_tick
+    const RequestorID _requestor_id, const Addr _pc, const Tick _ready_tick
 )
 {
     // We don't have the physical address in this case, so we use a dummy
@@ -79,7 +77,7 @@ MemoryRequestBookkeeper::createPrefetchRequestUsingVirtualAddr(
         /*request_size*/ _request_size,
         /*requestor_id*/ _requestor_id,
         /*pc*/ _pc,
-        /*earliest_issue_tick*/ _earliest_issue_tick,
+        /*ready_tick*/ _ready_tick,
         /*has_physical_address*/ false
     );
 }
@@ -87,8 +85,7 @@ MemoryRequestBookkeeper::createPrefetchRequestUsingVirtualAddr(
 MemoryRequestBookkeeper*
 MemoryRequestBookkeeper::createPrefetchRequestUsingPhysicalAddr(
     const Addr _request_paddr, const uint64_t _request_size,
-    const RequestorID _requestor_id, const Addr _pc,
-    const Tick _earliest_issue_tick
+    const RequestorID _requestor_id, const Addr _pc, const Tick _ready_tick
 )
 {
     // We don't have the virtual address in this case, so we use the physical
@@ -99,7 +96,7 @@ MemoryRequestBookkeeper::createPrefetchRequestUsingPhysicalAddr(
         /*request_size*/ _request_size,
         /*requestor_id*/ _requestor_id,
         /*pc*/ _pc,
-        /*earliest_issue_tick*/ _earliest_issue_tick,
+        /*ready_tick*/ _ready_tick,
         /*has_physical_address*/ true
     );
 }
@@ -177,8 +174,8 @@ MemoryRequestManager::enqueuePrefetchRequestUsingVirtualAddr(
         "cannot enqueue prefetch request using virtual address."
     );
     DMP_MEMORY_MANAGER_DEBUG(
-        "Enqueue prefetch request using vaddr 0x%llx, "
-        "earliest issue tick %lld\n", block_aligned_vaddr,
+        "Enqueue prefetch request using vaddr 0x%llx, ready tick %lld\n",
+        block_aligned_vaddr,
         curTick() + clock_domain->cyclesToTicks(
             request_propagation_delay_in_cycles
         )
@@ -202,7 +199,7 @@ MemoryRequestManager::enqueuePrefetchRequestUsingVirtualAddr(
             /*_request_size*/ cache_block_size,
             /*_requestor_id*/ requestor_id,
             /*_pc*/ pc,
-            /*_earliest_issue_tick*/ curTick() + clock_domain->cyclesToTicks(
+            /*_ready_tick*/ curTick() + clock_domain->cyclesToTicks(
                 request_propagation_delay_in_cycles
             )
         );
@@ -219,8 +216,7 @@ MemoryRequestManager::enqueuePrefetchRequestUsingPhysicalAddr(
 )
 {
     DMP_MEMORY_MANAGER_DEBUG(
-        "Enqueue prefetch request using paddr 0x%llx, "
-        "earliest issue tick %lld\n",
+        "Enqueue prefetch request using paddr 0x%llx, ready tick %lld\n",
         block_aligned_paddr,
         curTick() + clock_domain->cyclesToTicks(
             request_propagation_delay_in_cycles
@@ -244,7 +240,7 @@ MemoryRequestManager::enqueuePrefetchRequestUsingPhysicalAddr(
             /*_request_size*/ cache_block_size,
             /*_requestor_id*/ requestor_id,
             /*_pc*/ pc,
-            /*_earliest_issue_tick*/ curTick() + clock_domain->cyclesToTicks(
+            /*_ready_tick*/ curTick() + clock_domain->cyclesToTicks(
                 request_propagation_delay_in_cycles
             )
         );
@@ -269,7 +265,7 @@ MemoryRequestManager::getNextReadyRequestTick() const
     if (!hasPendingMemoryRequests()) {
         return MaxTick;
     }
-    return pending_memory_queue.front()->earliest_issue_tick;
+    return pending_memory_queue.front()->ready_tick;
 }
 
 PacketPtr
@@ -305,7 +301,7 @@ MemoryRequestManager::scheduleSendAddressTranslationRequestsEvent()
     if (!event_already_scheduled && has_pending_translation) {
         const Tick scheduled_tick =
             std::max(
-                pending_translation_queue.front()->earliest_issue_tick,
+                pending_translation_queue.front()->ready_tick,
                 curTick() + clock_domain->cyclesToTicks(Cycles(1))
             );
         owner->schedule(processPendingTranslationQueueEvent, scheduled_tick);
@@ -321,7 +317,7 @@ MemoryRequestManager::scheduleProcessCompletedRequestQueueEvent()
     if (!event_already_scheduled && has_completed_request) {
         const Tick scheduled_tick =
             std::max(
-                pending_translation_queue.front()->earliest_issue_tick,
+                pending_translation_queue.front()->ready_tick,
                 curTick() + clock_domain->cyclesToTicks(Cycles(1))
             );
         owner->schedule(processCompletedRequestEvent, scheduled_tick);

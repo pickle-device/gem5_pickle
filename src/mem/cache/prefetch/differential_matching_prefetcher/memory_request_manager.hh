@@ -66,27 +66,24 @@ class MemoryRequestBookkeeper
     const uint64_t request_size;
     const RequestorID requestor_id;
     const Addr pc;
-    // The earliest time when the memory request can be issued
-    const Tick earliest_issue_tick;
+    // The earliest time when the memory request is ready, i.e., can be issued
+    const Tick ready_tick;
     // Don't use the constructor directly.
     // Use the factory method in MemoryRequestManager instead.
     MemoryRequestBookkeeper(
       const Addr _request_vaddr, const Addr _request_paddr,
       const uint64_t _request_size, const RequestorID _requestor_id,
-      const Addr _pc, const Tick _earliest_issue_tick,
-      const bool has_physical_address
+      const Addr _pc, const Tick _ready_tick, const bool has_physical_address
     );
     ~MemoryRequestBookkeeper();
     // Factory method to create a MemoryRequestBookkeeper
     static MemoryRequestBookkeeper* createPrefetchRequestUsingVirtualAddr(
       const Addr _request_vaddr, const uint64_t _request_size,
-      const RequestorID _requestor_id, const Addr _pc,
-      const Tick _earliest_issue_tick
+      const RequestorID _requestor_id, const Addr _pc, const Tick _ready_tick
     );
     static MemoryRequestBookkeeper* createPrefetchRequestUsingPhysicalAddr(
       const Addr _request_paddr, const uint64_t _request_size,
-      const RequestorID _requestor_id, const Addr _pc,
-      const Tick _earliest_issue_tick
+      const RequestorID _requestor_id, const Addr _pc, const Tick _ready_tick
     );
     RequestPtr getRequest();
     PacketPtr getPacket();
