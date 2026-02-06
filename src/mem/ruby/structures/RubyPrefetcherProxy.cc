@@ -155,6 +155,8 @@ RubyPrefetcherProxy::issuePrefetch()
         DPRINTF(HWPrefetch, "No prefetch slots are available\n");
     }
 
+    // Keep scheduling next prefetch until there are no more prefetches to
+    // issue
     scheduleNextPrefetch();
 }
 
