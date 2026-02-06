@@ -71,6 +71,9 @@ namespace prefetch
 
 class Base : public ClockedObject
 {
+  public:
+    using EvictionInfo = CacheDataUpdateProbeArg;
+  private:
     class PrefetchListener : public ProbeListenerArgBase<CacheAccessProbeArg>
     {
       public:
@@ -85,8 +88,6 @@ class Base : public ClockedObject
         const bool isFill;
         const bool miss;
     };
-
-    using EvictionInfo = CacheDataUpdateProbeArg;
 
     class PrefetchEvictListener : public ProbeListenerArgBase<EvictionInfo>
     {
