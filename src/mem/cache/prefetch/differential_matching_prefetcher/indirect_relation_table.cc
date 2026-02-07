@@ -58,6 +58,9 @@ RangeTableEntry::RangeTableEntry(
     current_range_count(0)
 {
     range_counters.fill(0);
+
+    // Initialize with the smallest range size
+    range_counters[rangeSizeToBin(1)] = 1;
 }
 
 void
@@ -227,10 +230,23 @@ IndirectRelationTableEntry::getPrefetchesIfIndexPcMatches(
             );
         } else if (target_access_type == AccessType::Range) {
             // For range access, we can prefetch a range of addresses
+            const uint64_t predicted_range_size =
+                range_table_entry.getPredictedRangeSize();
             DMP_IRT_DEBUG(
-                "Range access type is not yet implemented in "
-                "IndirectRelationTableEntry::getPrefetchesIfIdMatches.\n"
+                "IndirectRelationTableEntry ID %llu: Index PC %#x matches, "
+                "data from index pc %lld, predicted range size %lu\n",
+                id, index_pc, data_from_index_pc, predicted_range_size
             );
+            for (uint64_t i = 0; i < predicted_range_size; i++) {
+                Addr prefetch_vaddr = target_base_vaddr +
+                    ((data_from_index_pc + i) << shift_amount);
+                prefetch_requests.emplace_back(
+                    /*target_pc*/ target_pc,
+                    /*prefetch_vaddr*/ prefetch_vaddr,
+                    /*size*/ 1ULL << shift_amount,
+                    /*irt_id*/ id
+                );
+            }
         }
         return prefetch_requests;
     }
