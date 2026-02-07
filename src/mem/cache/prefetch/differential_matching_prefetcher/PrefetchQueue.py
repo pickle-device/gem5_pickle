@@ -29,6 +29,13 @@ from m5.params import *
 from m5.proxy import *
 
 
+class PrefetchQueueReplacementPolicy(Enum):
+    vals = [
+        "DROP_NEW_REQUEST",
+        "EVICT_OLDEST_REQUEST",
+    ]
+
+
 # The backend of the Differential Matching Prefetcher that handles
 # prefetch request issuance and tracking.
 class DifferentialMatchingPrefetcherPrefetchQueue(ClockedObject):

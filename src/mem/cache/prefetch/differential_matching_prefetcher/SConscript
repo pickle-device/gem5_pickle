@@ -35,7 +35,8 @@ SimObject(
 
 SimObject(
     'PrefetchQueue.py',
-    sim_objects=['DifferentialMatchingPrefetcherPrefetchQueue']
+    sim_objects=['DifferentialMatchingPrefetcherPrefetchQueue'],
+    enums=['PrefetchQueueReplacementPolicy']
 )
 
 SimObject(
@@ -67,8 +68,9 @@ DebugFlag('DifferentialMatchingPrefetcherRangeTableDebug')
 DebugFlag('DifferentialMatchingPrefetcherStrideTrackerDebug')
 
 DebugFlag('DifferentialMatchingPrefetcherPrefetchAgentDebug')
+DebugFlag('DifferentialMatchingPrefetcherPrefetchAgentCacheObserverDebug')
 
-# All flags for Differential Matching Prefetcher except the cache observer
+# All flags for Differential Matching Prefetcher except the cache observers
 CompoundFlag(
     'DifferentialMatchingPrefetcherAllDebug',
     [

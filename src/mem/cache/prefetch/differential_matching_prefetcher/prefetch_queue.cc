@@ -32,6 +32,7 @@
 
 #include "base/types.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_request.hh"
+#include "mem/packet.hh"
 #include "params/PrefetchQueue.hh"
 
 namespace gem5
@@ -52,7 +53,7 @@ PrefetchQueue::PrefetchQueue(
     cache_block_size(params.system->cacheLineSize()),
     block_shift(log2(params.system->cacheLineSize())),
     request_propagation_delay(params.request_propagation_delay),
-    skip_address_translation(params.mmu != nullptr),
+    skip_address_translation(params.mmu == nullptr),
     memory_request_manager(
         /*owner*/ this,
         /*clock_domain*/ params.clock_domain,
@@ -76,7 +77,7 @@ PrefetchQueue::enqueuePendingRequest(PrefetchRequest prefetch_request)
 {
     bool can_coalesce = false;
     const Addr prefetch_vaddr_block_aligned =
-        prefetch_request.prefetch_vaddr >> block_shift;
+        (prefetch_request.prefetch_vaddr >> block_shift) << block_shift;
 
     auto prefetch_request_it = prefetch_requests.find(
         prefetch_vaddr_block_aligned
@@ -146,6 +147,144 @@ PacketPtr
 PrefetchQueue::getNextRequestPacket()
 {
     return memory_request_manager.getNextRequestPacket();
+}
+
+void
+PrefetchQueue::trackL2CacheHit(PacketPtr pkt)
+{
+    const Addr paddr = pkt->req->getPaddr();
+    if (prefetch_requests.find(paddr) != prefetch_requests.end()) {
+        notifyMemoryRequestCompleted(pkt);
+    }
+}
+
+void
+PrefetchQueue::trackL2CacheMiss(PacketPtr pkt)
+{
+    const Addr paddr = pkt->req->getPaddr();
+    const Addr pc = pkt->req->getPC();
+    // We don't need to do anything upon cache miss, as we will receive a
+    // memory response when the memory request is completed, and we will
+    // process the completed prefetch request and generate new prefetch
+    // requests at that time.
+
+    // TODO: Remove this
+    // Test Prefetching
+    static uint64_t count = 0;
+    if (indirect_relation_table->containsIndexPc(0x120) && pc == 0x120) {
+        std::vector<PrefetchRequest> new_requests = {
+            PrefetchRequest(
+                /*target_pc*/ 0x140,
+                /*prefetch_vaddr*/ 0x20000000 + count * 8,
+                /*size*/ 8,
+                /*irt_id*/ 0
+            )
+        };
+        count++;
+        for (const PrefetchRequest &new_request : new_requests) {
+            enqueuePendingRequest(new_request);
+        }
+        DMP_PREFETCH_QUEUE_DEBUG(
+            "Test: Enqueued new prefetch request for vaddr 0x%llx based on "
+            "index pc 0x120\n",
+            0x20000000 + (count - 1) * 8
+        );
+    }
+}
+
+void
+PrefetchQueue::trackL2CacheFill(PacketPtr pkt)
+{
+    const Addr paddr = pkt->req->getPaddr();
+    if (prefetch_requests.find(paddr) != prefetch_requests.end()) {
+        notifyMemoryRequestCompleted(pkt);
+    }
+}
+
+void
+PrefetchQueue::notifyMemoryRequestCompleted(PacketPtr pkt)
+{
+    memory_request_manager.processMemoryResponse(pkt);
+}
+
+void
+PrefetchQueue::processCompletedPrefetchRequest(
+    const Addr prefetch_vaddr_block_aligned,
+    const std::vector<uint8_t>& response_data
+)
+{
+    auto prefetch_request_it = prefetch_requests.find(
+        prefetch_vaddr_block_aligned
+    );
+    if (prefetch_request_it == prefetch_requests.end()) {
+        DMP_PREFETCH_QUEUE_DEBUG(
+            "Received completed prefetch request for vaddr block 0x%llx, "
+            "but no outstanding prefetch request found for this address.\n",
+            prefetch_vaddr_block_aligned
+        );
+        return;
+    }
+
+    std::list<PrefetchRequest> &requests = prefetch_request_it->second;
+    for (PrefetchRequest &prefetch_request : requests) {
+        const Addr request_vaddr = prefetch_request.prefetch_vaddr;
+        const Addr target_pc = prefetch_request.target_pc;
+        DMP_PREFETCH_QUEUE_DEBUG(
+            "Processing completed prefetch request for vaddr 0x%llx, "
+            "pc 0x%llx\n",
+            request_vaddr, target_pc
+        );
+        const uint64_t data_size = prefetch_request.size;
+        const uint64_t offset_to_cache_block =
+            request_vaddr & (cache_block_size - 1);
+        const uint8_t* data_ptr = response_data.data() + offset_to_cache_block;
+        if (data_size == 1) {
+            uint8_t data = *data_ptr;
+            prefetch_request.setResponse(static_cast<const uint64_t>(data));
+        } else if (data_size == 2) {
+            uint16_t data = *reinterpret_cast<const uint16_t*>(data_ptr);
+            prefetch_request.setResponse(static_cast<const uint64_t>(data));
+        } else if (data_size == 4) {
+            uint32_t data = *reinterpret_cast<const uint32_t*>(data_ptr);
+            prefetch_request.setResponse(static_cast<const uint64_t>(data));
+        } else if (data_size == 8) {
+            uint64_t data = *reinterpret_cast<const uint64_t*>(data_ptr);
+            prefetch_request.setResponse(data);
+        } else {
+            DMP_PREFETCH_QUEUE_DEBUG(
+                "Unsupported data size %lu for prefetch request with vaddr "
+                "0x%llx\n",
+                data_size, request_vaddr
+            );
+        }
+
+        DMP_PREFETCH_QUEUE_DEBUG(
+            "Extracted data 0x%llx from completed prefetch request for vaddr "
+            "0x%llx\n",
+            prefetch_request.getResponse(), request_vaddr
+        );
+
+        // Now we consult the IRT to generate new prefetch requests based on
+        // the matching results.
+        std::optional<std::vector<PrefetchRequest>> new_prefetch_requests =
+            indirect_relation_table->queryEntryByIndexPc(
+                /*index_pc*/ target_pc, // the target_pc now becomes the
+                                        // index_pc for the IRT query
+                /*data_from_index_pc*/ prefetch_request.getResponse()
+            );
+        if (new_prefetch_requests.has_value()) {
+            for (const PrefetchRequest &new_request :
+                new_prefetch_requests.value()) {
+                enqueuePendingRequest(new_request);
+            }
+        } else {
+            DMP_PREFETCH_QUEUE_DEBUG(
+                "No matching entry found in IRT for index pc 0x%llx, "
+                "data from index pc %lu\n",
+                target_pc, prefetch_request.getResponse()
+            );
+        }
+    }
 }
 
 }; // namespace dmp

@@ -32,14 +32,17 @@
 #include <cstdint>
 #include <list>
 #include <queue>
+#include <vector>
 
 #include "arch/generic/mmu.hh"
 #include "base/logging.hh"
 #include "base/types.hh"
 #include "debug/DifferentialMatchingPrefetcherPrefetchQueueDebug.hh"
+#include "enums/PrefetchQueueReplacementPolicy.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/indirect_relation_table.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/memory_request_manager.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_request.hh"
+#include "mem/packet.hh"
 #include "mem/ruby/slicc_interface/AbstractController.hh"
 #include "params/DifferentialMatchingPrefetcherPrefetchQueue.hh"
 #include "sim/clocked_object.hh"
@@ -107,14 +110,37 @@ class PrefetchQueue : public ClockedObject
     void setIndirectRelationTable(IndirectRelationTable* irt);
     bool enqueuePendingRequest(PrefetchRequest prefetch_request);
     bool isFull() const;
-    void notifyRequestCompleted(
-        const Addr prefetch_vaddr_block_aligned,
-        std::vector<uint8_t>& response
-    );
+
     // Memory request interface
     bool hasPendingMemoryRequests() const;
     Tick getNextReadyRequestTick() const;
     PacketPtr getNextRequestPacket();
+
+    // Cache access tracking. The packet is different from the one in the
+    // prefetch request as when the prefetch proxy sends the cache access
+    // notifications to the prefetcher, the proxy creates a new packet to
+    // store the data and the original request. However, we'll need to copy
+    // the data out as the packet will be deleted after the notification
+    // callback.
+    void trackL2CacheHit(PacketPtr pkt);
+    void trackL2CacheMiss(PacketPtr pkt);
+    void trackL2CacheFill(PacketPtr pkt);
+
+    // Notification interface for memory request completion, called when a
+    // prefetch request is completed and the data is sent back to the prefetch
+    // queue. These notifications will be forwarded to the MemoryRequestManager
+    // for further processing.
+    void notifyMemoryRequestCompleted(PacketPtr pkt);
+
+    // Notification interface for processing the completed prefetch requests,
+    // called by the MemoryRequestManager when it finishes extracting data
+    // from the completed memory requests. The prefetch queue is then
+    // responsible for consulting the IRT and generating new prefetch requests.
+    void processCompletedPrefetchRequest(
+      const Addr prefetch_vaddr_block_aligned,
+      const std::vector<uint8_t>& response_data
+    );
+
 };  // class PrefetchQueue
 
 }; // namespace dmp

@@ -46,15 +46,34 @@ PrefetchAgent::PrefetchAgent(const PrefetchAgentParams& params)
 void
 PrefetchAgent::notify(const CacheAccessProbeArg &acc, const PrefetchInfo &pfi)
 {
-    // TODO: Implement the notification handling logic here
-    DMP_PREFETCH_AGENT_DEBUG("Notify called with CacheAccessProbeArg\n");
+    const Addr vaddr = pfi.getAddr();
+    const Addr paddr = acc.pkt->req->getPaddr();
+    const Addr pc = acc.pkt->req->getPC();
+    const bool is_miss = pfi.isCacheMiss();
+    const bool has_data = pfi.requestHasData();
+    DMP_PREFETCH_AGENT_CACHE_OBSERVER_DEBUG(
+        "Notify called with CacheAccessProbeArg: vaddr=0x%llx, paddr=0x%llx, "
+        "pc=0x%llx, is_miss=%d, has_data=%d\n",
+        vaddr, paddr, pc, is_miss, has_data
+    );
+    if (!is_miss){
+        prefetch_queue->trackL2CacheHit(acc.pkt);
+    } else {
+        prefetch_queue->trackL2CacheMiss(acc.pkt);
+    }
 }
 
 void
 PrefetchAgent::notifyFill(const CacheAccessProbeArg &acc)
 {
-    // TODO: Implement the fill notification logic here
-    DMP_PREFETCH_AGENT_DEBUG("NotifyFill called with CacheAccessProbeArg\n");
+    const Addr paddr = acc.pkt->req->getPaddr();
+    const Addr pc = acc.pkt->req->getPC();
+    DMP_PREFETCH_AGENT_CACHE_OBSERVER_DEBUG(
+        "NotifyFill called with CacheAccessProbeArg: paddr=0x%llx, "
+        "pc=0x%llx\n",
+        paddr, pc
+    );
+    prefetch_queue->trackL2CacheFill(acc.pkt);
 }
 
 void
@@ -78,10 +97,12 @@ Tick
 PrefetchAgent::nextPrefetchReadyTime() const
 {
     const Tick next_ready_tick = prefetch_queue->getNextReadyRequestTick();
-    DMP_PREFETCH_AGENT_DEBUG(
-        "Next ready prefetch request will be ready at tick %lld\n",
-        next_ready_tick
-    );
+    if (next_ready_tick != MaxTick) {
+        DMP_PREFETCH_AGENT_DEBUG(
+            "Next ready prefetch request will be ready at tick %lld\n",
+            next_ready_tick
+        );
+    }
     return next_ready_tick;
 }
 

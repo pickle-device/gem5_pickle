@@ -29,6 +29,7 @@
 #ifndef __PREFETCH_AGENT_HH__
 #define __PREFETCH_AGENT_HH__
 
+#include "debug/DifferentialMatchingPrefetcherPrefetchAgentCacheObserverDebug.hh"
 #include "debug/DifferentialMatchingPrefetcherPrefetchAgentDebug.hh"
 #include "mem/cache/prefetch/base.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_queue.hh"
@@ -37,6 +38,10 @@
 #define DMP_PREFETCH_AGENT_DEBUG(...) \
     DPRINTF(DifferentialMatchingPrefetcherPrefetchAgentDebug, \
             "(Prefetch Agent) " __VA_ARGS__)
+
+#define DMP_PREFETCH_AGENT_CACHE_OBSERVER_DEBUG(...) \
+    DPRINTF(DifferentialMatchingPrefetcherPrefetchAgentCacheObserverDebug, \
+            "(Prefetch Agent Cache Observer) " __VA_ARGS__)
 
 namespace gem5
 {

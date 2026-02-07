@@ -68,6 +68,8 @@ class MemoryRequestBookkeeper
     const Addr pc;
     // The earliest time when the memory request is ready, i.e., can be issued
     const Tick ready_tick;
+    // Response data
+    std::vector<uint8_t> response_data;
     // Don't use the constructor directly.
     // Use the factory method in MemoryRequestManager instead.
     MemoryRequestBookkeeper(
@@ -88,6 +90,7 @@ class MemoryRequestBookkeeper
     RequestPtr getRequest();
     PacketPtr getPacket();
     bool hasPhysicalAddress() const;
+    void setDataFromPacket(PacketPtr pkt);
   private:
     RequestPtr request;
     PacketPtr packet;
@@ -113,14 +116,21 @@ class MemoryRequestManager
     BaseMMU* mmu;
     Cycles request_propagation_delay_in_cycles;
     const bool skip_address_translation;
+
     // Mapping from block-aligned address to outstanding memory request
     // bookkeeper. When skip_address_translation is false, the key is the
     // block-aligned virtual address; otherwise, it is the block-aligned
     // physical address.
     // The bookkeeper tracks the state of the memory request, and the set
     // of bookkeepers in outstanding_requests is the union of requests that are
-    // pending translation and requests that are pending memory issue.
+    // pending translation, pending memory, and completed request queues.
     std::unordered_map<Addr, MemoryRequestBookkeeper*> outstanding_requests;
+
+    // Mapping physical address to virtual address of the outstanding requests.
+    // Used to map the memory response back to the outstanding request.
+    // Should not be used as an address translation buffer.
+    std::unordered_map<Addr, Addr> paddr_to_vaddr;
+
     // Requests that are ready for address translation, but have not yet
     // started address translation.
     std::queue<MemoryRequestBookkeeper*> pending_translation_queue;
@@ -156,6 +166,8 @@ class MemoryRequestManager
     bool hasPendingMemoryRequests() const;
     Tick getNextReadyRequestTick() const;
     PacketPtr getNextRequestPacket();
+
+    void processMemoryResponse(PacketPtr pkt);
 
   private:
     // Event handlers

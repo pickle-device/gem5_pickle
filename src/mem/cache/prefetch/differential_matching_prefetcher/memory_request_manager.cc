@@ -28,6 +28,8 @@
 
 #include "mem/cache/prefetch/differential_matching_prefetcher/memory_request_manager.hh"
 
+#include <cassert>
+
 #include "arch/generic/mmu.hh"
 #include "base/logging.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_queue.hh"
@@ -51,16 +53,17 @@ MemoryRequestBookkeeper::MemoryRequestBookkeeper(
       const Addr _pc, const Tick _ready_tick, const bool has_physical_address
 ) : request_vaddr(_request_vaddr), request_paddr(_request_paddr),
     request_size(_request_size), requestor_id(_requestor_id), pc(_pc),
-    ready_tick(_ready_tick), request(nullptr),
+    ready_tick(_ready_tick), request(nullptr), packet(nullptr),
     has_physical_address(has_physical_address)
 {
 }
 
 MemoryRequestBookkeeper::~MemoryRequestBookkeeper()
 {
-    if (packet != nullptr) {
-        delete packet;
-    }
+    // We don't need to manually delete the request as it is managed by a
+    // shared pointer.
+    // We also don't need to manually delete the packet as it will be deleted
+    // by the prefetcher proxy.
 }
 
 MemoryRequestBookkeeper*
@@ -141,6 +144,13 @@ bool
 MemoryRequestBookkeeper::hasPhysicalAddress() const
 {
     return has_physical_address;
+}
+
+void
+MemoryRequestBookkeeper::setDataFromPacket(PacketPtr pkt)
+{
+    const uint8_t* data_ptr = pkt->getConstPtr<uint8_t>();
+    response_data.assign(data_ptr, data_ptr + request_size);
 }
 
 MemoryRequestManager::MemoryRequestManager(
@@ -245,6 +255,7 @@ MemoryRequestManager::enqueuePrefetchRequestUsingPhysicalAddr(
             )
         );
     outstanding_requests[block_aligned_paddr] = bookkeeper;
+    paddr_to_vaddr[block_aligned_paddr] = block_aligned_paddr;
     pending_memory_queue.push(bookkeeper);
 
     // The ruby prefetch proxy will check the pending memory queue and send out
@@ -277,7 +288,54 @@ MemoryRequestManager::getNextRequestPacket()
     // We don't check if the request is ready to be issued here, as the
     // prefetcher proxy will check that before calling getNextRequestPacket.
     // We just return the packet of the next request to be issued.
-    return pending_memory_queue.front()->getPacket();
+    MemoryRequestBookkeeper* bookkeeper = pending_memory_queue.front();
+    pending_memory_queue.pop();
+    return bookkeeper->getPacket();
+}
+
+void
+MemoryRequestManager::processMemoryResponse(PacketPtr pkt)
+{
+    const Addr block_aligned_paddr = pkt->req->getPaddr();
+    assert(block_aligned_paddr % cache_block_size == 0);
+
+    // Move the corresponding bookkeeper from pending_memory_queue to
+    // completed_request_queue, and schedule an event to process the completed
+    // request queue.
+    auto vaddr_it = paddr_to_vaddr.find(block_aligned_paddr);
+    if (vaddr_it == paddr_to_vaddr.end()) {
+        // This should never happen, as we should only receive memory responses
+        // for requests that we have sent out, and all sent out requests should
+        // have an entry in paddr_to_vaddr.
+        DMP_MEMORY_MANAGER_DEBUG(
+            "Received memory response for paddr 0x%llx, but no outstanding "
+            "request found for this address.\n",
+            block_aligned_paddr
+        );
+        return;
+    }
+    const Addr block_aligned_vaddr = vaddr_it->second;
+    auto bookkeeper_it = outstanding_requests.find(block_aligned_vaddr);
+    if (bookkeeper_it == outstanding_requests.end()) {
+        // This should never happen, as we should only receive memory responses
+        // for requests that we have sent out, and all sent out requests should
+        // be in translated_outstanding_requests.
+        DMP_MEMORY_MANAGER_DEBUG(
+            "Received memory response for paddr 0x%llx, but no outstanding "
+            "request found for this address.\n",
+            block_aligned_vaddr
+        );
+        return;
+    }
+    MemoryRequestBookkeeper* bookkeeper = bookkeeper_it->second;
+
+    // copy the data as it will be deleted after this function returns
+    bookkeeper->setDataFromPacket(pkt);
+
+    paddr_to_vaddr.erase(vaddr_it);
+    outstanding_requests.erase(block_aligned_paddr);
+    completed_request_queue.push(bookkeeper);
+    scheduleProcessCompletedRequestQueueEvent();
 }
 
 void
@@ -289,7 +347,15 @@ MemoryRequestManager::processPendingTranslationQueue()
 void
 MemoryRequestManager::processCompletedRequestQueue()
 {
-    // TODO
+    while (!completed_request_queue.empty()) {
+        MemoryRequestBookkeeper* bookkeeper = completed_request_queue.front();
+        completed_request_queue.pop();
+        owner->processCompletedPrefetchRequest(
+            /*prefetch_vaddr_block_aligned*/bookkeeper->request_vaddr,
+            /*response_data*/ bookkeeper->response_data
+        );
+        delete bookkeeper;
+    }
 }
 
 void
@@ -317,7 +383,7 @@ MemoryRequestManager::scheduleProcessCompletedRequestQueueEvent()
     if (!event_already_scheduled && has_completed_request) {
         const Tick scheduled_tick =
             std::max(
-                pending_translation_queue.front()->ready_tick,
+                completed_request_queue.front()->ready_tick,
                 curTick() + clock_domain->cyclesToTicks(Cycles(1))
             );
         owner->schedule(processCompletedRequestEvent, scheduled_tick);
