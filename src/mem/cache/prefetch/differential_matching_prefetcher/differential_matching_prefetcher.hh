@@ -50,6 +50,7 @@
 #include "mem/packet.hh"
 #include "mem/ruby/slicc_interface/AbstractController.hh"
 #include "params/DifferentialMatchingPrefetcher.hh"
+#include "sim/clock_domain.hh"
 #include "sim/eventq.hh"
 #include "sim/probe/probe.hh"
 #include "sim/system.hh"
@@ -89,6 +90,7 @@ class DifferentialMatchingPrefetcher : \
   private:
     System *system;
     const uint64_t cache_line_size;
+    ClockDomain *clock_domain;
     PrefetchQueue *prefetch_queue;
     ruby::AbstractController *l1_controller;
     EventFunctionWrapper process_detection_event;

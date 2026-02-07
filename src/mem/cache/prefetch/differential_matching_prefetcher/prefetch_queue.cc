@@ -96,6 +96,8 @@ PrefetchQueue::enqueuePendingRequest(PrefetchRequest prefetch_request)
         existing_request.push_back(std::move(prefetch_request));
     } else {
         // Enqueue the new prefetch request
+        // TODO: implement a more sophisticated replacement policy when the
+        // queue is full, instead of simply rejecting
         if (isFull()) {
             DMP_PREFETCH_QUEUE_DEBUG(
                 "Prefetch queue is full. Cannot enqueue prefetch "

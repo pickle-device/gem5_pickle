@@ -38,7 +38,7 @@
 #include "debug/DifferentialMatchingPrefetcherDebug.hh"
 #include "mem/cache/cache_probe_arg.hh"
 #include "params/DifferentialMatchingPrefetcher.hh"
-#include "sim/clocked_object.hh"
+#include "sim/clock_domain.hh"
 #include "sim/probe/probe.hh"
 
 namespace gem5
@@ -54,6 +54,7 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
     const DifferentialMatchingPrefetcherParams &p
 ) : ProbeListenerObject(p), system(p.system),
     cache_line_size(p.system->cacheLineSize()),
+    clock_domain(p.clock_domain),
     prefetch_queue(p.prefetch_queue),
     l1_controller(p.l1_controller),
     process_detection_event(
@@ -127,7 +128,7 @@ DifferentialMatchingPrefetcher::scheduleHandleDetectionEvent()
     if (!process_detection_event.scheduled()) {
         schedule(
             process_detection_event,
-            curTick() + 250 // 250 ticks = 1 clock cycle at 4GHz
+            curTick() + clock_domain->cyclesToTicks(Cycles(1))
         );
     }
 }

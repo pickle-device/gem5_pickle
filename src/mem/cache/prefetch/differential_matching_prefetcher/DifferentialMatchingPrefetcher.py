@@ -36,6 +36,7 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
     cxx_header = "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher.hh"
 
     system = Param.System(Parent.any, "System this prefetcher belongs to")
+    clock_domain = Param.ClockDomain("Clock domain for this prefetcher")
     prefetch_queue = Param.DifferentialMatchingPrefetcherPrefetchQueue(
         "The prefetch queue serving as the backend of this prefetcher"
     )
