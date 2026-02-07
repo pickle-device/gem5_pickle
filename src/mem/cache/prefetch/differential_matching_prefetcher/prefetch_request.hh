@@ -68,6 +68,9 @@ class PrefetchRequest
     );
 
     void setResponse(const uint64_t _response);
+    bool setResponseFromCacheBlockData(
+        const uint8_t* cache_block_data, const uint64_t cache_block_size
+    );
     uint64_t getResponse() const;
 
     void profileQueueEnteringTick(const Tick tick);

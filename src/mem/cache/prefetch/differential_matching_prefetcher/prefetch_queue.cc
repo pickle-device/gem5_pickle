@@ -234,35 +234,16 @@ PrefetchQueue::processCompletedPrefetchRequest(
             "pc 0x%llx\n",
             request_vaddr, target_pc
         );
-        const uint64_t data_size = prefetch_request.size;
-        const uint64_t offset_to_cache_block =
-            request_vaddr & (cache_block_size - 1);
-        const uint8_t* data_ptr = response_data.data() + offset_to_cache_block;
-        if (data_size == 1) {
-            uint8_t data = *data_ptr;
-            prefetch_request.setResponse(static_cast<const uint64_t>(data));
-        } else if (data_size == 2) {
-            uint16_t data = *reinterpret_cast<const uint16_t*>(data_ptr);
-            prefetch_request.setResponse(static_cast<const uint64_t>(data));
-        } else if (data_size == 4) {
-            uint32_t data = *reinterpret_cast<const uint32_t*>(data_ptr);
-            prefetch_request.setResponse(static_cast<const uint64_t>(data));
-        } else if (data_size == 8) {
-            uint64_t data = *reinterpret_cast<const uint64_t*>(data_ptr);
-            prefetch_request.setResponse(data);
-        } else {
+        if (!prefetch_request.setResponseFromCacheBlockData(
+            response_data.data(), cache_block_size
+        )) {
             DMP_PREFETCH_QUEUE_DEBUG(
-                "Unsupported data size %lu for prefetch request with vaddr "
-                "0x%llx\n",
-                data_size, request_vaddr
+                "Failed to set response for prefetch request with vaddr "
+                "0x%llx\n, data_size %lu, cache_block_size %lu\n",
+                request_vaddr, prefetch_request.size, cache_block_size
             );
+            continue;
         }
-
-        DMP_PREFETCH_QUEUE_DEBUG(
-            "Extracted data 0x%llx from completed prefetch request for vaddr "
-            "0x%llx\n",
-            prefetch_request.getResponse(), request_vaddr
-        );
 
         // Now we consult the IRT to generate new prefetch requests based on
         // the matching results.
@@ -285,6 +266,9 @@ PrefetchQueue::processCompletedPrefetchRequest(
             );
         }
     }
+
+    // Remove the completed prefetch request from the queue
+    prefetch_requests.erase(prefetch_request_it);
 }
 
 }; // namespace dmp

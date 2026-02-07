@@ -226,15 +226,6 @@ IndirectionCandidateScoreboard::trackL1CacheMiss(const Addr target_pc)
         ),
         scoreboard.end()
     );
-
-    // ughh, sanity check the AI generated code
-    // TODO: remove this.
-    for (const auto &entry: scoreboard) {
-        if (entry.isSampleWindowFull()) {
-            panic("Entry with index PC %#x still has full sample window after "
-                  "processing cache misses.", entry.getIndexPC());
-        }
-    }
 }
 
 void

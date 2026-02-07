@@ -154,8 +154,7 @@ DifferentialMatchingPrefetcher::promoteIndexPcFromIqToIcs()
 }
 
 void
-DifferentialMatchingPrefetcher::\
-    addIndirectionCandidateToDifferentialMatcher(
+DifferentialMatchingPrefetcher::addIndirectionCandidateToDifferentialMatcher(
     const Addr index_pc, const Addr target_pc
 )
 {

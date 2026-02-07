@@ -60,6 +60,36 @@ PrefetchRequest::setResponse(const uint64_t _response)
 
 }
 
+bool
+PrefetchRequest::setResponseFromCacheBlockData(
+    const uint8_t* cache_block_data, const uint64_t cache_block_size
+)
+{
+    // Calculate the offset of the requested data within the cache block
+    const uint64_t offset_to_cache_block =
+        prefetch_vaddr & (cache_block_size - 1);
+    assert(offset_to_cache_block + size <= cache_block_size);
+
+    const uint8_t* data_ptr = cache_block_data + offset_to_cache_block;
+    if (size == 1) {
+        uint8_t data = *data_ptr;
+        setResponse(static_cast<uint64_t>(data));
+    } else if (size == 2) {
+        uint16_t data = *reinterpret_cast<const uint16_t*>(data_ptr);
+        setResponse(static_cast<uint64_t>(data));
+    } else if (size == 4) {
+        uint32_t data = *reinterpret_cast<const uint32_t*>(data_ptr);
+        setResponse(static_cast<uint64_t>(data));
+    } else if (size == 8) {
+        uint64_t data = *reinterpret_cast<const uint64_t*>(data_ptr);
+        setResponse(data);
+    } else {
+        // Unsupported data size
+        return false;
+    }
+    return true;
+}
+
 uint64_t
 PrefetchRequest::getResponse() const
 {
