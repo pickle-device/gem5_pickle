@@ -138,6 +138,12 @@ AbstractController::regStats()
 }
 
 void
+AbstractController::notifyPrefetcherProxyOfNewPrefetchRequest()
+{
+    panic("Unimplemented notifyPrefetcherProxyOfNewPrefetchRequest\n");
+}
+
+void
 AbstractController::profileMsgDelay(uint32_t virtualNetwork, Cycles delay)
 {
     assert(virtualNetwork < stats.delayVCHistogram.size());

@@ -93,6 +93,9 @@ class AbstractController : public ClockedObject, public Consumer
 
     void initNetworkPtr(Network* net_ptr) { m_net_ptr = net_ptr; }
 
+    // Notify the controller of a new prefetch request
+    virtual void notifyPrefetcherProxyOfNewPrefetchRequest();
+
     // return instance name
     void blockOnQueue(Addr, MessageBuffer*);
     bool isBlocked(Addr) const;

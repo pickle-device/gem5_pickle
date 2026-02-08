@@ -103,10 +103,10 @@ class RubyPrefetcherProxy : public CacheAccessor, public Named
     /** Registers probes. */
     void regProbePoints();
 
-  private:
-
     /** Schedule the next ready prefetch */
     void scheduleNextPrefetch();
+
+  private:
 
     /** Issue prefetch to the contoller prefetch queue */
     void issuePrefetch();

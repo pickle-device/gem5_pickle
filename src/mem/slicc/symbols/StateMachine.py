@@ -335,6 +335,19 @@ if buildEnv["PROTOCOL"] == "${protocol}":
         ident = self.ident
         c_ident = f"{self.ident}_Controller"
 
+        has_prefetcher_proxy = False
+        prefetcher_proxy_name = ""
+        for obj in self.objects:
+            if obj.type.c_ident == "RubyPrefetcherProxy":
+                has_prefetcher_proxy = True
+                prefetcher_proxy_name = obj.ident
+                break
+
+        if not has_prefetcher_proxy:
+            print("No prefetcher proxy found.")
+        else:
+            print(f"Found prefetcher proxy object: {prefetcher_proxy_name}")
+
         protocol = self.symtab.slicc.protocol
         header_string = protocol + "_" + self.ident
         gen_filename = f"{protocol}/{c_ident}"
@@ -427,7 +440,14 @@ class $c_ident : public AbstractController
 public:
 """
         )
+        if has_prefetcher_proxy:
+            code(
+                """
+    // Notify the prefetcher proxy of a new prefetch request
+    void notifyPrefetcherProxyOfNewPrefetchRequest() override;
 
+"""
+            )
         code.indent()
         # added by SS
         for param in self.config_parameters:
@@ -586,6 +606,20 @@ void unset_tbe(${{self.TBEType.c_ident}}*& m_tbe_ptr);
 
     def printControllerCC(self, path, includes):
         """Output the actions for performing the actions"""
+
+        has_prefetcher_proxy = False
+        prefetcher_proxy_name = ""
+        for obj in self.objects:
+            print(f"Checking object: {obj.ident} of type {obj.type.c_ident}")
+            if obj.type.c_ident == "RubyPrefetcherProxy":
+                has_prefetcher_proxy = True
+                prefetcher_proxy_name = obj.ident
+                break
+
+        if not has_prefetcher_proxy:
+            print("No prefetcher proxy found.")
+        else:
+            print(f"Found prefetcher proxy object: {prefetcher_proxy_name}")
 
         code = self.symtab.codeFormatter()
         ident = self.ident
@@ -795,6 +829,21 @@ m_net_ptr->set${network}NetQueue(m_version + base, $vid->getOrdered(), $vnet,
         code(
             """
 }
+
+"""
+        )
+        if has_prefetcher_proxy:
+            code(
+                """
+void
+$c_ident::notifyPrefetcherProxyOfNewPrefetchRequest()
+{
+        m_${{prefetcher_proxy_name}}_ptr->scheduleNextPrefetch();
+}
+"""
+            )
+        code(
+            """
 
 void
 $c_ident::init()
