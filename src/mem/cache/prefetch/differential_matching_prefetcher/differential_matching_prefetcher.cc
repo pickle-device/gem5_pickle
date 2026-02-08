@@ -113,6 +113,11 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
 {
     panic_if(l1_controller == nullptr,
             "L1 controller pointer passed to DMP prefetcher is null");
+    // this is not a very clean design as it creates a circular dependency
+    // between the prefetcher and the prefetch queue, but it is simple and
+    // works for our purpose.
+    prefetch_queue->setOwner(this);
+    prefetch_queue->setL2Controller(l2_controller);
     prefetch_queue->setIndirectRelationTable(&indirect_relation_table);
 }
 

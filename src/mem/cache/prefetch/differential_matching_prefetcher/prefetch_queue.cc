@@ -31,8 +31,12 @@
 #include <list>
 
 #include "base/types.hh"
+#include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_request.hh"
 #include "mem/packet.hh"
+#include "mem/ruby/common/DataBlock.hh"
+#include "mem/ruby/protocol/CHI/Cache_CacheEntry.hh"
+#include "mem/ruby/protocol/CHI/Cache_Controller.hh"
 #include "params/PrefetchQueue.hh"
 
 namespace gem5
@@ -67,6 +71,19 @@ PrefetchQueue::PrefetchQueue(
 }
 
 void
+PrefetchQueue::setOwner(DifferentialMatchingPrefetcherInterface* dmp)
+{
+    owner = dmp;
+}
+
+void
+PrefetchQueue::setL2Controller(ruby::AbstractController* l2)
+{
+    l2_controller = dynamic_cast<ruby::CHI::Cache_Controller*>(l2);
+    assert(l2_controller != nullptr);
+}
+
+void
 PrefetchQueue::setIndirectRelationTable(IndirectRelationTable* irt)
 {
     indirect_relation_table = irt;
@@ -84,6 +101,35 @@ PrefetchQueue::enqueuePendingRequest(PrefetchRequest prefetch_request)
     );
     const Addr prefetch_pc = prefetch_request.target_pc;
     can_coalesce = (prefetch_request_it != prefetch_requests.end());
+
+    // Check if the data is already in the L2 cache. Since the protocol does
+    // not record a local prefetch hit as a hit event, we need to directly
+    // acquire the data from the L2 controller.
+    ruby::CHI::Cache_CacheEntry* entry = l2_controller->getCacheEntry(
+        prefetch_vaddr_block_aligned
+    );
+    if (entry != nullptr) {
+         DMP_PREFETCH_QUEUE_DEBUG(
+            "Prefetch request for vaddr 0x%llx hits in L2 cache. "
+            "No need to enqueue the request.\n",
+            prefetch_request.prefetch_vaddr
+        );
+        // We can directly process the completed prefetch request without
+        // sending a memory request, as the data is already in the L2 cache.
+        // TODO: model the delay of sending the request to L2 and getting the
+        // response back
+        const ruby::DataBlock& response_data = entry->getDataBlk();
+        const uint8_t* response_data_ptr = response_data.getData(
+            0, cache_block_size
+        );
+        std::vector<uint8_t> response_data_vec(
+            response_data_ptr, response_data_ptr + cache_block_size
+        );
+        processCompletedPrefetchRequest(
+            prefetch_vaddr_block_aligned, response_data_vec
+        );
+        return true;
+    }
 
     if (can_coalesce) {
         // Coalesce the prefetch request
@@ -112,6 +158,9 @@ PrefetchQueue::enqueuePendingRequest(PrefetchRequest prefetch_request)
         );
         prefetch_requests[prefetch_vaddr_block_aligned].emplace_back(
             prefetch_request
+        );
+        owner->notifyNewPrefetchRequest(
+            CacheControllerLevel::L2
         );
         if (skip_address_translation) {
             memory_request_manager.enqueuePrefetchRequestUsingPhysicalAddr(
@@ -270,6 +319,11 @@ PrefetchQueue::processCompletedPrefetchRequest(
     }
 
     // Remove the completed prefetch request from the queue
+    DMP_PREFETCH_QUEUE_DEBUG(
+        "Removing completed prefetch request for vaddr block 0x%llx from "
+        "prefetch queue\n",
+        prefetch_vaddr_block_aligned
+    );
     prefetch_requests.erase(prefetch_request_it);
 }
 
