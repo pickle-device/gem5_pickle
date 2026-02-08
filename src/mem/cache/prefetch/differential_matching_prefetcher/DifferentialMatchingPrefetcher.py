@@ -43,6 +43,9 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
     l1_controller = Param.RubyController(
         "L1 cache controller associated with this prefetcher"
     )
+    l2_controller = Param.RubyController(
+        "L2 cache controller associated with this prefetcher"
+    )
 
     # DMP Parameters
     index_queue_size = Param.Unsigned(

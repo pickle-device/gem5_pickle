@@ -57,6 +57,7 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
     clock_domain(p.clock_domain),
     prefetch_queue(p.prefetch_queue),
     l1_controller(p.l1_controller),
+    l2_controller(p.l2_controller),
     process_detection_event(
         [this]{processDetectionEvent();}, name() + ".process_detection_event"
     ),
@@ -386,6 +387,20 @@ DifferentialMatchingPrefetcher::observeL1CacheFill(
             arg.req->getSize()
         );
 
+    }
+}
+
+void
+DifferentialMatchingPrefetcher::notifyNewPrefetchRequest(
+    const CacheControllerLevel cache_controller_level
+)
+{
+    if (cache_controller_level == CacheControllerLevel::L1) {
+        l1_controller->notifyPrefetcherProxyOfNewPrefetchRequest();
+    } else if (cache_controller_level == CacheControllerLevel::L2) {
+        l2_controller->notifyPrefetcherProxyOfNewPrefetchRequest();
+    } else {
+        panic("Unknown cache controller level in notifyNewPrefetchRequest");
     }
 }
 

@@ -44,6 +44,13 @@ enum class AccessType
     Range
 };
 
+enum class CacheControllerLevel
+{
+    Unknown,
+    L1,
+    L2
+};
+
 class DifferentialMatchingPrefetcherInterface
 {
   public:
@@ -62,6 +69,13 @@ class DifferentialMatchingPrefetcherInterface
       const Addr index_pc, const Addr target_pc, const bool successful_match,
       const Addr target_base_vaddr, const int64_t shift_amount,
       const AccessType index_access_type, const AccessType target_access_type
+    ) = 0;
+    // Notify the prefetch proxy of a new prefetch request, triggering the
+    // prefetch proxy to schedule prefetch requests.
+    // This is called by the prefetch queue when a new prefetch request is
+    // enqueued.
+    virtual void notifyNewPrefetchRequest(
+      const CacheControllerLevel cache_controller_level
     ) = 0;
 };
 

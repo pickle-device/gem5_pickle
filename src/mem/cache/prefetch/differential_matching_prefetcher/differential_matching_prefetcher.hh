@@ -93,6 +93,7 @@ class DifferentialMatchingPrefetcher : \
     ClockDomain *clock_domain;
     PrefetchQueue *prefetch_queue;
     ruby::AbstractController *l1_controller;
+    ruby::AbstractController *l2_controller;
     EventFunctionWrapper process_detection_event;
 
   // prefetcher parameters
@@ -156,6 +157,12 @@ class DifferentialMatchingPrefetcher : \
       const Addr index_pc, const Addr target_pc, const bool successful_match,
       const Addr target_base_vaddr, const int64_t shift_amount,
       const AccessType index_access_type, const AccessType target_access_type
+    ) override;
+    // Forward the notification from the prefetch queue to the prefetch proxy
+    // to trigger the scheduling of prefetch requests when there is a new
+    // prefetch request to be scheduled from prefetch queue.
+    void notifyNewPrefetchRequest(
+      const CacheControllerLevel cache_controller_level
     ) override;
     // Helpers
     Addr getBlockAddress(Addr addr) const;
