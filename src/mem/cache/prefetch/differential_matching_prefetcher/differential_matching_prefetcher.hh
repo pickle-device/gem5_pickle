@@ -91,7 +91,8 @@ class DifferentialMatchingPrefetcher : \
     System *system;
     const uint64_t cache_line_size;
     ClockDomain *clock_domain;
-    PrefetchQueue *prefetch_queue;
+    PrefetchQueue *dmp_prefetch_queue;
+    PrefetchQueue *stride_prefetch_queue;
     ruby::AbstractController *l1_controller;
     ruby::AbstractController *l2_controller;
     EventFunctionWrapper process_detection_event;
@@ -145,6 +146,7 @@ class DifferentialMatchingPrefetcher : \
     // Here, we receive a new stride detection from the Stride Tracker.
     // We inject the PC into the Index Queue.
     void handleNewlyDetectedStride(const Addr pc) override;
+    void handleIcsHasAvailableSlots() override;
     // Here, we receive a new candidate pair of PCs from the Indirection
     // Candidate Scoreboard (ICS). We can start differential matching for this
     // pair of PCs.
@@ -162,8 +164,16 @@ class DifferentialMatchingPrefetcher : \
     // to trigger the scheduling of prefetch requests when there is a new
     // prefetch request to be scheduled from prefetch queue.
     void notifyNewPrefetchRequest(
-      const CacheControllerLevel cache_controller_level
+      const enums::CacheLevel cache_controller_level
     ) override;
+    // Here, we receive the prefetched data from the stride prefetcher. We use
+    // this data to find out if it is part of the IRT table. If it is, we
+    // use this data to generate new prefetch requests for the next level
+    // of indirection.
+    void handleNewPrefetchedDataFromStridePrefetcher(
+      const Addr target_paddr, const Addr pc, const uint64_t data
+    ) override;
+
     // Helpers
     Addr getBlockAddress(Addr addr) const;
     uint64_t getDataFromProbe(const SimpleCacheAccessProbeArg &arg) const;

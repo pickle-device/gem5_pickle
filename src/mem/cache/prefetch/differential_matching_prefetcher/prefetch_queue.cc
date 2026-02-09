@@ -31,8 +31,10 @@
 #include <list>
 
 #include "base/types.hh"
+#include "enums/CacheLevel.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_request.hh"
+#include "mem/cache/prefetch/differential_matching_prefetcher/util.hh"
 #include "mem/packet.hh"
 #include "mem/ruby/common/DataBlock.hh"
 #include "mem/ruby/protocol/CHI/Cache_CacheEntry.hh"
@@ -53,6 +55,9 @@ PrefetchQueue::PrefetchQueue(
 )
   : ClockedObject(params),
     system(params.system),
+    cache_controller(nullptr),
+    cache_controller_level(params.cache_level),
+    owner(nullptr),
     queue_size(params.queue_size),
     cache_block_size(params.system->cacheLineSize()),
     block_shift(log2(params.system->cacheLineSize())),
@@ -77,10 +82,12 @@ PrefetchQueue::setOwner(DifferentialMatchingPrefetcherInterface* dmp)
 }
 
 void
-PrefetchQueue::setL2Controller(ruby::AbstractController* l2)
+PrefetchQueue::setCacheController(ruby::AbstractController* _cache_controller)
 {
-    l2_controller = dynamic_cast<ruby::CHI::Cache_Controller*>(l2);
-    assert(l2_controller != nullptr);
+    cache_controller = dynamic_cast<ruby::CHI::Cache_Controller*>(
+        _cache_controller
+    );
+    assert(cache_controller != nullptr);
 }
 
 void
@@ -102,22 +109,22 @@ PrefetchQueue::enqueuePendingRequest(PrefetchRequest prefetch_request)
     const Addr prefetch_pc = prefetch_request.target_pc;
     can_coalesce = (prefetch_request_it != prefetch_requests.end());
 
-    // Check if the data is already in the L2 cache. Since the protocol does
+    // Check if the data is already in the cache. Since the protocol does
     // not record a local prefetch hit as a hit event, we need to directly
-    // acquire the data from the L2 controller.
-    ruby::CHI::Cache_CacheEntry* entry = l2_controller->getCacheEntry(
+    // acquire the data from the controller.
+    ruby::CHI::Cache_CacheEntry* entry = cache_controller->getCacheEntry(
         prefetch_vaddr_block_aligned
     );
     if (entry != nullptr) {
-         DMP_PREFETCH_QUEUE_DEBUG(
-            "Prefetch request for vaddr 0x%llx hits in L2 cache. "
+        DMP_PREFETCH_QUEUE_DEBUG(
+            "Prefetch request for vaddr 0x%llx hits in cache. "
             "No need to enqueue the request.\n",
             prefetch_request.prefetch_vaddr
         );
         // We can directly process the completed prefetch request without
-        // sending a memory request, as the data is already in the L2 cache.
-        // TODO: model the delay of sending the request to L2 and getting the
-        // response back
+        // sending a memory request, as the data is already in the cache.
+        // TODO: model the delay of sending the request to L1/L2 and getting
+        // the response back
         const ruby::DataBlock& response_data = entry->getDataBlk();
         const uint8_t* response_data_ptr = response_data.getData(
             0, cache_block_size
@@ -159,9 +166,7 @@ PrefetchQueue::enqueuePendingRequest(PrefetchRequest prefetch_request)
         prefetch_requests[prefetch_vaddr_block_aligned].emplace_back(
             prefetch_request
         );
-        owner->notifyNewPrefetchRequest(
-            CacheControllerLevel::L2
-        );
+        owner->notifyNewPrefetchRequest(cache_controller_level);
         if (skip_address_translation) {
             memory_request_manager.enqueuePrefetchRequestUsingPhysicalAddr(
                 prefetch_vaddr_block_aligned, prefetch_pc
@@ -201,53 +206,42 @@ PrefetchQueue::getNextRequestPacket()
 }
 
 void
-PrefetchQueue::trackL2CacheHit(PacketPtr pkt)
+PrefetchQueue::trackCacheHit(PacketPtr pkt)
 {
     const Addr paddr = pkt->req->getPaddr();
-    if (prefetch_requests.find(paddr) != prefetch_requests.end()) {
+    const Addr block_aligned_paddr = paddr & ~(cache_block_size - 1);
+    DMP_PREFETCH_QUEUE_DEBUG(
+        "Tracking cache hit for paddr 0x%llx (size %lu)\n",
+        paddr, pkt->getSize()
+    );
+    if (
+        prefetch_requests.find(block_aligned_paddr) != prefetch_requests.end()
+    ) {
         notifyMemoryRequestCompleted(pkt);
     }
 }
 
 void
-PrefetchQueue::trackL2CacheMiss(PacketPtr pkt)
+PrefetchQueue::trackCacheMiss(PacketPtr pkt)
 {
-    const Addr paddr = pkt->req->getPaddr();
-    const Addr pc = pkt->req->getPC();
     // We don't need to do anything upon cache miss, as we will receive a
     // memory response when the memory request is completed, and we will
     // process the completed prefetch request and generate new prefetch
     // requests at that time.
-
-    // TODO: Remove this
-    // Test Prefetching
-    static uint64_t count = 0;
-    if (indirect_relation_table->containsIndexPc(0x120) && pc == 0x120) {
-        std::vector<PrefetchRequest> new_requests = {
-            PrefetchRequest(
-                /*target_pc*/ 0x140,
-                /*prefetch_vaddr*/ 0x20000000 + count * 8,
-                /*size*/ 8,
-                /*irt_id*/ 0
-            )
-        };
-        count++;
-        for (const PrefetchRequest &new_request : new_requests) {
-            enqueuePendingRequest(new_request);
-        }
-        DMP_PREFETCH_QUEUE_DEBUG(
-            "Test: Enqueued new prefetch request for vaddr 0x%llx based on "
-            "index pc 0x120\n",
-            0x20000000 + (count - 1) * 8
-        );
-    }
 }
 
 void
-PrefetchQueue::trackL2CacheFill(PacketPtr pkt)
+PrefetchQueue::trackCacheFill(PacketPtr pkt)
 {
     const Addr paddr = pkt->req->getPaddr();
-    if (prefetch_requests.find(paddr) != prefetch_requests.end()) {
+    const Addr block_aligned_paddr = paddr & ~(cache_block_size - 1);
+    DMP_PREFETCH_QUEUE_DEBUG(
+        "Tracking cache fill for paddr 0x%llx (size %lu)\n",
+        paddr, pkt->getSize()
+    );
+    if (
+        prefetch_requests.find(block_aligned_paddr) != prefetch_requests.end()
+    ) {
         notifyMemoryRequestCompleted(pkt);
     }
 }
@@ -286,7 +280,8 @@ PrefetchQueue::processCompletedPrefetchRequest(
             request_vaddr, target_pc
         );
         if (!prefetch_request.setResponseFromCacheBlockData(
-            response_data.data(), cache_block_size
+            /*cache_block_data*/ response_data.data(),
+            /*cache_block_size*/ cache_block_size
         )) {
             DMP_PREFETCH_QUEUE_DEBUG(
                 "Failed to set response for prefetch request with vaddr "
@@ -296,8 +291,33 @@ PrefetchQueue::processCompletedPrefetchRequest(
             continue;
         }
 
+        // If the cache level is L1, then this is the prefetch queue of the
+        // stride prefetcher, and we need to notify the DMP of the prefetched
+        // data from the stride prefetcher.
+        if (cache_controller_level == enums::CacheLevel::L1) {
+            DMP_PREFETCH_QUEUE_DEBUG(
+                "Notifying DMP of new prefetched data from stride prefetcher: "
+                "prefetch_vaddr_block_aligned=0x%llx, target_paddr=0x%llx, "
+                "target_pc=0x%llx, size=%lu, data=%#llx\n",
+                prefetch_vaddr_block_aligned, request_vaddr, target_pc,
+                prefetch_request.size, prefetch_request.getResponse()
+            );
+            owner->handleNewPrefetchedDataFromStridePrefetcher(
+                /*target_paddr*/ request_vaddr,
+                /*pc*/ target_pc,
+                /*data*/ prefetch_request.getResponse()
+            );
+        }
+
         // Now we consult the IRT to generate new prefetch requests based on
-        // the matching results.
+        // the matching results. If there's no IRT, this is the stride
+        // prefetcher.
+        if (indirect_relation_table == nullptr) {
+            // If the IRT is not set, it's a prefetcher that does not generate
+            // new prefetch requests based on the IRT, so we can skip the IRT
+            // query and directly continue to the next request.
+            continue;
+        }
         std::optional<std::vector<PrefetchRequest>> new_prefetch_requests =
             indirect_relation_table->queryEntryByIndexPc(
                 /*index_pc*/ target_pc, // the target_pc now becomes the
@@ -318,13 +338,13 @@ PrefetchQueue::processCompletedPrefetchRequest(
         }
     }
 
+    prefetch_requests.erase(prefetch_request_it);
     // Remove the completed prefetch request from the queue
     DMP_PREFETCH_QUEUE_DEBUG(
         "Removing completed prefetch request for vaddr block 0x%llx from "
-        "prefetch queue\n",
-        prefetch_vaddr_block_aligned
+        "prefetch queue, queue size %lu\n",
+        prefetch_vaddr_block_aligned, prefetch_requests.size()
     );
-    prefetch_requests.erase(prefetch_request_it);
 }
 
 }; // namespace dmp

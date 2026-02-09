@@ -36,6 +36,7 @@
 #include "base/trace.hh"
 #include "debug/DifferentialMatchingPrefetcherCacheObserverDebug.hh"
 #include "debug/DifferentialMatchingPrefetcherDebug.hh"
+#include "enums/CacheLevel.hh"
 #include "mem/cache/cache_probe_arg.hh"
 #include "params/DifferentialMatchingPrefetcher.hh"
 #include "sim/clock_domain.hh"
@@ -55,7 +56,8 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
 ) : ProbeListenerObject(p), system(p.system),
     cache_line_size(p.system->cacheLineSize()),
     clock_domain(p.clock_domain),
-    prefetch_queue(p.prefetch_queue),
+    dmp_prefetch_queue(p.dmp_prefetch_queue),
+    stride_prefetch_queue(p.stride_prefetch_queue),
     l1_controller(p.l1_controller),
     l2_controller(p.l2_controller),
     process_detection_event(
@@ -76,6 +78,10 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
         /*capacity*/ p.index_queue_size,
         /*_confidence_threshold*/ 0.5,
         /*_cache_block_size*/ p.system->cacheLineSize(),
+        /*_prefetch_distance*/ p.stride_prefetcher_distance,
+        /*_prefetch_degree*/ p.stride_prefetcher_degree,
+        /*_can_cross_page*/ p.stride_prefetcher_can_cross_page,
+        /*_page_size_in_bytes*/ p.page_size,
         /*_prefetcher_interface*/ this
     ),
     index_queue(p.index_queue_size, IndexQueueReplacementPolicy::LowestScore),
@@ -113,12 +119,18 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
 {
     panic_if(l1_controller == nullptr,
             "L1 controller pointer passed to DMP prefetcher is null");
+    panic_if(l2_controller == nullptr,
+        "L2 controller pointer passed to DMP prefetcher is null");
     // this is not a very clean design as it creates a circular dependency
     // between the prefetcher and the prefetch queue, but it is simple and
     // works for our purpose.
-    prefetch_queue->setOwner(this);
-    prefetch_queue->setL2Controller(l2_controller);
-    prefetch_queue->setIndirectRelationTable(&indirect_relation_table);
+    dmp_prefetch_queue->setOwner(this);
+    dmp_prefetch_queue->setCacheController(l2_controller);
+    dmp_prefetch_queue->setIndirectRelationTable(&indirect_relation_table);
+    stride_prefetch_queue->setOwner(this);
+    stride_prefetch_queue->setCacheController(l1_controller);
+    stride_prefetch_queue->setIndirectRelationTable(nullptr);
+    stride_tracker.setPrefetchQueue(stride_prefetch_queue);
 }
 
 void
@@ -191,7 +203,16 @@ DifferentialMatchingPrefetcher::handleNewlyDetectedStride(const Addr pc)
         "New stride detected: PC %#x\n", pc
     );
     index_queue.add(pc, curTick());
-    scheduleHandleDetectionEvent();
+    promoteIndexPcFromIqToIcs();
+}
+
+void
+DifferentialMatchingPrefetcher::handleIcsHasAvailableSlots()
+{
+    DMP_PREFETCHER_DEBUG(
+        "ICS has available slots. Try promoting index PCs from IQ to ICS.\n"
+    );
+    promoteIndexPcFromIqToIcs();
 }
 
 void
@@ -309,9 +330,10 @@ DifferentialMatchingPrefetcher::observeL1CacheHit(
     );
 
     const Addr pc = arg.req->getPC();
-    const Addr block_address = getBlockAddress(arg.req->getPaddr());
+    const uint64_t access_size = arg.req->getSize();
+    const Addr paddr = arg.req->getPaddr();
     const Tick access_timestamp = curTick();
-    stride_tracker.track(pc, block_address, access_timestamp);
+    stride_tracker.track(pc, access_size, paddr, access_timestamp);
     if (!differential_matcher.isEmpty()) {
         differential_matcher.trackL1CacheHit(
             pc,
@@ -343,9 +365,10 @@ DifferentialMatchingPrefetcher::observeL1CacheMiss(
         arg.req->getPC(), arg.hasCacheFillData()
     );
     const Addr pc = arg.req->getPC();
-    const Addr block_address = getBlockAddress(arg.req->getPaddr());
+    const uint64_t access_size = arg.req->getSize();
+    const Addr paddr = arg.req->getPaddr();
     const Tick access_timestamp = curTick();
-    stride_tracker.track(pc, block_address, access_timestamp);
+    stride_tracker.track(pc, access_size, paddr, access_timestamp);
     indirection_candidate_scoreboard.trackL1CacheMiss(pc);
     if (!differential_matcher.isEmpty()) {
         differential_matcher.trackL1CacheMiss(
@@ -397,15 +420,42 @@ DifferentialMatchingPrefetcher::observeL1CacheFill(
 
 void
 DifferentialMatchingPrefetcher::notifyNewPrefetchRequest(
-    const CacheControllerLevel cache_controller_level
+    const enums::CacheLevel cache_controller_level
 )
 {
-    if (cache_controller_level == CacheControllerLevel::L1) {
+    if (cache_controller_level == enums::CacheLevel::L1) {
         l1_controller->notifyPrefetcherProxyOfNewPrefetchRequest();
-    } else if (cache_controller_level == CacheControllerLevel::L2) {
+    } else if (cache_controller_level == enums::CacheLevel::L2) {
         l2_controller->notifyPrefetcherProxyOfNewPrefetchRequest();
     } else {
-        panic("Unknown cache controller level in notifyNewPrefetchRequest");
+        panic("Unknown cache controller level in CacheLevel");
+    }
+}
+
+void
+DifferentialMatchingPrefetcher::handleNewPrefetchedDataFromStridePrefetcher(
+    const Addr target_paddr, const Addr pc, const uint64_t data
+)
+{
+    DMP_PREFETCHER_DEBUG(
+        "Received new prefetched data from stride prefetcher: "
+        "target_paddr=%#x, pc=%#x, data=%#x\n",
+        target_paddr, pc, data
+    );
+    std::optional<std::vector<PrefetchRequest>> new_prefetches =
+        indirect_relation_table.queryEntryByIndexPc(
+            /*index_pc*/ pc,
+            /*data_from_index_pc*/ data
+        );
+    if (new_prefetches.has_value()) {
+        for (const PrefetchRequest &new_prefetch : new_prefetches.value()) {
+            DMP_PREFETCHER_DEBUG(
+                "New prefetch generated from stride prefetcher data: "
+                "target_paddr=%#x, pc=%#x, new_prefetch=%#x\n",
+                target_paddr, pc, new_prefetch.prefetch_vaddr
+            );
+            dmp_prefetch_queue->enqueuePendingRequest(new_prefetch);
+        }
     }
 }
 

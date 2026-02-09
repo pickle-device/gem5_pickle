@@ -37,14 +37,28 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
 
     system = Param.System(Parent.any, "System this prefetcher belongs to")
     clock_domain = Param.ClockDomain("Clock domain for this prefetcher")
-    prefetch_queue = Param.DifferentialMatchingPrefetcherPrefetchQueue(
+    dmp_prefetch_queue = Param.DifferentialMatchingPrefetcherPrefetchQueue(
         "The prefetch queue serving as the backend of this prefetcher"
+    )
+    stride_prefetch_queue = Param.DifferentialMatchingPrefetcherPrefetchQueue(
+        "The prefetch queue serving as the backend of the stride prefetcher"
     )
     l1_controller = Param.RubyController(
         "L1 cache controller associated with this prefetcher"
     )
     l2_controller = Param.RubyController(
         "L2 cache controller associated with this prefetcher"
+    )
+    stride_prefetcher_can_cross_page = Param.Bool(
+        False,
+        "Whether the stride prefetcher can generate prefetches that cross "
+        "page boundaries.",
+    )
+    page_size = Param.MemorySize(
+        "4KiB",
+        "Page size used in the system. This is used to determine the page "
+        "boundary for the stride prefetcher when "
+        "stride_prefetcher_can_cross_page is False.",
     )
 
     # DMP Parameters
@@ -86,6 +100,14 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
     )
     range_table_num_entries = Param.Unsigned(
         4, "Number of entries in the range table"
+    )
+
+    # Stride prefetcher parameters
+    stride_prefetcher_distance = Param.Unsigned(
+        1, "Distance for the stride prefetcher used in DMP"
+    )
+    stride_prefetcher_degree = Param.Unsigned(
+        4, "Degree for the stride prefetcher used in DMP"
     )
 
     # Patches for fixing some parts of the paper

@@ -39,6 +39,8 @@
 #include "base/types.hh"
 #include "debug/DifferentialMatchingPrefetcherStrideTrackerDebug.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
+#include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_queue.hh"
+#include "mem/cache/prefetch/differential_matching_prefetcher/util.hh"
 
 #define DMP_STRIDE_TRACKER_DEBUG(...) \
     DPRINTF(DifferentialMatchingPrefetcherStrideTrackerDebug, \
@@ -57,6 +59,7 @@ class StrideTrackerEntry
 {
   public:
     Addr pc;
+    uint64_t access_size;
     Tick access_timestamp;
     int64_t previous_stride;
     Addr previous_effective_address;
@@ -64,7 +67,8 @@ class StrideTrackerEntry
     double confidence_threshold;
   public:
     StrideTrackerEntry(
-      const Addr _pc, const Addr _block_address, const Tick _access_timestamp,
+      const Addr _pc, const uint64_t _access_size,
+      const Addr _block_address, const Tick _access_timestamp,
       const double _confidence_threshold
     );
     void update(
@@ -79,20 +83,39 @@ class StrideTracker
     const uint64_t capacity;
     const double confidence_threshold;
     const uint64_t cache_block_size;
+    const uint64_t prefetch_distance;
+    const uint64_t prefetch_degree;
+    const bool can_cross_page;
+    const Addr page_size_in_bytes;
+    const uint64_t page_shift;
     std::vector<StrideTrackerEntry> stride_tracker;
     DifferentialMatchingPrefetcherInterface *prefetcher_interface;
+    PrefetchQueue *prefetch_queue;
+    // We use this to track recently prefetched addresses to avoid redundant
+    // prefetches.
+    QueuedDict recentPrefetchAddresses;
     void replaceLeastRecentlyUsedEntry(
-        const Addr pc, const Addr block_address, const Tick access_timestamp
+        const Addr pc, const uint64_t access_size, const Addr block_address,
+        const Tick access_timestamp
     );
   public:
     StrideTracker(
       const uint64_t _capacity, const double _confidence_threshold,
-      const uint64_t _cache_block_size,
+      const uint64_t _cache_block_size, const uint64_t _prefetch_distance,
+      const uint64_t _prefetch_degree, const bool _can_cross_page,
+      const Addr _page_size_in_bytes,
       DifferentialMatchingPrefetcherInterface *_prefetcher_interface
     );
+    void setPrefetchQueue(PrefetchQueue *_prefetch_queue);
+    std::optional<uint64_t> getAccessSizeForPC(const Addr pc) const;
     void track(
-      const Addr pc, const Addr block_address, const Tick access_timestamp
+      const Addr pc, const uint64_t access_size, const Addr paddr,
+      const Tick access_timestamp
     );
+    void emitPrefetches(
+      const Addr pc, const Addr paddr, const Tick access_timestamp
+    );
+    bool samePage(const Addr addr1, const Addr addr2) const;
 };
 
 } // namespace dmp

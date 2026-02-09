@@ -28,6 +28,9 @@
 
 #include "mem/cache/prefetch/differential_matching_prefetcher/stride_tracker.hh"
 
+#include "base/types.hh"
+#include "mem/cache/prefetch/differential_matching_prefetcher/util.hh"
+
 namespace gem5
 {
 
@@ -38,9 +41,10 @@ namespace dmp
 {
 
 StrideTrackerEntry::StrideTrackerEntry(
-  const Addr _pc, const Addr _block_address, const Tick _access_timestamp,
-  const double _confidence_threshold
+  const Addr _pc, const uint64_t _access_size, const Addr _block_address,
+  const Tick _access_timestamp, const double _confidence_threshold
 ) : pc(_pc),
+    access_size(_access_size),
     access_timestamp(_access_timestamp),
     previous_stride(0),
     previous_effective_address(_block_address),
@@ -93,24 +97,56 @@ bool StrideTrackerEntry::isConfident() const
 
 StrideTracker::StrideTracker(
   const uint64_t _capacity, const double _confidence_threshold,
-  const uint64_t _cache_block_size,
+  const uint64_t _cache_block_size, const uint64_t _prefetch_distance,
+  const uint64_t _prefetch_degree, const bool _can_cross_page,
+  const Addr _page_size_in_bytes,
   DifferentialMatchingPrefetcherInterface *_prefetcher_interface
 ) : capacity(_capacity),
     confidence_threshold(_confidence_threshold),
     cache_block_size(_cache_block_size),
-    prefetcher_interface(_prefetcher_interface)
+    prefetch_distance(_prefetch_distance),
+    prefetch_degree(_prefetch_degree),
+    can_cross_page(_can_cross_page),
+    page_size_in_bytes(_page_size_in_bytes),
+    page_shift(log2(_page_size_in_bytes)),
+    prefetcher_interface(_prefetcher_interface),
+    prefetch_queue(nullptr),
+    recentPrefetchAddresses(64)
 {
     stride_tracker.reserve(capacity);
+    fatal_if(
+        can_cross_page,
+        "StrideTracker currently does not support generating prefetches that "
+        "cross page boundaries."
+    );
+}
+
+void
+StrideTracker::setPrefetchQueue(PrefetchQueue *_prefetch_queue)
+{
+    prefetch_queue = _prefetch_queue;
+}
+
+std::optional<uint64_t>
+StrideTracker::getAccessSizeForPC(const Addr pc) const
+{
+    for (const auto &entry : stride_tracker) {
+        if (entry.pc == pc) {
+            return entry.access_size;
+        }
+    }
+    return std::nullopt;
 }
 
 void
 StrideTracker::replaceLeastRecentlyUsedEntry(
-    const Addr pc, const Addr block_address, const Tick access_timestamp
+    const Addr pc, const uint64_t access_size, const Addr paddr,
+    const Tick access_timestamp
 )
 {
     if (stride_tracker.size() < capacity) {
         stride_tracker.emplace_back(
-            pc, block_address, access_timestamp, confidence_threshold
+            pc, access_size, paddr, access_timestamp, confidence_threshold
         );
         DMP_STRIDE_TRACKER_DEBUG(
             "Added new entry for PC %#x\n", pc
@@ -126,8 +162,9 @@ StrideTracker::replaceLeastRecentlyUsedEntry(
         }
     }
     // Replace the LRU entry with the new one
-    *lru_it = StrideTrackerEntry(pc, block_address, access_timestamp,
-                                confidence_threshold);
+    *lru_it = StrideTrackerEntry(
+        pc, access_size, paddr, access_timestamp, confidence_threshold
+    );
     DMP_STRIDE_TRACKER_DEBUG(
         "Replaced LRU entry with new entry for PC %#x\n", pc
     );
@@ -135,7 +172,8 @@ StrideTracker::replaceLeastRecentlyUsedEntry(
 
 void
 StrideTracker::track(
-  const Addr pc, const Addr block_address, const Tick access_timestamp
+  const Addr pc, const uint64_t access_size, const Addr paddr,
+  const Tick access_timestamp
 )
 {
     // Check if the PC already exists in the stride tracker
@@ -144,7 +182,7 @@ StrideTracker::track(
             // Found the entry, now we check confidence before updating
             const bool was_confident = it->isConfident();
             // Update the existing entry
-            it->update(block_address, access_timestamp);
+            it->update(paddr, access_timestamp);
             // If we just recently became confident, notify the prefetcher
             if (!was_confident && it->isConfident()) {
                 prefetcher_interface->handleNewlyDetectedStride(pc);
@@ -153,12 +191,70 @@ StrideTracker::track(
                     pc, it->previous_stride
                 );
             }
+            // If the entry is confident, we emit prefetches
+            if (it->isConfident()) {
+                emitPrefetches(pc, paddr, access_timestamp);
+            }
             return;
         }
     }
 
     // If not found, add a new entry (possibly replacing an old one)
-    replaceLeastRecentlyUsedEntry(pc, block_address, access_timestamp);
+    replaceLeastRecentlyUsedEntry(pc, access_size, paddr, access_timestamp);
+}
+
+void
+StrideTracker::emitPrefetches(
+  const Addr pc, const Addr current_paddr, const Tick access_timestamp
+)
+{
+    // Find the entry for the given PC
+    for (const auto &entry : stride_tracker) {
+        if (entry.pc == pc && entry.isConfident()) {
+            const int64_t stride = entry.previous_stride;
+            for (
+                uint64_t i = prefetch_distance;
+                i <= prefetch_distance + prefetch_degree;
+                ++i
+            ) {
+                const Addr prefetch_address = current_paddr + i * stride;
+                if (recentPrefetchAddresses.contains(prefetch_address)) {
+                    continue;
+                }
+                if (!can_cross_page) {
+                    if (!samePage(current_paddr, prefetch_address)) {
+                        break;
+                    }
+                } else {
+                    // cross-page prefetching is currently not supported
+                    fatal(
+                        "StrideTracker does not support cross-page prefetching"
+                    );
+                }
+                DMP_STRIDE_TRACKER_DEBUG(
+                    "Emitting prefetch for PC %#x to address %#x\n",
+                    pc, prefetch_address
+                );
+                // Enqueue the prefetch request
+                recentPrefetchAddresses.push(prefetch_address);
+                prefetch_queue->enqueuePendingRequest(
+                    PrefetchRequest(
+                        /*_target_pc*/ pc,
+                        /*_prefetch_vaddr*/ prefetch_address,
+                        /*_size*/ entry.access_size,
+                        /*_irt_id*/ 0
+                    )
+                );
+            }
+            break;
+        }
+    }
+}
+
+bool
+StrideTracker::samePage(const Addr addr1, const Addr addr2) const
+{
+    return (addr1 >> page_shift) == (addr2 >> page_shift);
 }
 
 } // namespace dmp
