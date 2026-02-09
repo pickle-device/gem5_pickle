@@ -57,9 +57,9 @@ PrefetchAgent::notify(const CacheAccessProbeArg &acc, const PrefetchInfo &pfi)
         vaddr, paddr, pc, is_miss, has_data
     );
     if (!is_miss){
-        prefetch_queue->trackL2CacheHit(acc.pkt);
+        prefetch_queue->trackCacheHit(acc.pkt);
     } else {
-        prefetch_queue->trackL2CacheMiss(acc.pkt);
+        prefetch_queue->trackCacheMiss(acc.pkt);
     }
 }
 
@@ -73,7 +73,7 @@ PrefetchAgent::notifyFill(const CacheAccessProbeArg &acc)
         "pc=0x%llx\n",
         paddr, pc
     );
-    prefetch_queue->trackL2CacheFill(acc.pkt);
+    prefetch_queue->trackCacheFill(acc.pkt);
 }
 
 void
