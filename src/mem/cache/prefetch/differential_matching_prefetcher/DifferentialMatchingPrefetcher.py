@@ -104,10 +104,10 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
 
     # Stride prefetcher parameters
     stride_prefetcher_distance = Param.Unsigned(
-        1, "Distance for the stride prefetcher used in DMP"
+        2, "Distance for the stride prefetcher used in DMP"
     )
     stride_prefetcher_degree = Param.Unsigned(
-        4, "Degree for the stride prefetcher used in DMP"
+        16, "Degree for the stride prefetcher used in DMP"
     )
     stride_prefetch_pc_even_when_dmp_has_the_same_target_pc = Param.Bool(
         True,
