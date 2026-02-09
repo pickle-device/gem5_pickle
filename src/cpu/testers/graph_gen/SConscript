@@ -30,4 +30,5 @@ Source('bfs_gen.cc')
 Source('csr.cc')
 
 DebugFlag('BFSGen')
+DebugFlag('BFSGenProgressTracker')
 SimObject('BFSGen.py', sim_objects=['BFSGen'])

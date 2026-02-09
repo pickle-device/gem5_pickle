@@ -39,6 +39,7 @@
 
 #include "base/logging.hh"
 #include "debug/BFSGen.hh"
+#include "debug/BFSGenProgressTracker.hh"
 #include "sim/eventq.hh"
 #include "sim/sim_exit.hh"
 #include "sim/system.hh"
@@ -131,7 +132,7 @@ VisitorTracker::VisitorTracker(
     // write).
     const uint64_t num_neighbors = \
       graph->csr->rowPtr[vertex_id + 1] - graph->csr->rowPtr[vertex_id];
-    uint64_t first_neighbor_index = graph->csr->rowPtr[vertex_id];
+    const uint64_t first_neighbor_index = graph->csr->rowPtr[vertex_id];
 
     // 3. Access neighbor list to get each neighbor vertex ID
     for (uint64_t i = 0; i < num_neighbors; ++i) {
@@ -228,6 +229,14 @@ BFSGen::BFSGenPort::recvTimingResp(PacketPtr pkt)
         }
     }
     owner->stats.numResponsesReceived++;
+    const uint64_t total_responses = static_cast<uint64_t>(
+        owner->stats.numResponsesReceived.value()
+    );
+    if (total_responses % owner->progress_tracking_interval == 0) {
+        BFS_GEN_PROGRESS_TRACKER_DEBUG(
+            "Received %lu responses so far\n", total_responses
+        );
+    }
     delete pkt;
     if (!found) {
         BFS_GEN_DEBUG(
@@ -294,7 +303,8 @@ BFSGen::BFSGen(const BFSGenParams &p)
           p.visited_list_access_pc
       ),
       current_work_queue_index(0),
-      stats(this)
+      stats(this),
+      progress_tracking_interval(p.progress_tracking_interval)
 {
     BFS_GEN_DEBUG(
       "BFSGen started up with cache block size: %lu\n", cache_block_size
@@ -312,6 +322,11 @@ BFSGen::BFSGen(const BFSGenParams &p)
             max_num_responses
         );
     }
+
+    panic_if(
+        progress_tracking_interval == 0,
+        "Progress tracking interval must be greater than 0\n"
+    );
 }
 
 BFSGen::~BFSGen()

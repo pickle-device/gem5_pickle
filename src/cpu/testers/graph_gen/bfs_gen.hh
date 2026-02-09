@@ -39,6 +39,7 @@
 #include "base/types.hh"
 #include "cpu/testers/graph_gen/csr.hh"
 #include "debug/BFSGen.hh"
+#include "debug/BFSGenProgressTracker.hh"
 #include "mem/packet.hh"
 #include "mem/port.hh"
 #include "mem/request.hh"
@@ -48,6 +49,9 @@
 
 #define BFS_GEN_DEBUG(...) \
     DPRINTF(BFSGen, __VA_ARGS__)
+
+#define BFS_GEN_PROGRESS_TRACKER_DEBUG(...) \
+    DPRINTF(BFSGenProgressTracker, __VA_ARGS__)
 
 namespace gem5
 {
@@ -208,6 +212,8 @@ class BFSGen : public ClockedObject
     } stats;
 
   public:
+    const uint64_t progress_tracking_interval;
+
     // We share the following data structures with BFSGenPort
     // Inflight packets
     // Here, we track the vaddr and corresponding vertex IDs

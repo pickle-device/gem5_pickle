@@ -40,6 +40,11 @@ class BFSGen(ClockedObject):
 
     cache_block_size = Param.Unsigned(64, "Cache block size in bytes")
 
+    # Debugging parameters
+    progress_tracking_interval = Param.Unsigned(
+        100000, "Interval for tracking BFS progress in number of responses"
+    )
+
     # Graph configuration parameters
     graph_file = Param.String("Input graph file in adjacency list format")
     is_directed = Param.Bool(
