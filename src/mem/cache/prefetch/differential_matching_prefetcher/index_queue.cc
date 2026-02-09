@@ -74,8 +74,7 @@ IndexQueueEntry::getScore() const
 
 IndexQueue::IndexQueue(
     uint64_t _max_size, IndexQueueReplacementPolicy _replacement_policy
-)
-  : max_size(_max_size), replacement_policy(_replacement_policy)
+) : max_size(_max_size), replacement_policy(_replacement_policy)
 {
     index_queue.reserve(max_size);
 }
@@ -101,9 +100,7 @@ IndexQueue::replaceLeastRecentlyUsedEntry(
 }
 
 void
-IndexQueue::replaceLowestScoreEntry(
-    const Addr pc, const Tick access_timestamp
-)
+IndexQueue::replaceLowestScoreEntry(const Addr pc, const Tick access_timestamp)
 {
     if (index_queue.empty()) {
         return;
