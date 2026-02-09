@@ -36,6 +36,14 @@ class PrefetchQueueReplacementPolicy(Enum):
     ]
 
 
+class CacheLevel(Enum):
+    vals = [
+        "L1",
+        "L2",
+        "L3",
+    ]
+
+
 # The backend of the Differential Matching Prefetcher that handles
 # prefetch request issuance and tracking.
 class DifferentialMatchingPrefetcherPrefetchQueue(ClockedObject):
@@ -50,6 +58,7 @@ class DifferentialMatchingPrefetcherPrefetchQueue(ClockedObject):
         Parent.any, "Clock domain for this prefetcher"
     )
     mmu = Param.BaseMMU("The MMU of the associated core")
+    cache_level = Param.CacheLevel("Cache level for this prefetch queue")
 
     # Prefetch queue parameters
     queue_size = Param.Int(64, "Number of entries in the prefetch queue")
