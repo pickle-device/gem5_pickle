@@ -79,6 +79,9 @@ class DifferentialMatchingPrefetcherInterface
     virtual void handleNewPrefetchedDataFromStridePrefetcher(
       const Addr target_paddr, const Addr pc, const uint64_t data
     ) = 0;
+    // Allow other prefetchers to query whether DMP already prefetches for
+    // a specific PC.
+    virtual bool isATargetPC(const Addr pc) const = 0;
 };
 
 } // namespace dmp

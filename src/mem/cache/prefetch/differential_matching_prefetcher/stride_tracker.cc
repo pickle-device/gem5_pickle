@@ -100,6 +100,7 @@ StrideTracker::StrideTracker(
   const uint64_t _cache_block_size, const uint64_t _prefetch_distance,
   const uint64_t _prefetch_degree, const bool _can_cross_page,
   const Addr _page_size_in_bytes,
+  const bool _stride_prefetch_pc_even_when_dmp_has_the_same_target_pc,
   DifferentialMatchingPrefetcherInterface *_prefetcher_interface
 ) : capacity(_capacity),
     confidence_threshold(_confidence_threshold),
@@ -109,6 +110,9 @@ StrideTracker::StrideTracker(
     can_cross_page(_can_cross_page),
     page_size_in_bytes(_page_size_in_bytes),
     page_shift(log2(_page_size_in_bytes)),
+    stride_prefetch_pc_even_when_dmp_has_the_same_target_pc(
+        _stride_prefetch_pc_even_when_dmp_has_the_same_target_pc
+    ),
     prefetcher_interface(_prefetcher_interface),
     prefetch_queue(nullptr),
     recentPrefetchAddresses(64)
@@ -211,6 +215,13 @@ StrideTracker::emitPrefetches(
     // Find the entry for the given PC
     for (const auto &entry : stride_tracker) {
         if (entry.pc == pc && entry.isConfident()) {
+            // If the DMP is already generating prefetches for this PC, we
+            // skip emitting new prefetches to avoid interference.
+            if (!stride_prefetch_pc_even_when_dmp_has_the_same_target_pc) {
+                if (prefetcher_interface->isATargetPC(pc)) {
+                    return;
+                }
+            }
             const int64_t stride = entry.previous_stride;
             for (
                 uint64_t i = prefetch_distance;

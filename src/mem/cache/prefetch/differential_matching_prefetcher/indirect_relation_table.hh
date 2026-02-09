@@ -130,7 +130,8 @@ class IndirectRelationTable
         const AccessType index_access_type,
         const AccessType target_access_type
     );
-    bool containsIndexPc(const Addr index_pc) const;
+    bool isAnIndexPC(const Addr index_pc) const;
+    bool isATargetPC(const Addr target_pc) const;
     bool containsEntry(const Addr index_pc, const Addr target_pc) const;
     std::optional<std::vector<PrefetchRequest>> queryEntryByIndexPc(
         const Addr index_pc, const int64_t data_from_index_pc

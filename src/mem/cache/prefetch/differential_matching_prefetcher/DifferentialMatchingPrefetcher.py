@@ -109,6 +109,11 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
     stride_prefetcher_degree = Param.Unsigned(
         4, "Degree for the stride prefetcher used in DMP"
     )
+    stride_prefetch_pc_even_when_dmp_has_the_same_target_pc = Param.Bool(
+        True,
+        "Whether the stride prefetcher should emit prefetches for a PC even "
+        "when the DMP is already generating prefetches for the same target PC.",
+    )
 
     # Patches for fixing some parts of the paper
     ics_deprioritize_on_unsuccessful_matching_patch = Param.Bool(

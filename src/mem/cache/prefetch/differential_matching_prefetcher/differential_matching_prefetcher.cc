@@ -82,6 +82,8 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
         /*_prefetch_degree*/ p.stride_prefetcher_degree,
         /*_can_cross_page*/ p.stride_prefetcher_can_cross_page,
         /*_page_size_in_bytes*/ p.page_size,
+        /*_stride_prefetch_pc_even_when_dmp_has_the_same_target_pc*/
+        p.stride_prefetch_pc_even_when_dmp_has_the_same_target_pc,
         /*_prefetcher_interface*/ this
     ),
     index_queue(p.index_queue_size, IndexQueueReplacementPolicy::LowestScore),
@@ -457,6 +459,11 @@ DifferentialMatchingPrefetcher::handleNewPrefetchedDataFromStridePrefetcher(
             dmp_prefetch_queue->enqueuePendingRequest(new_prefetch);
         }
     }
+}
+
+bool
+DifferentialMatchingPrefetcher::isATargetPC(const Addr pc) const
+{    return indirect_relation_table.isATargetPC(pc);
 }
 
 Addr

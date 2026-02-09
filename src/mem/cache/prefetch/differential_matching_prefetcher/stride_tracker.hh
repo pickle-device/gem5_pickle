@@ -88,6 +88,7 @@ class StrideTracker
     const bool can_cross_page;
     const Addr page_size_in_bytes;
     const uint64_t page_shift;
+    const bool stride_prefetch_pc_even_when_dmp_has_the_same_target_pc;
     std::vector<StrideTrackerEntry> stride_tracker;
     DifferentialMatchingPrefetcherInterface *prefetcher_interface;
     PrefetchQueue *prefetch_queue;
@@ -104,6 +105,7 @@ class StrideTracker
       const uint64_t _cache_block_size, const uint64_t _prefetch_distance,
       const uint64_t _prefetch_degree, const bool _can_cross_page,
       const Addr _page_size_in_bytes,
+      const bool _stride_prefetch_pc_even_when_dmp_has_the_same_target_pc,
       DifferentialMatchingPrefetcherInterface *_prefetcher_interface
     );
     void setPrefetchQueue(PrefetchQueue *_prefetch_queue);

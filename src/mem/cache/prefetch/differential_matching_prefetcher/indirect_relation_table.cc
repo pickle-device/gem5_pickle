@@ -336,7 +336,7 @@ IndirectRelationTable::addEntry(
 }
 
 bool
-IndirectRelationTable::containsIndexPc(const Addr index_pc) const
+IndirectRelationTable::isAnIndexPC(const Addr index_pc) const
 {
     for (const auto &entry : entries) {
         if (entry.index_pc == index_pc) {
@@ -345,6 +345,18 @@ IndirectRelationTable::containsIndexPc(const Addr index_pc) const
     }
     return false;
 }
+
+bool
+IndirectRelationTable::isATargetPC(const Addr target_pc) const
+{
+    for (const auto &entry : entries) {
+        if (entry.target_pc == target_pc) {
+            return true;
+        }
+    }
+    return false;
+}
+
 
 bool
 IndirectRelationTable::containsEntry(

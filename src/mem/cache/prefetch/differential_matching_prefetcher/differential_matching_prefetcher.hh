@@ -173,6 +173,9 @@ class DifferentialMatchingPrefetcher : \
     void handleNewPrefetchedDataFromStridePrefetcher(
       const Addr target_paddr, const Addr pc, const uint64_t data
     ) override;
+    // Allow other prefetchers to query whether DMP already prefetches for
+    // a specific PC.
+    bool isATargetPC(const Addr pc) const override;
 
     // Helpers
     Addr getBlockAddress(Addr addr) const;
