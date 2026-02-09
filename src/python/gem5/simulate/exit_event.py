@@ -114,7 +114,7 @@ class ExitEvent(Enum):
             # This is for the graph_gen exit event
             return ExitEvent.EXIT
         elif exit_string.endswith(
-            "has reached the maximum number of responses to process."
+            "reached maximum number of responses to process."
         ):
             # This is for the graph_gen exit event
             return ExitEvent.EXIT
