@@ -29,6 +29,8 @@
 #ifndef __DMP_INTERFACE_HH__
 #define __DMP_INTERFACE_HH__
 
+#include "enums/CacheLevel.hh"
+
 namespace gem5
 {
 
@@ -44,13 +46,6 @@ enum class AccessType
     Range
 };
 
-enum class CacheControllerLevel
-{
-    Unknown,
-    L1,
-    L2
-};
-
 class DifferentialMatchingPrefetcherInterface
 {
   public:
@@ -58,6 +53,9 @@ class DifferentialMatchingPrefetcherInterface
     // Called when a new stride is detected, the parameter is PC of the
     // instruction.
     virtual void handleNewlyDetectedStride(const Addr pc) = 0;
+    // Called when the ICS still has capacity to accommodate new candidate
+    // index PC.
+    virtual void handleIcsHasAvailableSlots() = 0;
     // Called when a candidate pair of PCs is promoted from the Indirection
     // Candidate Scoreboard (ICS), the parameter is PC of the instruction.
     virtual void handleNewCandidateFromIcs(
@@ -75,7 +73,11 @@ class DifferentialMatchingPrefetcherInterface
     // This is called by the prefetch queue when a new prefetch request is
     // enqueued.
     virtual void notifyNewPrefetchRequest(
-      const CacheControllerLevel cache_controller_level
+      const enums::CacheLevel cache_controller_level
+    ) = 0;
+    // Notify the dmp of the prefetched data from stride prefetcher
+    virtual void handleNewPrefetchedDataFromStridePrefetcher(
+      const Addr target_paddr, const Addr pc, const uint64_t data
     ) = 0;
 };
 
