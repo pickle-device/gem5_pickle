@@ -296,7 +296,8 @@ MemoryRequestManager::getNextRequestPacket()
 void
 MemoryRequestManager::processMemoryResponse(PacketPtr pkt)
 {
-    const Addr block_aligned_paddr = pkt->req->getPaddr();
+    const Addr paddr = pkt->req->getPaddr();
+    const Addr block_aligned_paddr = paddr & ~(cache_block_size - 1);
     assert(block_aligned_paddr % cache_block_size == 0);
 
     // Move the corresponding bookkeeper from pending_memory_queue to
