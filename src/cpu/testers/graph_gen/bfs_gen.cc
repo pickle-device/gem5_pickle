@@ -477,6 +477,7 @@ BFSGen::notifyPacketReceived(const Addr vaddr, const uint64_t vertex_id)
         if (it->getVertexId() == vertex_id) {
             // If this visitor is done, mark it for removal
             if (it->isDone()) {
+                stats.numVerticesVisited++;
                 to_be_removed_vertex_ids.insert(vertex_id);
                 continue;
             }
@@ -753,6 +754,8 @@ BFSGen::exitSimIfFinish() const
 BFSGen::BFSGenStats::BFSGenStats(BFSGen* _owner)
   : statistics::Group(_owner),
     owner(_owner),
+    ADD_STAT(numVerticesVisited, statistics::units::Count::get(),
+        "Number of vertices visited during BFS traversal."),
     ADD_STAT(numResponsesReceived, statistics::units::Count::get(),
         "Number of responses received from memory.")
 {

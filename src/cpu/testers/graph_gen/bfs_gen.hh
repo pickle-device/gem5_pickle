@@ -206,6 +206,7 @@ class BFSGen : public ClockedObject
     {
         BFSGen* owner;
 
+        statistics::Scalar numVerticesVisited;
         statistics::Scalar numResponsesReceived;
 
         BFSGenStats(BFSGen* _owner);
