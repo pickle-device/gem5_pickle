@@ -59,3 +59,4 @@ class PrefetchAgent(BasePrefetcher):
     prefetch_on_pf_hit = True
     use_virtual_addresses = False
     page_bytes = "4KiB"
+    send_whole_cache_block_on_cache_access_observation = True

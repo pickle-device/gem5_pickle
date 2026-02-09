@@ -89,6 +89,9 @@ class BasePrefetcher(ClockedObject):
     page_bytes = Param.MemorySize(
         "4KiB", "Size of pages for virtual addresses"
     )
+    send_whole_cache_block_on_cache_access_observation = Param.Bool(
+        False, "Send the whole cache block on cache access observation"
+    )
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
