@@ -114,6 +114,8 @@ class IndirectionCandidateScoreboard
       bool _deprioritize_previously_unsuccessful_match,
       DifferentialMatchingPrefetcherInterface *_prefetcher_interface
     );
+    // Return true if the scoreboard is full.
+    bool isFull() const;
     // Add a new entry for the given index PC. Return true if added
     // successfully.
     bool addEntry(const Addr index_pc);

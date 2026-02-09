@@ -141,6 +141,12 @@ IndirectionCandidateScoreboard::IndirectionCandidateScoreboard(
 }
 
 bool
+IndirectionCandidateScoreboard::isFull() const
+{
+    return scoreboard.size() >= max_num_entries;
+}
+
+bool
 IndirectionCandidateScoreboard::addEntry(const Addr index_pc)
 {
     // If the index PC already exists, do nothing
@@ -151,11 +157,16 @@ IndirectionCandidateScoreboard::addEntry(const Addr index_pc)
     }
 
     // If the scoreboard is not full, add a new entry
-    if (scoreboard.size() < max_num_entries) {
+    if (!isFull()) {
         scoreboard.emplace_back(
             index_pc, max_num_entries, sample_window_size
         );
         DMP_ICS_DEBUG("Added index PC %#x to ICS\n", index_pc);
+        // If still not full, notify the prefetcher interface that ICS has
+        // available slots for new candidates
+        if (!isFull()) {
+            prefetcher_interface->handleIcsHasAvailableSlots();
+        }
         return true;
     }
     return false;
@@ -226,6 +237,7 @@ IndirectionCandidateScoreboard::trackL1CacheMiss(const Addr target_pc)
         ),
         scoreboard.end()
     );
+    prefetcher_interface->handleIcsHasAvailableSlots();
 }
 
 void
