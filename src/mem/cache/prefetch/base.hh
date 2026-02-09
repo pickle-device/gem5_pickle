@@ -320,6 +320,8 @@ class Base : public ClockedObject
 
     const Addr pageBytes;
 
+    const bool sendWholeCacheBlockOnCacheAccessObservation;
+
     /** Prefetch on every access, not just misses */
     const bool prefetchOnAccess;
 
@@ -413,6 +415,9 @@ class Base : public ClockedObject
     virtual PacketPtr getPacket() = 0;
 
     virtual Tick nextPrefetchReadyTime() const = 0;
+
+
+    bool getWholeCacheBlockOnCacheAccessObservation() const;
 
     void
     prefetchUnused()

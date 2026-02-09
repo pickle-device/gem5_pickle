@@ -82,6 +82,8 @@ class RubyPrefetcherProxy : public CacheAccessor, public Named
                         prefetch::Base* prefetcher,
                         MessageBuffer *pf_queue);
 
+    const Addr blockSizeBytes;
+
     /** Deschedled the ready prefetch event */
     void deschedulePrefetch();
 

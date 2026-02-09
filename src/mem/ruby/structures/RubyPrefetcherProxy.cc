@@ -50,6 +50,7 @@ RubyPrefetcherProxy::RubyPrefetcherProxy(AbstractController* _parent,
                           prefetch::Base* _prefetcher,
                           MessageBuffer *_pf_queue)
     :Named(_parent->name()),
+    blockSizeBytes(_parent->m_ruby_system->getBlockSizeBytes()),
     prefetcher(_prefetcher),
     cacheCntrl(_parent),
     pfQueue(_pf_queue),
@@ -168,9 +169,12 @@ RubyPrefetcherProxy::notifyPfHit(const RequestPtr& req, bool is_read,
     assert(req);
     Packet pkt(req, is_read ? Packet::makeReadCmd(req) :
                               Packet::makeWriteCmd(req));
-    // NOTE: for now we only communicate physical address with prefetchers
-    pkt.dataStaticConst<uint8_t>(data_blk.getData(getOffset(req->getPaddr()),
-                                  pkt.getSize()));
+    if (prefetcher->getWholeCacheBlockOnCacheAccessObservation()) {
+        pkt.dataStaticConst<uint8_t>(data_blk.getData(0, blockSizeBytes));
+    } else {
+        pkt.dataStaticConst<uint8_t>(
+            data_blk.getData(getOffset(req->getPaddr()), pkt.getSize()));
+    }
     DPRINTF(HWPrefetch, "notify hit: %s\n", pkt.print());
     ppHit->notify(CacheAccessProbeArg(&pkt, *this));
     scheduleNextPrefetch();
@@ -202,9 +206,12 @@ RubyPrefetcherProxy::notifyPfFill(const RequestPtr& req,
     Packet pkt(req, Packet::makeReadCmd(req));
     if (from_pf)
         pkt.cmd = Packet::Command::HardPFReq;
-    // NOTE: for now we only communicate physical address with prefetchers
-    pkt.dataStaticConst<uint8_t>(data_blk.getData(getOffset(req->getPaddr()),
-                                  pkt.getSize()));
+    if (prefetcher->getWholeCacheBlockOnCacheAccessObservation()) {
+        pkt.dataStaticConst<uint8_t>(data_blk.getData(0, blockSizeBytes));
+    } else {
+        pkt.dataStaticConst<uint8_t>(
+            data_blk.getData(getOffset(req->getPaddr()), pkt.getSize()));
+    }
     DPRINTF(HWPrefetch, "notify fill: %s\n", pkt.print());
     ppFill->notify(CacheAccessProbeArg(&pkt, *this));
     scheduleNextPrefetch();

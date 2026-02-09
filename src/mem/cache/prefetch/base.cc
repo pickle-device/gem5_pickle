@@ -106,6 +106,9 @@ Base::Base(const BasePrefetcherParams &p)
       onWrite(p.on_write), onData(p.on_data), onInst(p.on_inst),
       requestorId(p.sys->getRequestorId(this)),
       pageBytes(p.page_bytes),
+      sendWholeCacheBlockOnCacheAccessObservation(
+          p.send_whole_cache_block_on_cache_access_observation
+      ),
       prefetchOnAccess(p.prefetch_on_access),
       prefetchOnPfHit(p.prefetch_on_pf_hit),
       useVirtualAddresses(p.use_virtual_addresses),
@@ -190,6 +193,12 @@ Base::observeAccess(const PacketPtr &pkt, bool miss, bool prefetched) const
     }
 
     return true;
+}
+
+bool
+Base::getWholeCacheBlockOnCacheAccessObservation() const
+{
+    return sendWholeCacheBlockOnCacheAccessObservation;
 }
 
 bool
