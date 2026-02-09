@@ -256,6 +256,7 @@ StrideTracker::emitPrefetches(
                         /*_irt_id*/ 0
                     )
                 );
+                prefetcher_interface->getStats().numStridePrefetchesEmitted++;
             }
             break;
         }

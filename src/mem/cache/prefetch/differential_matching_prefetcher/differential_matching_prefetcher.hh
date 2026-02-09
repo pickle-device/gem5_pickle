@@ -35,6 +35,7 @@
 
 #include "base/cache/associative_cache.hh"
 #include "base/sat_counter.hh"
+#include "base/statistics.hh"
 #include "base/trace.hh"
 #include "base/types.hh"
 #include "debug/DifferentialMatchingPrefetcherCacheObserverDebug.hh"
@@ -120,6 +121,7 @@ class DifferentialMatchingPrefetcher : \
     );
     ~DifferentialMatchingPrefetcher() override = default;
     void regProbeListeners() override;
+    void regStats() override;
 
   private:
     // What to do when an event happens?
@@ -180,6 +182,11 @@ class DifferentialMatchingPrefetcher : \
     // Helpers
     Addr getBlockAddress(Addr addr) const;
     uint64_t getDataFromProbe(const SimpleCacheAccessProbeArg &arg) const;
+
+  public:
+    PrefetcherStats stats;
+    PrefetcherStats& getStats() override;
+
 };
 
 } // namespace dmp

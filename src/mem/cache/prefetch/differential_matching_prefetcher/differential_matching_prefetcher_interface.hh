@@ -29,6 +29,9 @@
 #ifndef __DMP_INTERFACE_HH__
 #define __DMP_INTERFACE_HH__
 
+#include "base/statistics.hh"
+#include "base/stats/group.hh"
+#include "base/types.hh"
 #include "enums/CacheLevel.hh"
 
 namespace gem5
@@ -45,6 +48,15 @@ enum class AccessType
     Single,
     Range
 };
+
+struct PrefetcherStats : public statistics::Group
+{
+  PrefetcherStats(statistics::Group *parent);
+  statistics::Scalar numPrefetchableL1CacheHits;
+  statistics::Scalar numPrefetchableL1CacheMisses;
+  statistics::Scalar numStridePrefetchesEmitted;
+  statistics::Scalar numDMPPrefetchesEmitted;
+}; // struct PrefetcherStats
 
 class DifferentialMatchingPrefetcherInterface
 {
@@ -82,6 +94,8 @@ class DifferentialMatchingPrefetcherInterface
     // Allow other prefetchers to query whether DMP already prefetches for
     // a specific PC.
     virtual bool isATargetPC(const Addr pc) const = 0;
+    // Get the stats
+    virtual PrefetcherStats& getStats() = 0;
 };
 
 } // namespace dmp

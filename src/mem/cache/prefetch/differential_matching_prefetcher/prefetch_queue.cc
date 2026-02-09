@@ -328,6 +328,7 @@ PrefetchQueue::processCompletedPrefetchRequest(
             for (const PrefetchRequest &new_request :
                 new_prefetch_requests.value()) {
                 enqueuePendingRequest(new_request);
+                owner->getStats().numDMPPrefetchesEmitted++;
             }
         } else {
             DMP_PREFETCH_QUEUE_DEBUG(

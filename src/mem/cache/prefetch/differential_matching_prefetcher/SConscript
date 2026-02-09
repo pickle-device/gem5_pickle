@@ -46,6 +46,7 @@ SimObject(
 
 Source('differential_matcher.cc')
 Source('differential_matching_prefetcher.cc')
+Source('differential_matching_prefetcher_interface.cc')
 Source('index_queue.cc')
 Source('indirect_relation_table.cc')
 Source('indirection_candidate_scoreboard.cc')

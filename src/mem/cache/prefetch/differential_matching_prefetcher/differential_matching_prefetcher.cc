@@ -33,6 +33,7 @@
 #include "base/intmath.hh"
 #include "base/logging.hh"
 #include "base/random.hh"
+#include "base/statistics.hh"
 #include "base/trace.hh"
 #include "debug/DifferentialMatchingPrefetcherCacheObserverDebug.hh"
 #include "debug/DifferentialMatchingPrefetcherDebug.hh"
@@ -117,7 +118,8 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
         p.indirect_relation_table_num_entries,
         /*_max_num_range_table_entries*/
         p.range_table_num_entries
-    )
+    ),
+    stats(this)
 {
     panic_if(l1_controller == nullptr,
             "L1 controller pointer passed to DMP prefetcher is null");
@@ -300,6 +302,12 @@ DifferentialMatchingPrefetcher::regProbeListeners()
     pm->addListener("DataMovementWriteback", *(listeners.back()));
 }
 
+void
+DifferentialMatchingPrefetcher::regStats()
+{
+    ProbeListenerObject::regStats();
+}
+
 bool
 DifferentialMatchingPrefetcher::isObservable(
     const SimpleCacheAccessProbeArg &arg
@@ -317,6 +325,8 @@ DifferentialMatchingPrefetcher::observeL1CacheHit(
     if (!isObservable(arg)) {
         return;
     }
+
+    stats.numPrefetchableL1CacheHits++;
 
     if (!arg.hasCacheFillData()) {
         // We only care about cache hits with data
@@ -359,6 +369,8 @@ DifferentialMatchingPrefetcher::observeL1CacheMiss(
     if (!isObservable(arg)) {
         return;
     }
+
+    stats.numPrefetchableL1CacheMisses++;
 
     DMP_CACHE_OBSERVER_DEBUG(
         "DMP L1 Cache MISS observed: paddr=%#x, vaddr=%#x, size=%d, pc=%#x, "
@@ -483,6 +495,12 @@ DifferentialMatchingPrefetcher::getDataFromProbe(
         pkt_data |= static_cast<uint64_t>(pkt_data_ptr[i]) << (i*8);
     }
     return pkt_data;
+}
+
+PrefetcherStats&
+DifferentialMatchingPrefetcher::getStats()
+{
+    return stats;
 }
 
 } // namespace dmp
