@@ -71,7 +71,8 @@ PrefetchQueue::PrefetchQueue(
         /*mmu*/ params.mmu,
         /*request_propagation_delay*/ request_propagation_delay
     ),
-    indirect_relation_table(nullptr)
+    indirect_relation_table(nullptr),
+    stats(this)
 {
 }
 
@@ -109,6 +110,11 @@ PrefetchQueue::enqueuePendingRequest(PrefetchRequest prefetch_request)
     const Addr prefetch_pc = prefetch_request.target_pc;
     can_coalesce = (prefetch_request_it != prefetch_requests.end());
 
+    stats.num_enqueued_requests++;
+    if (can_coalesce) {
+        stats.num_requests_after_coalescing++;
+    }
+
     // Check if the data is already in the cache. Since the protocol does
     // not record a local prefetch hit as a hit event, we need to directly
     // acquire the data from the controller.
@@ -116,6 +122,7 @@ PrefetchQueue::enqueuePendingRequest(PrefetchRequest prefetch_request)
         prefetch_vaddr_block_aligned
     );
     if (entry != nullptr) {
+        stats.num_requests_fulfilled_by_local_cache++;
         DMP_PREFETCH_QUEUE_DEBUG(
             "Prefetch request for vaddr 0x%llx hits in cache. "
             "No need to enqueue the request.\n",
@@ -272,6 +279,7 @@ PrefetchQueue::processCompletedPrefetchRequest(
 
     std::list<PrefetchRequest> &requests = prefetch_request_it->second;
     for (PrefetchRequest &prefetch_request : requests) {
+        stats.num_requests_fulfilled_by_prefetching++;
         const Addr request_vaddr = prefetch_request.prefetch_vaddr;
         const Addr target_pc = prefetch_request.target_pc;
         DMP_PREFETCH_QUEUE_DEBUG(
@@ -346,6 +354,34 @@ PrefetchQueue::processCompletedPrefetchRequest(
         "prefetch queue, queue size %lu\n",
         prefetch_vaddr_block_aligned, prefetch_requests.size()
     );
+}
+
+PrefetchQueue::PrefetchQueueStats::PrefetchQueueStats(
+    statistics::Group* parent
+) : statistics::Group(parent, "PrefetchQueueStats"),
+    ADD_STAT(
+        num_enqueued_requests, statistics::units::Count::get(),
+        "Number of prefetch requests enqueued to the prefetch queue"
+    ),
+    ADD_STAT(
+        num_requests_after_coalescing, statistics::units::Count::get(),
+        "Number of prefetch requests after coalescing the requests for the "
+        "same cache block"
+    ),
+    ADD_STAT(
+        num_dropped_requests_due_to_full_queue,
+        statistics::units::Count::get(),
+        "Number of prefetch requests dropped due to full prefetch queue"
+    ),
+    ADD_STAT(
+        num_requests_fulfilled_by_local_cache, statistics::units::Count::get(),
+        "Number of prefetch requests fulfilled by local cache hits"
+    ),
+    ADD_STAT(
+        num_requests_fulfilled_by_prefetching, statistics::units::Count::get(),
+        "Number of prefetch requests fulfilled by prefetching"
+    )
+{
 }
 
 }; // namespace dmp

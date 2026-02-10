@@ -36,6 +36,8 @@
 
 #include "arch/generic/mmu.hh"
 #include "base/logging.hh"
+#include "base/statistics.hh"
+#include "base/stats/group.hh"
 #include "base/types.hh"
 #include "debug/DifferentialMatchingPrefetcherPrefetchQueueDebug.hh"
 #include "enums/PrefetchQueueReplacementPolicy.hh"
@@ -148,6 +150,18 @@ class PrefetchQueue : public ClockedObject
       const Addr prefetch_vaddr_block_aligned,
       const std::vector<uint8_t>& response_data
     );
+
+  public:
+    struct PrefetchQueueStats : public statistics::Group
+    {
+        PrefetchQueueStats(statistics::Group* parent);
+
+        statistics::Scalar num_enqueued_requests;
+        statistics::Scalar num_requests_after_coalescing;
+        statistics::Scalar num_dropped_requests_due_to_full_queue;
+        statistics::Scalar num_requests_fulfilled_by_local_cache;
+        statistics::Scalar num_requests_fulfilled_by_prefetching;
+    } stats;
 
 };  // class PrefetchQueue
 
