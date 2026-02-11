@@ -92,11 +92,13 @@ class DifferentialMatchingPrefetcher : \
     System *system;
     const uint64_t cache_line_size;
     ClockDomain *clock_domain;
+    const Addr memory_size_in_bytes;
     PrefetchQueue *dmp_prefetch_queue;
     PrefetchQueue *stride_prefetch_queue;
     ruby::AbstractController *l1_controller;
     ruby::AbstractController *l2_controller;
     EventFunctionWrapper process_detection_event;
+    const bool enable_dmp_prefetching;
 
   // prefetcher parameters
   private:

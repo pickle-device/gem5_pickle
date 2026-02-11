@@ -57,6 +57,7 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
 ) : ProbeListenerObject(p), system(p.system),
     cache_line_size(p.system->cacheLineSize()),
     clock_domain(p.clock_domain),
+    memory_size_in_bytes(p.memory_size),
     dmp_prefetch_queue(p.dmp_prefetch_queue),
     stride_prefetch_queue(p.stride_prefetch_queue),
     l1_controller(p.l1_controller),
@@ -64,6 +65,7 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
     process_detection_event(
         [this]{processDetectionEvent();}, name() + ".process_detection_event"
     ),
+    enable_dmp_prefetching(p.enable_dmp_prefetching),
     index_queue_size(p.index_queue_size),
     indirection_candidate_scoreboard_num_entries(
         p.indirection_candidate_scoreboard_num_entries
@@ -78,6 +80,7 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
     stride_tracker(
         /*capacity*/ p.index_queue_size,
         /*_confidence_threshold*/ 0.5,
+        /*_memory_size_in_bytes*/ p.memory_size,
         /*_cache_block_size*/ p.system->cacheLineSize(),
         /*_prefetch_distance*/ p.stride_prefetcher_distance,
         /*_prefetch_degree*/ p.stride_prefetcher_degree,
@@ -121,6 +124,10 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
     ),
     stats(this)
 {
+    // We use 1KiB as a placeholder value for memory size because the actual
+    // memory size is not known at the time of prefetcher construction in
+    // Python. The actual memory size must be set later.
+    panic_if(memory_size_in_bytes == 1024, "Memory size must be set");
     panic_if(l1_controller == nullptr,
             "L1 controller pointer passed to DMP prefetcher is null");
     panic_if(l2_controller == nullptr,
@@ -468,14 +475,27 @@ DifferentialMatchingPrefetcher::handleNewPrefetchedDataFromStridePrefetcher(
                 "target_paddr=%#x, pc=%#x, new_prefetch=%#x\n",
                 target_paddr, pc, new_prefetch.prefetch_vaddr
             );
-            dmp_prefetch_queue->enqueuePendingRequest(new_prefetch);
+            if (enable_dmp_prefetching) {
+                if (new_prefetch.prefetch_vaddr >= memory_size_in_bytes) {
+                    stats.numDMPPrefetchesDroppedDueToOutOfMemoryBounds++;
+                    DMP_PREFETCHER_DEBUG(
+                        "Dropping DMP prefetch request due to out of memory "
+                        "bounds: "
+                        "prefetch_vaddr=%#x, memory_size_in_bytes=%#x\n",
+                        new_prefetch.prefetch_vaddr, memory_size_in_bytes
+                    );
+                    continue;
+                }
+                dmp_prefetch_queue->enqueuePendingRequest(new_prefetch);
+            }
         }
     }
 }
 
 bool
 DifferentialMatchingPrefetcher::isATargetPC(const Addr pc) const
-{    return indirect_relation_table.isATargetPC(pc);
+{
+    return indirect_relation_table.isATargetPC(pc);
 }
 
 Addr
