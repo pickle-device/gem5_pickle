@@ -62,6 +62,9 @@ class DifferentialMatchingPrefetcherPrefetchQueue(ClockedObject):
 
     # Prefetch queue parameters
     queue_size = Param.Int(64, "Number of entries in the prefetch queue")
+    local_cache_data_access_delay = Param.Cycles(
+        "Number of cycles it takes to access data from the local cache"
+    )
     request_propagation_delay = Param.Cycles(
         "Delay for prefetch requests to propagate to prefetch queue"
     )
