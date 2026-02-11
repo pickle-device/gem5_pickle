@@ -83,6 +83,7 @@ CompoundFlag(
         'DifferentialMatchingPrefetcherMemoryRequestManagerDebug',
         'DifferentialMatchingPrefetcherPrefetchQueueDebug',
         'DifferentialMatchingPrefetcherRangeTableDebug',
-        'DifferentialMatchingPrefetcherStrideTrackerDebug'
+        'DifferentialMatchingPrefetcherStrideTrackerDebug',
+        'DifferentialMatchingPrefetcherPrefetchAgentDebug',
     ]
 )
