@@ -32,6 +32,7 @@
 #include <cstdint>
 #include <list>
 #include <queue>
+#include <tuple>
 #include <vector>
 
 #include "arch/generic/mmu.hh"
@@ -44,11 +45,13 @@
 #include "mem/cache/prefetch/differential_matching_prefetcher/indirect_relation_table.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/memory_request_manager.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_request.hh"
+#include "mem/cache/prefetch/differential_matching_prefetcher/util.hh"
 #include "mem/packet.hh"
 #include "mem/ruby/protocol/CHI/Cache_Controller.hh"
 #include "mem/ruby/slicc_interface/AbstractController.hh"
 #include "params/DifferentialMatchingPrefetcherPrefetchQueue.hh"
 #include "sim/clocked_object.hh"
+#include "sim/eventq.hh"
 #include "sim/probe/probe.hh"
 #include "sim/system.hh"
 
@@ -86,6 +89,16 @@ class PrefetchQueue : public ClockedObject
     const Addr cache_block_size;
     const Addr block_shift;
 
+    // This event is used to process the new prefetch requests generated after
+    // processing the completed prefetch requests.
+    EventFunctionWrapper processPendingNewPrefetchRequestsEvent;
+    // This event is used to send stride prefetch results from the L1 prefetch
+    // queue to the DMP.
+    EventFunctionWrapper sendPrefetchedDataFromStridePrefetcherToDMPEvent;
+
+    // The delay of getting data out of the local cache.
+    Cycles local_cache_data_access_delay;
+
     // Regardless of whether we do prefetch address generation in the L1 cache
     // or the L2 cache side, there is always some delay of sending the request
     // from L1 to L2. This delay is modeled here.
@@ -110,6 +123,27 @@ class PrefetchQueue : public ClockedObject
     // the differential matcher.
     IndirectRelationTable* indirect_relation_table;
 
+    // This queue is used to hold the new prefetch requests generated after
+    // processing the completed prefetch requests. These have yet to be
+    // coalesced.
+    // We use a separate queue to avoid interfering with the ongoing processing
+    // of the current prefetch requests in the prefetch_requests map, as the
+    // new requests may have addresses that overlap with the current requests,
+    // and we don't want to process them together.
+    std::queue<PrefetchRequest> pending_new_requests;
+
+    // This queue is used to hold stride prefetch results that are generated
+    // in the L1 prefetch queue and need to be sent to the DMP. Since the
+    // stride result will generate new prefetch requests in the DMP in the
+    // same cycle, and we don't want to interfere with the ongoing processing
+    // of the current prefetch requests in the prefetch_requests map, we use a
+    // separate queue to hold, we can process them later without affecting the
+    // current requests.
+    // The tuple contains the vaddr of the prefetched block (this vaddr is only
+    // for debugging purposes), the pc of the stride, and the prefetched data.
+    std::queue<std::tuple<Addr, Addr, uint64_t>>
+      pending_stride_prefetch_results;
+
   public:
     PARAMS(DifferentialMatchingPrefetcherPrefetchQueue);
     PrefetchQueue(
@@ -120,6 +154,11 @@ class PrefetchQueue : public ClockedObject
     void setIndirectRelationTable(IndirectRelationTable* irt);
     bool enqueuePendingRequest(PrefetchRequest prefetch_request);
     bool isFull() const;
+    void processPendingNewPrefetchRequests();
+    void processPendingStridePrefetchResults();
+    void scheduleProcessPendingNewPrefetchRequestsEvent();
+    void scheduleProcessPendingStridePrefetchResultsEvent();
+
 
     // Memory request interface
     bool hasPendingMemoryRequests() const;
@@ -148,7 +187,8 @@ class PrefetchQueue : public ClockedObject
     // responsible for consulting the IRT and generating new prefetch requests.
     void processCompletedPrefetchRequest(
       const Addr prefetch_vaddr_block_aligned,
-      const std::vector<uint8_t>& response_data
+      const std::vector<uint8_t>& response_data,
+      const bool is_prefetch_hit_in_local_cache
     );
 
   public:

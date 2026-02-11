@@ -29,6 +29,8 @@
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_queue.hh"
 
 #include <list>
+#include <tuple>
+#include <utility>
 
 #include "base/types.hh"
 #include "enums/CacheLevel.hh"
@@ -61,6 +63,15 @@ PrefetchQueue::PrefetchQueue(
     queue_size(params.queue_size),
     cache_block_size(params.system->cacheLineSize()),
     block_shift(log2(params.system->cacheLineSize())),
+    processPendingNewPrefetchRequestsEvent(
+        [this]{ processPendingNewPrefetchRequests(); },
+        "Prefetch Queue Process Pending New Prefetch Requests Event"
+    ),
+    sendPrefetchedDataFromStridePrefetcherToDMPEvent(
+        [this]{ processPendingStridePrefetchResults(); },
+        "Prefetch Queue Process Pending Stride Prefetch Results Event"
+    ),
+    local_cache_data_access_delay(params.local_cache_data_access_delay),
     request_propagation_delay(params.request_propagation_delay),
     skip_address_translation(params.mmu == nullptr),
     memory_request_manager(
@@ -69,6 +80,7 @@ PrefetchQueue::PrefetchQueue(
         /*cache_block_size*/ cache_block_size,
         /*requestor_id*/ params.system->getRequestorId(this),
         /*mmu*/ params.mmu,
+        /*local_cache_data_access_delay*/ local_cache_data_access_delay,
         /*request_propagation_delay*/ request_propagation_delay
     ),
     indirect_relation_table(nullptr),
@@ -89,6 +101,7 @@ PrefetchQueue::setCacheController(ruby::AbstractController* _cache_controller)
         _cache_controller
     );
     assert(cache_controller != nullptr);
+    memory_request_manager.setCacheController(cache_controller);
 }
 
 void
@@ -115,36 +128,6 @@ PrefetchQueue::enqueuePendingRequest(PrefetchRequest prefetch_request)
         stats.num_requests_after_coalescing++;
     }
 
-    // Check if the data is already in the cache. Since the protocol does
-    // not record a local prefetch hit as a hit event, we need to directly
-    // acquire the data from the controller.
-    ruby::CHI::Cache_CacheEntry* entry = cache_controller->getCacheEntry(
-        prefetch_vaddr_block_aligned
-    );
-    if (entry != nullptr) {
-        stats.num_requests_fulfilled_by_local_cache++;
-        DMP_PREFETCH_QUEUE_DEBUG(
-            "Prefetch request for vaddr 0x%llx hits in cache. "
-            "No need to enqueue the request.\n",
-            prefetch_request.prefetch_vaddr
-        );
-        // We can directly process the completed prefetch request without
-        // sending a memory request, as the data is already in the cache.
-        // TODO: model the delay of sending the request to L1/L2 and getting
-        // the response back
-        const ruby::DataBlock& response_data = entry->getDataBlk();
-        const uint8_t* response_data_ptr = response_data.getData(
-            0, cache_block_size
-        );
-        std::vector<uint8_t> response_data_vec(
-            response_data_ptr, response_data_ptr + cache_block_size
-        );
-        processCompletedPrefetchRequest(
-            prefetch_vaddr_block_aligned, response_data_vec
-        );
-        return true;
-    }
-
     if (can_coalesce) {
         // Coalesce the prefetch request
         std::list<PrefetchRequest> &existing_request =
@@ -159,6 +142,7 @@ PrefetchQueue::enqueuePendingRequest(PrefetchRequest prefetch_request)
         // TODO: implement a more sophisticated replacement policy when the
         // queue is full, instead of simply rejecting
         if (isFull()) {
+            stats.num_dropped_requests_due_to_full_queue++;
             DMP_PREFETCH_QUEUE_DEBUG(
                 "Prefetch queue is full. Cannot enqueue prefetch "
                 "request for vaddr 0x%llx\n",
@@ -190,8 +174,65 @@ PrefetchQueue::enqueuePendingRequest(PrefetchRequest prefetch_request)
 bool
 PrefetchQueue::isFull() const
 {
-    const uint64_t current_size = prefetch_requests.size();
+    const uint64_t current_size =
+        prefetch_requests.size() + pending_new_requests.size();
     return current_size >= queue_size;
+}
+
+void
+PrefetchQueue::processPendingNewPrefetchRequests()
+{
+    while (!pending_new_requests.empty()) {
+        PrefetchRequest prefetch_request = pending_new_requests.front();
+        pending_new_requests.pop();
+        enqueuePendingRequest(prefetch_request);
+    }
+}
+
+void
+PrefetchQueue::processPendingStridePrefetchResults()
+{
+    while (!pending_stride_prefetch_results.empty()) {
+        std::tuple<Addr, Addr, uint64_t> stride_prefetch_result =
+            pending_stride_prefetch_results.front();
+        const Addr stride_prefetch_vaddr = std::get<0>(stride_prefetch_result);
+        const Addr stride_pc = std::get<1>(stride_prefetch_result);
+        const uint64_t prefetched_data = std::get<2>(stride_prefetch_result);
+        pending_stride_prefetch_results.pop();
+        // Process the stride prefetch result
+        owner->handleNewPrefetchedDataFromStridePrefetcher(
+            /*target_paddr*/ stride_prefetch_vaddr,
+            /*pc*/ stride_pc,
+            /*data*/ prefetched_data
+        );
+    }
+}
+
+void
+PrefetchQueue::scheduleProcessPendingNewPrefetchRequestsEvent()
+{
+    const bool event_already_scheduled =
+        processPendingNewPrefetchRequestsEvent.scheduled();
+    const bool has_pending_new_requests = !pending_new_requests.empty();
+    if (!event_already_scheduled && has_pending_new_requests) {
+        const Tick scheduled_tick = curTick() + cyclesToTicks(Cycles(1));
+        schedule(processPendingNewPrefetchRequestsEvent, scheduled_tick);
+    }
+}
+
+void
+PrefetchQueue::scheduleProcessPendingStridePrefetchResultsEvent()
+{
+    const bool event_already_scheduled =
+        sendPrefetchedDataFromStridePrefetcherToDMPEvent.scheduled();
+    const bool has_pending_stride_prefetch_results =
+        !pending_stride_prefetch_results.empty();
+    if (!event_already_scheduled && has_pending_stride_prefetch_results) {
+        const Tick scheduled_tick = curTick() + cyclesToTicks(Cycles(1));
+        schedule(
+            sendPrefetchedDataFromStridePrefetcherToDMPEvent, scheduled_tick
+        );
+    }
 }
 
 bool
@@ -262,7 +303,8 @@ PrefetchQueue::notifyMemoryRequestCompleted(PacketPtr pkt)
 void
 PrefetchQueue::processCompletedPrefetchRequest(
     const Addr prefetch_vaddr_block_aligned,
-    const std::vector<uint8_t>& response_data
+    const std::vector<uint8_t>& response_data,
+    const bool is_prefetch_hit_in_local_cache
 )
 {
     auto prefetch_request_it = prefetch_requests.find(
@@ -279,7 +321,11 @@ PrefetchQueue::processCompletedPrefetchRequest(
 
     std::list<PrefetchRequest> &requests = prefetch_request_it->second;
     for (PrefetchRequest &prefetch_request : requests) {
-        stats.num_requests_fulfilled_by_prefetching++;
+        if (is_prefetch_hit_in_local_cache) {
+            stats.num_requests_fulfilled_by_local_cache++;
+        } else {
+            stats.num_requests_fulfilled_by_prefetching++;
+        }
         const Addr request_vaddr = prefetch_request.prefetch_vaddr;
         const Addr target_pc = prefetch_request.target_pc;
         DMP_PREFETCH_QUEUE_DEBUG(
@@ -310,11 +356,19 @@ PrefetchQueue::processCompletedPrefetchRequest(
                 prefetch_vaddr_block_aligned, request_vaddr, target_pc,
                 prefetch_request.size, prefetch_request.getResponse()
             );
-            owner->handleNewPrefetchedDataFromStridePrefetcher(
-                /*target_paddr*/ request_vaddr,
-                /*pc*/ target_pc,
-                /*data*/ prefetch_request.getResponse()
+            // TODO:: fix this
+            //owner->handleNewPrefetchedDataFromStridePrefetcher(
+            //    /*target_paddr*/ request_vaddr,
+            //    /*pc*/ target_pc,
+            //    /*data*/ prefetch_request.getResponse()
+            //);
+            pending_stride_prefetch_results.push(
+                std::make_tuple(
+                    request_vaddr, target_pc, prefetch_request.getResponse()
+                )
             );
+            scheduleProcessPendingStridePrefetchResultsEvent();
+            continue;
         }
 
         // Now we consult the IRT to generate new prefetch requests based on
@@ -335,7 +389,10 @@ PrefetchQueue::processCompletedPrefetchRequest(
         if (new_prefetch_requests.has_value()) {
             for (const PrefetchRequest &new_request :
                 new_prefetch_requests.value()) {
-                enqueuePendingRequest(new_request);
+                //enqueuePendingRequest(new_request);
+                // TODO: fix this
+                pending_new_requests.push(new_request);
+                scheduleProcessPendingNewPrefetchRequestsEvent();
                 owner->getStats().numDMPPrefetchesEmitted++;
             }
         } else {
