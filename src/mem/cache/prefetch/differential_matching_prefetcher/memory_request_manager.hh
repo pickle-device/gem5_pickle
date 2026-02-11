@@ -30,8 +30,11 @@
 #define __DMP_MEMORY_REQUEST_MANAGER_HH__
 
 #include <cstdint>
+#include <deque>
 #include <list>
 #include <queue>
+#include <unordered_map>
+#include <utility>
 
 #include "arch/generic/mmu.hh"
 #include "base/logging.hh"
@@ -40,6 +43,7 @@
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_request.hh"
 #include "mem/packet.hh"
 #include "mem/request.hh"
+#include "mem/ruby/protocol/CHI/Cache_Controller.hh"
 #include "sim/clock_domain.hh"
 #include "sim/eventq.hh"
 
@@ -66,8 +70,9 @@ class MemoryRequestBookkeeper
     const uint64_t request_size;
     const RequestorID requestor_id;
     const Addr pc;
+    bool local_cache_hit;
     // The earliest time when the memory request is ready, i.e., can be issued
-    const Tick ready_tick;
+    Tick ready_tick;
     // Response data
     std::vector<uint8_t> response_data;
     // Don't use the constructor directly.
@@ -91,11 +96,31 @@ class MemoryRequestBookkeeper
     PacketPtr getPacket();
     bool hasPhysicalAddress() const;
     void setDataFromPacket(PacketPtr pkt);
+    void setDataFromDataBlock(
+      const ruby::DataBlock& data_block, const uint64_t cache_block_size
+    );
+    // Return true if the memory request has received response and is already
+    // in the completed request queue, waiting for the prefetch queue to be
+    // notified. Return false otherwise.
+    bool isCompleted() const;
+    bool isReady() const;
+
   private:
     RequestPtr request;
     PacketPtr packet;
     bool has_physical_address;
 };  // class MemoryRequestBookkeeper
+
+struct ReadyTickMemoryRequestComparator
+{
+    bool operator()(
+        const std::pair<Tick, MemoryRequestBookkeeper*>& a,
+        const std::pair<Tick, MemoryRequestBookkeeper*>& b
+    ) const {
+        // The request with the smaller ready tick should have higher priority.
+        return a.first > b.first;
+    }
+};
 
 // This class manages memory requests for the DMP prefetcher.
 // - For address translation, it interacts with the core's MMU to translate
@@ -114,8 +139,15 @@ class MemoryRequestManager
     uint64_t cache_block_size;
     RequestorID requestor_id;
     BaseMMU* mmu;
+    // we need cache controller to acquire data in local cache
+    ruby::CHI::Cache_Controller* cache_controller;
+    // the delay of getting data out of the local cache
+    Cycles local_cache_data_access_delay_in_cycles;
+    // the delay of sending address translation from the prefetcher (at L1) to
+    // the prefetch queue (at L1 for stride prefetcher, at L2 for DMP)
     Cycles request_propagation_delay_in_cycles;
     const bool skip_address_translation;
+    Tick previous_local_cache_access_completion_tick;
 
     // Mapping from block-aligned address to outstanding memory request
     // bookkeeper. When skip_address_translation is false, the key is the
@@ -136,21 +168,27 @@ class MemoryRequestManager
     std::queue<MemoryRequestBookkeeper*> pending_translation_queue;
     // Requests that are ready to be issued to the memory system, but have not
     // yet been issued.
-    std::queue<MemoryRequestBookkeeper*> pending_memory_queue;
+    std::deque<MemoryRequestBookkeeper*> pending_memory_queue;
     // Requests that have been completed (either successfully or
     // unsuccessfully), but the prefetch queue has not yet been notified.
-    std::queue<MemoryRequestBookkeeper*> completed_request_queue;
+    std::priority_queue<
+      std::pair<Tick, MemoryRequestBookkeeper*>,
+      std::vector<std::pair<Tick, MemoryRequestBookkeeper*>>,
+      ReadyTickMemoryRequestComparator
+    > completed_request_queue;
 
     // Event handlers
-    EventFunctionWrapper processPendingTranslationQueueEvent;
-    EventFunctionWrapper processCompletedRequestEvent;
+    EventFunctionWrapper process_pending_translation_queue_event;
+    EventFunctionWrapper process_completed_request_event;
 
   public:
     MemoryRequestManager(
       PrefetchQueue* _owner, ClockDomain* _clock_domain,
       uint64_t _cache_block_size, const RequestorID _requestor_id,
-      BaseMMU* _mmu, const Cycles _request_propagation_delay
+      BaseMMU* _mmu, const Cycles _local_cache_data_access_delay_in_cycles,
+      const Cycles _request_propagation_delay
     );
+    void setCacheController(ruby::CHI::Cache_Controller* _cache_controller);
 
     // Return:
     // - true if the prefetch request is successfully enqueued,
@@ -167,6 +205,7 @@ class MemoryRequestManager
     Tick getNextReadyRequestTick() const;
     PacketPtr getNextRequestPacket();
 
+    void processLocalCacheHitsFromPendingMemoryQueue();
     void processMemoryResponse(PacketPtr pkt);
 
   private:

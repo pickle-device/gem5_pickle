@@ -32,6 +32,7 @@
 
 #include "arch/generic/mmu.hh"
 #include "base/logging.hh"
+#include "base/types.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_queue.hh"
 #include "mem/packet.hh"
 #include "mem/request.hh"
@@ -53,8 +54,8 @@ MemoryRequestBookkeeper::MemoryRequestBookkeeper(
       const Addr _pc, const Tick _ready_tick, const bool has_physical_address
 ) : request_vaddr(_request_vaddr), request_paddr(_request_paddr),
     request_size(_request_size), requestor_id(_requestor_id), pc(_pc),
-    ready_tick(_ready_tick), request(nullptr), packet(nullptr),
-    has_physical_address(has_physical_address)
+    local_cache_hit(false), ready_tick(_ready_tick), request(nullptr),
+    packet(nullptr), has_physical_address(has_physical_address)
 {
 }
 
@@ -153,24 +154,59 @@ MemoryRequestBookkeeper::setDataFromPacket(PacketPtr pkt)
     response_data.assign(data_ptr, data_ptr + request_size);
 }
 
+void
+MemoryRequestBookkeeper::setDataFromDataBlock(
+    const ruby::DataBlock& data_block, const uint64_t cache_block_size
+)
+{
+    const uint8_t* data_ptr = data_block.getData(0, cache_block_size);
+    response_data.assign(data_ptr, data_ptr + request_size);
+}
+
+bool
+MemoryRequestBookkeeper::isCompleted() const
+{
+    return !response_data.empty();
+}
+
+bool
+MemoryRequestBookkeeper::isReady() const
+{
+    return curTick() >= ready_tick;
+}
+
 MemoryRequestManager::MemoryRequestManager(
     PrefetchQueue* _owner, ClockDomain* _clock_domain,
     uint64_t _cache_block_size, const RequestorID _requestor_id, BaseMMU* _mmu,
+    const Cycles _local_cache_data_access_delay_in_cycles,
     const Cycles _request_propagation_delay
 ) : owner(_owner), clock_domain(_clock_domain),
     cache_block_size(_cache_block_size),
     requestor_id(_requestor_id), mmu(_mmu),
+    cache_controller(nullptr),
+    local_cache_data_access_delay_in_cycles(
+        _local_cache_data_access_delay_in_cycles
+    ),
     request_propagation_delay_in_cycles(_request_propagation_delay),
     skip_address_translation(_mmu != nullptr),
-    processPendingTranslationQueueEvent(
+    previous_local_cache_access_completion_tick(0),
+    process_pending_translation_queue_event(
         [this]{ processPendingTranslationQueue(); },
         "DMP MemoryRequestManager Process Pending Translation Queue Event"
     ),
-    processCompletedRequestEvent(
+    process_completed_request_event(
         [this]{ processCompletedRequestQueue(); },
         "DMP MemoryRequestManager Process Completed Request Queue Event"
     )
 {
+}
+
+void
+MemoryRequestManager::setCacheController(
+    ruby::CHI::Cache_Controller* _cache_controller
+)
+{
+    cache_controller = _cache_controller;
 }
 
 bool
@@ -256,7 +292,7 @@ MemoryRequestManager::enqueuePrefetchRequestUsingPhysicalAddr(
         );
     outstanding_requests[block_aligned_paddr] = bookkeeper;
     paddr_to_vaddr[block_aligned_paddr] = block_aligned_paddr;
-    pending_memory_queue.push(bookkeeper);
+    pending_memory_queue.push_back(bookkeeper);
 
     // The ruby prefetch proxy will check the pending memory queue and send out
     // requests when they are ready, so we don't need to schedule an event
@@ -282,6 +318,8 @@ MemoryRequestManager::getNextReadyRequestTick() const
 PacketPtr
 MemoryRequestManager::getNextRequestPacket()
 {
+    processLocalCacheHitsFromPendingMemoryQueue();
+
     if (!hasPendingMemoryRequests()) {
         return nullptr;
     }
@@ -289,8 +327,74 @@ MemoryRequestManager::getNextRequestPacket()
     // prefetcher proxy will check that before calling getNextRequestPacket.
     // We just return the packet of the next request to be issued.
     MemoryRequestBookkeeper* bookkeeper = pending_memory_queue.front();
-    pending_memory_queue.pop();
+    pending_memory_queue.pop_front();
+    //processLocalCacheHitsFromPendingMemoryQueue();
     return bookkeeper->getPacket();
+}
+
+void
+MemoryRequestManager::processLocalCacheHitsFromPendingMemoryQueue()
+{
+    bool has_new_completed_request = false;
+    while (true) {
+        if (pending_memory_queue.empty()) {
+            break;
+        }
+        MemoryRequestBookkeeper* bookkeeper = pending_memory_queue.front();
+        if (bookkeeper->isCompleted()) {
+            // Just to make sure we don't process the same completed request
+            // multiple times.
+            pending_memory_queue.pop_front();
+            continue;
+        }
+        const Addr block_aligned_paddr = bookkeeper->request_paddr;
+        ruby::CHI::Cache_CacheEntry* entry =
+            cache_controller->getCacheEntry(block_aligned_paddr);
+        if (entry == nullptr) {
+            break;
+        }
+        DMP_MEMORY_MANAGER_DEBUG(
+            "Memory request for paddr 0x%llx hits in local cache. "
+            "Marking the request as completed and notifying the prefetch "
+            "queue.\n",
+            block_aligned_paddr
+        );
+        pending_memory_queue.pop_front();
+        const ruby::DataBlock& response_data = entry->getDataBlk();
+        bookkeeper->setDataFromDataBlock(response_data, cache_block_size);
+        bookkeeper->local_cache_hit = true;
+        // We serialize the access here. We only allow one local cache access
+        // at a time, and the next local cache access can only start after the
+        // current one finishes.
+        const Tick current_tick = curTick();
+        const Tick access_delay = clock_domain->cyclesToTicks(
+            local_cache_data_access_delay_in_cycles
+        );
+        Tick ready_tick_after_local_cache_access = 0;
+        if (current_tick < previous_local_cache_access_completion_tick) {
+            // if the current tick is still before the completion of the
+            // previous local cache access, we have to wait until the previous
+            // local cache access completes before we can access the local
+            // cache for this request.
+            ready_tick_after_local_cache_access =
+                previous_local_cache_access_completion_tick + access_delay;
+        } else {
+            ready_tick_after_local_cache_access = current_tick + access_delay;
+        }
+        bookkeeper->ready_tick = std::max(
+            bookkeeper->ready_tick + access_delay,
+            ready_tick_after_local_cache_access
+        );
+        previous_local_cache_access_completion_tick = bookkeeper->ready_tick;
+        completed_request_queue.push(std::make_pair(
+            bookkeeper->ready_tick, bookkeeper
+        ));
+        has_new_completed_request = true;
+    }
+
+    if (has_new_completed_request) {
+        scheduleProcessCompletedRequestQueueEvent();
+    }
 }
 
 void
@@ -329,13 +433,25 @@ MemoryRequestManager::processMemoryResponse(PacketPtr pkt)
         return;
     }
     MemoryRequestBookkeeper* bookkeeper = bookkeeper_it->second;
+    if (!bookkeeper->isReady()) {
+        return;
+    }
+    if (bookkeeper->isCompleted()) {
+        DMP_MEMORY_MANAGER_DEBUG(
+            "Received memory response for paddr 0x%llx, but the corresponding "
+            "request is already marked as completed. This can happen when the "
+            "data is fetched from the local cache first.\n",
+            block_aligned_paddr
+        );
+        return;
+    }
 
     // copy the data as it will be deleted after this function returns
+    bookkeeper->ready_tick = std::max(bookkeeper->ready_tick, curTick());
     bookkeeper->setDataFromPacket(pkt);
-
-    paddr_to_vaddr.erase(vaddr_it);
-    outstanding_requests.erase(block_aligned_paddr);
-    completed_request_queue.push(bookkeeper);
+    completed_request_queue.push(std::make_pair(
+        bookkeeper->ready_tick, bookkeeper
+    ));
     scheduleProcessCompletedRequestQueueEvent();
 }
 
@@ -349,12 +465,40 @@ void
 MemoryRequestManager::processCompletedRequestQueue()
 {
     while (!completed_request_queue.empty()) {
-        MemoryRequestBookkeeper* bookkeeper = completed_request_queue.front();
+        auto [ready_tick, bookkeeper] = completed_request_queue.top();
+        if (ready_tick > curTick()) {
+            // The requests in the completed request queue are ordered by their
+            // ready ticks, so if the front request is not ready yet, then the
+            // rest of the requests in the queue are also not ready yet, and we
+            // can stop processing the completed request queue for now.
+            break;
+        }
+        assert(bookkeeper != nullptr);
         completed_request_queue.pop();
         owner->processCompletedPrefetchRequest(
-            /*prefetch_vaddr_block_aligned*/bookkeeper->request_vaddr,
-            /*response_data*/ bookkeeper->response_data
+            /*prefetch_vaddr_block_aligned*/ bookkeeper->request_vaddr,
+            /*response_data*/ bookkeeper->response_data,
+            /*is_prefetch_hit_in_local_cache*/ bookkeeper->local_cache_hit
         );
+        DMP_MEMORY_MANAGER_DEBUG(
+            "Removing completed request for vaddr 0x%llx from completed "
+            "request queue, ptr_address 0x%llx\n",
+            bookkeeper->request_vaddr, (uint64_t)bookkeeper
+        );
+        pending_memory_queue.erase(std::remove_if(
+            pending_memory_queue.begin(), pending_memory_queue.end(),
+            [bookkeeper](MemoryRequestBookkeeper* bk) {
+                return bk == bookkeeper;
+            }
+        ), pending_memory_queue.end());
+        //std::remove_if(
+        //    completed_request_queue.begin(), completed_request_queue.end(),
+        //    [bookkeeper](MemoryRequestBookkeeper* bk) {
+        //        return bk == bookkeeper;
+        //    }
+        //);
+        paddr_to_vaddr.erase(bookkeeper->request_paddr);
+        outstanding_requests.erase(bookkeeper->request_vaddr);
         delete bookkeeper;
     }
 }
@@ -363,7 +507,7 @@ void
 MemoryRequestManager::scheduleSendAddressTranslationRequestsEvent()
 {
     const bool event_already_scheduled =
-        processPendingTranslationQueueEvent.scheduled();
+        process_pending_translation_queue_event.scheduled();
     const bool has_pending_translation = !pending_translation_queue.empty();
     if (!event_already_scheduled && has_pending_translation) {
         const Tick scheduled_tick =
@@ -371,7 +515,9 @@ MemoryRequestManager::scheduleSendAddressTranslationRequestsEvent()
                 pending_translation_queue.front()->ready_tick,
                 curTick() + clock_domain->cyclesToTicks(Cycles(1))
             );
-        owner->schedule(processPendingTranslationQueueEvent, scheduled_tick);
+        owner->schedule(
+            process_pending_translation_queue_event, scheduled_tick
+        );
     }
 }
 
@@ -379,15 +525,21 @@ void
 MemoryRequestManager::scheduleProcessCompletedRequestQueueEvent()
 {
     const bool event_already_scheduled =
-        processCompletedRequestEvent.scheduled();
+        process_completed_request_event.scheduled();
     const bool has_completed_request = !completed_request_queue.empty();
-    if (!event_already_scheduled && has_completed_request) {
-        const Tick scheduled_tick =
-            std::max(
-                completed_request_queue.front()->ready_tick,
-                curTick() + clock_domain->cyclesToTicks(Cycles(1))
+    if (has_completed_request) {
+        auto [ready_tick, bookkeeper] = completed_request_queue.top();
+        const Tick next_ready_tick = std::max(
+            curTick() + clock_domain->cyclesToTicks(Cycles(1)),
+            ready_tick
+        );
+        if (!event_already_scheduled) {
+            owner->schedule(process_completed_request_event, next_ready_tick);
+        } else {
+            owner->reschedule(
+                process_completed_request_event, next_ready_tick
             );
-        owner->schedule(processCompletedRequestEvent, scheduled_tick);
+        }
     }
 }
 
