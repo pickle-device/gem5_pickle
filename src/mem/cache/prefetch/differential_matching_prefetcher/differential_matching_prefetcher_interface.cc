@@ -31,6 +31,7 @@
 #include <cstdint>
 
 #include "base/statistics.hh"
+#include "base/stats/group.hh"
 
 namespace gem5
 {
@@ -56,8 +57,18 @@ PrefetcherStats::PrefetcherStats(statistics::Group *parent)
         "Number of stride prefetches emitted"
     ),
     ADD_STAT(
+        numStridePrefetchesDroppedDueToOutOfMemoryBounds,
+        statistics::units::Count::get(),
+        "Number of stride prefetches dropped due to out of memory bounds"
+    ),
+    ADD_STAT(
         numDMPPrefetchesEmitted, statistics::units::Count::get(),
         "Number of DMP prefetches emitted"
+    ),
+    ADD_STAT(
+        numDMPPrefetchesDroppedDueToOutOfMemoryBounds,
+        statistics::units::Count::get(),
+        "Number of DMP prefetches dropped due to out of memory bounds"
     )
 {
 }

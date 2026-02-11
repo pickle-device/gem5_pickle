@@ -55,7 +55,9 @@ struct PrefetcherStats : public statistics::Group
   statistics::Scalar numPrefetchableL1CacheHits;
   statistics::Scalar numPrefetchableL1CacheMisses;
   statistics::Scalar numStridePrefetchesEmitted;
+  statistics::Scalar numStridePrefetchesDroppedDueToOutOfMemoryBounds;
   statistics::Scalar numDMPPrefetchesEmitted;
+  statistics::Scalar numDMPPrefetchesDroppedDueToOutOfMemoryBounds;
 }; // struct PrefetcherStats
 
 class DifferentialMatchingPrefetcherInterface
