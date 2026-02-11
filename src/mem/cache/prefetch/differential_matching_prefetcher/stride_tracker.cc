@@ -97,13 +97,14 @@ bool StrideTrackerEntry::isConfident() const
 
 StrideTracker::StrideTracker(
   const uint64_t _capacity, const double _confidence_threshold,
-  const uint64_t _cache_block_size, const uint64_t _prefetch_distance,
-  const uint64_t _prefetch_degree, const bool _can_cross_page,
-  const Addr _page_size_in_bytes,
+  const Addr _memory_size_in_bytes, const uint64_t _cache_block_size,
+  const uint64_t _prefetch_distance, const uint64_t _prefetch_degree,
+  const bool _can_cross_page, const Addr _page_size_in_bytes,
   const bool _stride_prefetch_pc_even_when_dmp_has_the_same_target_pc,
   DifferentialMatchingPrefetcherInterface *_prefetcher_interface
 ) : capacity(_capacity),
     confidence_threshold(_confidence_threshold),
+    memory_size_in_bytes(_memory_size_in_bytes),
     cache_block_size(_cache_block_size),
     prefetch_distance(_prefetch_distance),
     prefetch_degree(_prefetch_degree),
@@ -229,6 +230,11 @@ StrideTracker::emitPrefetches(
                 ++i
             ) {
                 const Addr prefetch_address = current_paddr + i * stride;
+                if (prefetch_address >= memory_size_in_bytes) {
+                    PrefetcherStats &stats = prefetcher_interface->getStats();
+                    stats.numDMPPrefetchesDroppedDueToOutOfMemoryBounds++;
+                    break;
+                }
                 if (recentPrefetchAddresses.contains(prefetch_address)) {
                     continue;
                 }

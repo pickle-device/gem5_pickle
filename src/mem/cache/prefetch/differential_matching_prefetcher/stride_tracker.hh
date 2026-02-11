@@ -82,6 +82,7 @@ class StrideTracker
   private:
     const uint64_t capacity;
     const double confidence_threshold;
+    const Addr memory_size_in_bytes;
     const uint64_t cache_block_size;
     const uint64_t prefetch_distance;
     const uint64_t prefetch_degree;
@@ -94,7 +95,7 @@ class StrideTracker
     PrefetchQueue *prefetch_queue;
     // We use this to track recently prefetched addresses to avoid redundant
     // prefetches.
-    QueuedDict recentPrefetchAddresses;
+    QueuedSet<Addr> recentPrefetchAddresses;
     void replaceLeastRecentlyUsedEntry(
         const Addr pc, const uint64_t access_size, const Addr block_address,
         const Tick access_timestamp
@@ -102,9 +103,9 @@ class StrideTracker
   public:
     StrideTracker(
       const uint64_t _capacity, const double _confidence_threshold,
-      const uint64_t _cache_block_size, const uint64_t _prefetch_distance,
-      const uint64_t _prefetch_degree, const bool _can_cross_page,
-      const Addr _page_size_in_bytes,
+      const Addr _memory_size_in_bytes, const uint64_t _cache_block_size,
+      const uint64_t _prefetch_distance, const uint64_t _prefetch_degree,
+      const bool _can_cross_page, const Addr _page_size_in_bytes,
       const bool _stride_prefetch_pc_even_when_dmp_has_the_same_target_pc,
       DifferentialMatchingPrefetcherInterface *_prefetcher_interface
     );
