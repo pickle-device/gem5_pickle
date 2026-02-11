@@ -232,7 +232,7 @@ IndirectRelationTableEntry::getPrefetchesIfIndexPcMatches(
             // For range access, we can prefetch a range of addresses
             const uint64_t predicted_range_size =
                 range_table_entry.getPredictedRangeSize();
-            DMP_IRT_DEBUG(
+            DMP_RT_DEBUG(
                 "IndirectRelationTableEntry ID %llu: Index PC %#x matches, "
                 "data from index pc %lld, predicted range size %lu\n",
                 id, index_pc, data_from_index_pc, predicted_range_size
