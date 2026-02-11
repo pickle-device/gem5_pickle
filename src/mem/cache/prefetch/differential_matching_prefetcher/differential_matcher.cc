@@ -104,7 +104,10 @@ DifferentialMatcher::hasCandidate(
 bool
 DifferentialMatcher::addCandidate(const Addr index_pc, const Addr target_pc)
 {
-    if (isFull() || hasCandidate(index_pc, target_pc)) {
+    const bool is_full = isFull();
+    const bool has_similar_candidate = \
+        hasCandidate(index_pc, target_pc) || hasCandidate(target_pc, index_pc);
+    if (is_full || has_similar_candidate) {
         return false; // Cannot add new candidate
     }
     CandidatePcPair pc_pair = std::make_pair(index_pc, target_pc);
