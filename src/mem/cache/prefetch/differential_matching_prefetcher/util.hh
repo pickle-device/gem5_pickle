@@ -52,28 +52,76 @@ constexpr uint64_t log2(uint64_t n) {
 // Implemented as a combination of a queue and a hash set. The queue maintains
 // the order of the elements, while the hash set allows for O(1) presence
 // query.
+template <class T>
+class QueuedSet
+{
+    private:
+        std::queue<T> queue;
+        std::unordered_set<T> set;
+        size_t capacity;
+    public:
+        QueuedSet(size_t _capacity) : capacity(_capacity) {}
+        bool isFull() const {
+            if (capacity == 0) {
+                return false;
+            }
+            return queue.size() >= capacity;
+        }
+        bool contains(const T& element) const {
+            return set.find(element) != set.end();
+        }
+        void push(const T& element) {
+            if (isFull()) {
+                pop();
+            }
+            queue.push(element);
+            set.insert(element);
+        }
+        T front() const {
+            return queue.front();
+        }
+        void pop() {
+            T old_element = queue.front();
+            set.erase(old_element);
+            queue.pop();
+        }
+};  // class QueuedSet
+
+template <class Key, class Value>
 class QueuedDict
 {
     private:
-        std::queue<Addr> queue;
-        std::unordered_set<Addr> set;
+        std::queue<std::pair<Key, Value>> queue;
+        std::unordered_set<Key> set;
         size_t capacity;
     public:
         QueuedDict(size_t _capacity) : capacity(_capacity) {}
         bool isFull() const {
+            if (capacity == 0) {
+                return false;
+            }
             return queue.size() >= capacity;
         }
-        bool contains(const Addr& addr) const {
-            return set.find(addr) != set.end();
+        bool empty() const {
+            return queue.empty();
         }
-        void push(const Addr& addr) {
+        bool contains(const Key& key) const {
+            return set.find(key) != set.end();
+        }
+        void push(const std::pair<Key, Value>& pair) {
             if (isFull()) {
-                const Addr& front = queue.front();
-                set.erase(front);
-                queue.pop();
+                pop();
             }
-            queue.push(addr);
-            set.insert(addr);
+            queue.push(pair);
+            set.insert(pair.first);
+        }
+        std::pair<Key, Value>& front() {
+            return queue.front();
+        }
+        void pop() {
+            auto [old_key, old_value] = queue.front();
+            set.erase(old_key);
+            queue.pop();
         }
 };  // class QueuedDict
 
