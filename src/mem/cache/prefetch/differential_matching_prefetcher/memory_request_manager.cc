@@ -364,17 +364,12 @@ MemoryRequestManager::getNextRequestPacket()
     // We just return the packet of the next request to be issued.
     MemoryRequestBookkeeper* bookkeeper = pending_memory_queue.front();
     if (!bookkeeper->isReady()) {
-        //DMP_MEMORY_MANAGER_DEBUG(
-        //    "The next memory request for vaddr 0x%llx is not ready to be "
-        //    "issued yet. Ready tick: %lld, current tick: %lld\n",
-        //    bookkeeper->request_vaddr, bookkeeper->ready_tick, curTick()
-        //);
+        // If the next request is not ready yet, we return nullptr and wait for
+        // the prefetcher proxy to call getNextRequestPacket again when the
+        // request is ready.
+        owner->recheckPendingPrefetchRequests();
         return nullptr;
     }
-    //DMP_MEMORY_MANAGER_DEBUG(
-    //    "Issuing memory request for vaddr 0x%llx, paddr 0x%llx\n",
-    //    bookkeeper->request_vaddr, bookkeeper->request_paddr
-    //);
     pending_memory_queue.pop_front();
     stats.num_memory_request_issued++;
     processLocalCacheHitsFromPendingMemoryQueue();
@@ -394,11 +389,6 @@ MemoryRequestManager::processLocalCacheHitsFromPendingMemoryQueue()
             // Just to make sure we don't process the same completed request
             // multiple times.
             pending_memory_queue.pop_front();
-            // DMP_MEMORY_MANAGER_DEBUG(
-            //     "(local cache hit) Memory request for vaddr 0x%llx is "
-            //     "already marked as completed.\n",
-            //     bookkeeper->request_vaddr
-            // );
             continue;
         }
         const Addr block_aligned_paddr = bookkeeper->request_paddr;
@@ -412,11 +402,6 @@ MemoryRequestManager::processLocalCacheHitsFromPendingMemoryQueue()
             // and is waiting in the completed request queue to be processed,
             // so we don't need to process it again.
             pending_memory_queue.pop_front();
-            // DMP_MEMORY_MANAGER_DEBUG(
-            //     "(local cache hit) Memory request for vaddr 0x%llx is "
-            //     "already in the completed request queue.\n",
-            //     bookkeeper->request_vaddr
-            // );
             continue;
         }
         DMP_MEMORY_MANAGER_DEBUG(
@@ -494,33 +479,21 @@ MemoryRequestManager::processMemoryResponse(PacketPtr pkt)
     }
     MemoryRequestBookkeeper* bookkeeper = bookkeeper_it->second;
     if (!bookkeeper->isReady()) {
-        // DMP_MEMORY_MANAGER_DEBUG(
-        //     "Received memory response for paddr 0x%llx, but the "
-        //     "request is not ready to be completed yet. Ready tick: %lld, "
-        //     "current tick: %lld\n",
-        //     block_aligned_paddr, bookkeeper->ready_tick, curTick()
-        // );
+        // Should not happen as the prefetcher proxy only receives new
+        // prefetch requests from the MemoryRequestManager when they are ready.
         return;
     }
     if (bookkeeper->isCompleted()) {
-        // DMP_MEMORY_MANAGER_DEBUG(
-        //     "Received memory response for paddr 0x%llx, but the "
-        //     "request is already marked as completed. This can happen when "
-        //     "the data is fetched from the local cache first.\n",
-        //     block_aligned_paddr
-        // );
+        // This can happen when the request hits in the local cache and is
+        // marked as completed, then that block is evicted from the local cache
+        // before being pulled in again.
         return;
     }
 
     if (completed_request_queue.contains(block_aligned_paddr)) {
-        // This means that the request has already been marked as completed
-        // and is waiting in the completed request queue to be processed, so
-        // we don't need to process it again.
-        // DMP_MEMORY_MANAGER_DEBUG(
-        //     "Received memory response for paddr 0x%llx, but the "
-        //     "request is already in the completed request queue.\n",
-        //     block_aligned_paddr
-        // );
+        // Similar to the case above. Typically, a bookkeeper is marked as
+        // completed and put in the completed request queue at the same time.
+        // If we reach here, probably there's a bug.
         return;
     }
 
@@ -558,12 +531,6 @@ MemoryRequestManager::processCompletedRequestQueue()
             // ready ticks, so if the front request is not ready yet, then the
             // rest of the requests in the queue are also not ready yet, and we
             // can stop processing the completed request queue for now.
-            // DMP_MEMORY_MANAGER_DEBUG(
-            //     "The next completed request for vaddr 0x%llx is not ready "
-            //     "to be processed yet. "
-            //     "Ready tick: %lld, current tick: %lld\n",
-            //     bookkeeper->request_vaddr, ready_tick, curTick()
-            // );
             break;
         }
         assert(bookkeeper != nullptr);
@@ -583,17 +550,6 @@ MemoryRequestManager::processCompletedRequestQueue()
             "request queue, ptr_address 0x%llx\n",
             bookkeeper->request_vaddr, (uint64_t)bookkeeper
         );
-        //std::remove_if(
-        //    completed_request_queue.begin(), completed_request_queue.end(),
-        //    [bookkeeper](MemoryRequestBookkeeper* bk) {
-        //        return bk == bookkeeper;
-        //    }
-        //);
-        // DMP_MEMORY_MANAGER_DEBUG(
-        //     "Removing completed request for vaddr 0x%llx from outstanding "
-        //     "requests, ptr_address 0x%llx\n",
-        //     bookkeeper->request_vaddr, (uint64_t)bookkeeper
-        // );
         paddr_to_vaddr.erase(bookkeeper->request_paddr);
         outstanding_requests.erase(bookkeeper->request_vaddr);
         pending_memory_queue.erase(std::remove_if(
@@ -684,14 +640,14 @@ MemoryRequestManager::MemoryRequestManagerStats::MemoryRequestManagerStats(
     ),
     ADD_STAT(
         num_memory_requests_stuck, statistics::units::Count::get(),
-        "Number of memory requests that got stuck for more than 100000 cycles "
-        "and never got completed."
+        "Number of memory requests that got stuck for more than 10000 cycles "
+        "and never got completed"
     ),
     ADD_STAT(
         memory_request_stuck_duration_histogram,
         statistics::units::Tick::get(),
         "Histogram of memory request latency for requests that are fulfilled "
-        "by the memory system."
+        "by the memory system"
     )
 
 {
@@ -715,11 +671,13 @@ MemoryRequestManager::MemoryRequestManagerStats::preDumpStats()
 {
     statistics::Group::preDumpStats();
 
-    inform("Predump stats for MemoryRequestManager %s\n", parent->name());
-    inform("Current tick: %lu\n", curTick());
+    DMP_MEMORY_MANAGER_DEBUG(
+        "Predump stats for MemoryRequestManager %s\n", parent->name()
+    );
+    DMP_MEMORY_MANAGER_DEBUG("Current tick: %lu\n", curTick());
 
     const Tick cur_tick = curTick();
-    const Tick threshold = clock_domain->cyclesToTicks(Cycles(100000));
+    const Tick threshold = clock_domain->cyclesToTicks(Cycles(10000));
     for (
         auto &[block_aligned_vaddr, bookkeeper] : owner->outstanding_requests
     ) {
@@ -730,7 +688,7 @@ MemoryRequestManager::MemoryRequestManagerStats::preDumpStats()
             memory_request_stuck_duration_histogram.sample(
                 request_duration
             );
-            inform(
+            DMP_MEMORY_MANAGER_DEBUG(
                 "Memory request for vaddr 0x%llx has been outstanding since "
                 "tick %lld, which exceeds the threshold of %lld ticks. This "
                 "request is considered stuck.\n",

@@ -195,6 +195,11 @@ class PrefetchQueue : public ClockedObject
       const bool is_prefetch_hit_in_local_cache
     );
 
+    // This is for the MemoryRequestManager to tell the prefetcher proxy that
+    // the proxy needs to recheck the pending prefetch requests in the prefetch
+    // queue as there are still requests need to be scheduled.
+    void recheckPendingPrefetchRequests();
+
   private:
     uint64_t countNumPendingNewRequestsAfterCoalescing() const;
 

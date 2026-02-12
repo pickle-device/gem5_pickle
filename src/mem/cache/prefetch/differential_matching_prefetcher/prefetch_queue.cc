@@ -104,9 +104,11 @@ PrefetchQueue::preDumpStats()
 {
     statistics::Group::preDumpStats();
 
-    inform("Predump stats for PrefetchQueue %s\n", name());
-    inform("Current prefetch queue size: %lu\n", getQueueSize());
-    inform("Current tick: %lu\n", curTick());
+    DMP_PREFETCH_QUEUE_DEBUG("Predump stats for PrefetchQueue %s\n", name());
+    DMP_PREFETCH_QUEUE_DEBUG(
+        "Current prefetch queue size: %lu\n", getQueueSize()
+    );
+    DMP_PREFETCH_QUEUE_DEBUG("Current tick: %lu\n", curTick());
 
     // Now that we are about to exit the simulation, we want to know if there
     // are prefetches that got stuck in the queue and never got fulfilled.
@@ -116,7 +118,7 @@ PrefetchQueue::preDumpStats()
         for (const PrefetchRequest& request : requests) {
             const Tick request_latency =
                 cur_tick - request.getQueueEnteringTick();
-            if (request_latency > cyclesToTicks(Cycles(100000))) {
+            if (request_latency > cyclesToTicks(Cycles(10000))) {
                 stats.num_prefetch_requests_stuck++;
                 stats.prefetch_request_stuck_duration_histogram.sample(
                     request_latency
@@ -473,6 +475,12 @@ PrefetchQueue::processCompletedPrefetchRequest(
     );
 }
 
+void
+PrefetchQueue::recheckPendingPrefetchRequests()
+{
+    owner->notifyNewPrefetchRequest(cache_controller_level);
+}
+
 uint64_t
 PrefetchQueue::countNumPendingNewRequestsAfterCoalescing() const
 {
@@ -523,7 +531,7 @@ PrefetchQueue::PrefetchQueueStats::PrefetchQueueStats(
     ADD_STAT(
         num_prefetch_requests_stuck, statistics::units::Count::get(),
         "Number of prefetch requests that got stuck in the prefetch queue "
-        "for more than 100000 cycles and never got fulfilled"
+        "for more than 10000 cycles and never got fulfilled"
     ),
     ADD_STAT(
         prefetch_request_stuck_duration_histogram,
