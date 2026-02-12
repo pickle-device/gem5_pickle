@@ -31,6 +31,7 @@
 
 #include <cstdint>
 #include <queue>
+#include <tuple>
 #include <unordered_set>
 
 #include "base/types.hh"
@@ -124,6 +125,55 @@ class QueuedDict
             queue.pop();
         }
 };  // class QueuedDict
+
+template <class Priority, class Key, class Value, class Comparator>
+class PriorityQueuedDict
+{
+    private:
+        std::priority_queue<
+            std::tuple<Priority, Key, Value>,
+            std::vector<std::tuple<Priority, Key, Value>>,
+            Comparator
+        > queue;
+        std::unordered_set<Key> set;
+        size_t capacity;
+    public:
+        PriorityQueuedDict(size_t _capacity) : capacity(_capacity) {}
+        bool isFull() const {
+            if (capacity == 0) {
+                return false;
+            }
+            return queue.size() >= capacity;
+        }
+        bool empty() const {
+            return queue.empty();
+        }
+        bool contains(const Key& key) const {
+            return set.find(key) != set.end();
+        }
+        // return true if the pair is successfully pushed, false if the key
+        // already exists in the queue
+        bool push(Priority priority, const Key& key, const Value& value) {
+            if (isFull()) {
+                pop();
+            }
+            if (contains(key)) {
+                return false;
+            }
+            queue.push(std::make_tuple(priority, key, value));
+            set.insert(key);
+            return true;
+        }
+        const std::tuple<Priority, Key, Value>& top() const {
+            return queue.top();
+        }
+        void pop() {
+            auto [priority, key, val] = queue.top();
+            set.erase(key);
+            queue.pop();
+        }
+};  // class PriorityQueuedDict
+
 
 } // namespace dmp
 
