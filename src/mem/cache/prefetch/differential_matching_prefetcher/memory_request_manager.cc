@@ -29,6 +29,9 @@
 #include "mem/cache/prefetch/differential_matching_prefetcher/memory_request_manager.hh"
 
 #include <cassert>
+#include <cstdint>
+#include <functional>
+#include <utility>
 
 #include "arch/generic/mmu.hh"
 #include "base/logging.hh"
@@ -51,11 +54,43 @@ namespace prefetch
 namespace dmp
 {
 
+// Callback when address translation is done without faults.
+AddressTranslationDoneCallbackType default_translation_done_callback =
+  std::bind(
+    &MemoryRequestManager::handleTranslationCompletion,
+    this, std::placeholders::_1
+  );
+// Callback when address translation should not happen, i.e., when we work
+// directly with physical addresses.
+AddressTranslationDoneCallbackType panic_translation_done_callback =
+  std::bind(
+    &MemoryRequestManager::errorIfTranslationComplete,
+    this, std::placeholders::_1
+  );
+
+// Callback when address translation is done with faults.
+AddressTranslationFaultCallbackType default_translation_fault_callback =
+  std::bind(
+    &MemoryRequestManager::handleTranslationFault,
+    this, std::placeholders::_1, std::placeholders::_2
+  );
+// Callback when address translation should not happen, i.e., when we work
+// directly with physical addresses.
+AddressTranslationFaultCallbackType panic_translation_fault_callback =
+  std::bind(
+    &MemoryRequestManager::errorIfTranslationFault,
+    this, std::placeholders::_1, std::placeholders::_2
+  );
+
 MemoryRequestBookkeeper::MemoryRequestBookkeeper(
-      const Addr _request_vaddr, const Addr _request_paddr,
-      const uint64_t _request_size, const RequestorID _requestor_id,
-      const Addr _pc, const Tick _ready_tick, const bool has_physical_address
-) : request_vaddr(_request_vaddr), request_paddr(_request_paddr),
+  AddressTranslationDoneCallbackType _translation_done_callback,
+  AddressTranslationFaultCallbackType _translation_fault_callback,
+  const Addr _request_vaddr, const Addr _request_paddr,
+  const uint64_t _request_size, const RequestorID _requestor_id,
+  const Addr _pc, const Tick _ready_tick, const bool has_physical_address
+) : translation_done_callback(_translation_done_callback),
+    translation_fault_callback(_translation_fault_callback),
+    request_vaddr(_request_vaddr), request_paddr(_request_paddr),
     request_size(_request_size), requestor_id(_requestor_id), pc(_pc),
     local_cache_hit(false), ready_tick(_ready_tick),
     queue_entering_tick(0), queue_leaving_tick(0),
@@ -81,6 +116,8 @@ MemoryRequestBookkeeper::createPrefetchRequestUsingVirtualAddr(
     // We don't have the physical address in this case, so we use a dummy
     // value, signifying that the physical address is not known yet.
     return new MemoryRequestBookkeeper(
+        /*request_done_callback*/ default_translation_done_callback,
+        /*request_fault_callback*/ default_translation_fault_callback,
         /*request_vaddr*/ _request_vaddr,
         /*request_paddr*/ 0xBADC0DE,
         /*request_size*/ _request_size,
@@ -100,6 +137,8 @@ MemoryRequestBookkeeper::createPrefetchRequestUsingPhysicalAddr(
     // We don't have the virtual address in this case, so we use the physical
     // address for both virtual and physical addresses.
     return new MemoryRequestBookkeeper(
+        /*request_done_callback*/ panic_translation_done_callback,
+        /*request_fault_callback*/ panic_translation_fault_callback,
         /*request_vaddr*/ _request_paddr,
         /*request_paddr*/ _request_paddr,
         /*request_size*/ _request_size,
@@ -334,6 +373,44 @@ MemoryRequestManager::enqueuePrefetchRequestUsingPhysicalAddr(
     // requests when they are ready, so we don't need to schedule an event
     // here.
     return true;
+}
+
+void
+MemoryRequestManager::handleTranslationCompletion(
+    MemoryRequestBookkeeper* bookkeeper
+)
+{
+    // TODO
+}
+
+void
+MemoryRequestManager::handleTranslationFault(
+    MemoryRequestBookkeeper* bookkeeper, const Fault& fault
+)
+{
+    // TODO
+}
+
+void
+MemoryRequestManager::errorIfTranslationComplete(
+    MemoryRequestBookkeeper* bookkeeper
+)
+{
+    panic(
+        "Address translation completed for a request bookkeeper that is "
+        "configured to not have address translation."
+    );
+}
+
+void
+MemoryRequestManager::errorIfTranslationFault(
+    MemoryRequestBookkeeper* bookkeeper, const Fault& fault
+)
+{
+    panic(
+        "Address translation completed for a request bookkeeper that is "
+        "configured to not have address translation."
+    );
 }
 
 bool

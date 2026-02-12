@@ -31,6 +31,7 @@
 
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <list>
 #include <queue>
 #include <unordered_map>
@@ -69,9 +70,24 @@ namespace dmp
 
 class PrefetchQueue;
 
+// Callback when address translation is done without faults.
+using AddressTranslationDoneCallbackType = \
+    std::function<void(MemoryRequestBookkeeper*)>;
+// Callback when address translation is done with faults.
+using AddressTranslationFaultCallbackType = \
+    std::function<void(MemoryRequestBookkeeper*, const Fault&)>;
+
 class MemoryRequestBookkeeper
 {
   public:
+    // Translation result handlers
+    // The translation done callback is called when the address translation is
+    // finished without faults.
+    // The translation fault callback is called when the address translation is
+    // finished with faults.
+    AddressTranslationDoneCallbackType translation_done_callback;
+    AddressTranslationFaultCallbackType translation_fault_callback;
+
     const Addr request_vaddr;
     const Addr request_paddr;
     const uint64_t request_size;
@@ -86,6 +102,8 @@ class MemoryRequestBookkeeper
     // Don't use the constructor directly.
     // Use the factory method in MemoryRequestManager instead.
     MemoryRequestBookkeeper(
+      AddressTranslationDoneCallbackType _translation_done_callback,
+      AddressTranslationFaultCallbackType _translation_fault_callback,
       const Addr _request_vaddr, const Addr _request_paddr,
       const uint64_t _request_size, const RequestorID _requestor_id,
       const Addr _pc, const Tick _ready_tick, const bool has_physical_address
@@ -124,6 +142,46 @@ class MemoryRequestBookkeeper
     PacketPtr packet;
     bool has_physical_address;
 };  // class MemoryRequestBookkeeper
+
+class AddressTranslationHandler : public BaseMMU::Translation
+{
+  private:
+    MemoryRequestBookkeeper* bookkeeper;
+    RequestPtr req;
+  public:
+    AddressTranslationHandler(
+        MemoryRequestBookkeeper* _bookkeeper,
+        const RequestorID& requestor_id
+    ) : bookkeeper(_bookkeeper)
+    {
+        Request::Flags flags;
+        Addr vaddr = bookkeeper->request_vaddr;
+        req = std::make_shared<Request>(
+            /* vaddr */ vaddr,
+            /* size */ bookkeeper->request_size,
+            /* flags */ flags,
+            /* id */ requestor_id,
+            /* pc */ bookkeeper->pc,
+            /* context id */ 0
+        );
+    }
+
+    ~AddressTranslationHandler()
+    {
+    }
+
+    RequestPtr getRequest() { return req; }
+
+    void markDelayed() override {}
+
+    void finish(
+        const Fault &fault, const RequestPtr &req, ThreadContext *tc,
+        BaseMMU::Mode mode
+    ) override {
+        bookkeeper->setTranslationResult(fault, req);
+        delete this;
+    }
+};
 
 struct ReadyTickMemoryRequestComparator
 {
@@ -217,6 +275,16 @@ class MemoryRequestManager
     );
     bool enqueuePrefetchRequestUsingPhysicalAddr(
       Addr block_aligned_paddr, Addr pc
+    );
+
+    // Handling address translation
+    void handleTranslationCompletion(MemoryRequestBookkeeper* bookkeeper);
+    void handleTranslationFault(
+      MemoryRequestBookkeeper* bookkeeper, const Fault& fault
+    );
+    void errorIfTranslationComplete(MemoryRequestBookkeeper* bookkeeper);
+    void panicIfTranslationFaults(
+      MemoryRequestBookkeeper* bookkeeper, const Fault& fault
     );
 
     bool hasPendingMemoryRequests() const;
