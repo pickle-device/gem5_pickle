@@ -54,6 +54,7 @@ struct PrefetcherStats : public statistics::Group
   PrefetcherStats(statistics::Group *parent);
   statistics::Scalar numPrefetchableL1CacheHits;
   statistics::Scalar numPrefetchableL1CacheMisses;
+  statistics::Scalar numStridePrefetchesSentToIRT;
   statistics::Scalar numStridePrefetchesEmitted;
   statistics::Scalar numStridePrefetchesDroppedDueToOutOfMemoryBounds;
   statistics::Scalar numDMPPrefetchesEmitted;

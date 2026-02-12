@@ -469,6 +469,7 @@ DifferentialMatchingPrefetcher::handleNewPrefetchedDataFromStridePrefetcher(
             /*data_from_index_pc*/ data
         );
     if (new_prefetches.has_value()) {
+        stats.numStridePrefetchesSentToIRT++;
         for (const PrefetchRequest &new_prefetch : new_prefetches.value()) {
             DMP_PREFETCHER_DEBUG(
                 "New prefetch generated from stride prefetcher data: "

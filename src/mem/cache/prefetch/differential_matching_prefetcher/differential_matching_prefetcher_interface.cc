@@ -53,6 +53,10 @@ PrefetcherStats::PrefetcherStats(statistics::Group *parent)
         "Number of observed L1 cache misses"
     ),
     ADD_STAT(
+        numStridePrefetchesSentToIRT, statistics::units::Count::get(),
+        "Number of stride prefetches sent to IRT"
+    ),
+    ADD_STAT(
         numStridePrefetchesEmitted, statistics::units::Count::get(),
         "Number of stride prefetches emitted"
     ),
