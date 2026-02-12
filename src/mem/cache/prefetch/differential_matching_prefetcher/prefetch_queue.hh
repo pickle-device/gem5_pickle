@@ -30,6 +30,7 @@
 #define __DMP_PREFETCH_QUEUE_HH__
 
 #include <cstdint>
+#include <deque>
 #include <list>
 #include <queue>
 #include <tuple>
@@ -130,7 +131,7 @@ class PrefetchQueue : public ClockedObject
     // of the current prefetch requests in the prefetch_requests map, as the
     // new requests may have addresses that overlap with the current requests,
     // and we don't want to process them together.
-    std::queue<PrefetchRequest> pending_new_requests;
+    std::deque<PrefetchRequest> pending_new_requests;
 
     // This queue is used to hold stride prefetch results that are generated
     // in the L1 prefetch queue and need to be sent to the DMP. Since the
@@ -149,10 +150,13 @@ class PrefetchQueue : public ClockedObject
     PrefetchQueue(
       const DifferentialMatchingPrefetcherPrefetchQueueParams& params
     );
+    void regStats() override;
+    void preDumpStats() override;
     void setOwner(DifferentialMatchingPrefetcherInterface* dmp);
     void setCacheController(ruby::AbstractController* cache_controller);
     void setIndirectRelationTable(IndirectRelationTable* irt);
     bool enqueuePendingRequest(PrefetchRequest prefetch_request);
+    uint64_t getQueueSize() const;
     bool isFull() const;
     void processPendingNewPrefetchRequests();
     void processPendingStridePrefetchResults();
@@ -191,16 +195,28 @@ class PrefetchQueue : public ClockedObject
       const bool is_prefetch_hit_in_local_cache
     );
 
+  private:
+    uint64_t countNumPendingNewRequestsAfterCoalescing() const;
+
   public:
     struct PrefetchQueueStats : public statistics::Group
     {
         PrefetchQueueStats(statistics::Group* parent);
+        void regStats() override;
 
         statistics::Scalar num_enqueued_requests;
         statistics::Scalar num_requests_after_coalescing;
         statistics::Scalar num_dropped_requests_due_to_full_queue;
         statistics::Scalar num_requests_fulfilled_by_local_cache;
         statistics::Scalar num_requests_fulfilled_by_prefetching;
+
+        statistics::Histogram prefetch_queue_occupancy_histogram;
+        statistics::Histogram prefetch_request_latency_histogram;
+
+        // Prefetch requests that are stuck in the prefetch queue for a long
+        // time may indicate some issues, so we want to track them.
+        statistics::Scalar num_prefetch_requests_stuck;
+        statistics::Histogram prefetch_request_stuck_duration_histogram;
     } stats;
 
 };  // class PrefetchQueue

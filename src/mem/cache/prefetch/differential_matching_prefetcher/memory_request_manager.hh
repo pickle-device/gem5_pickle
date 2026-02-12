@@ -38,9 +38,12 @@
 
 #include "arch/generic/mmu.hh"
 #include "base/logging.hh"
+#include "base/statistics.hh"
+#include "base/stats/group.hh"
 #include "base/types.hh"
 #include "debug/DifferentialMatchingPrefetcherMemoryRequestManagerDebug.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_request.hh"
+#include "mem/cache/prefetch/differential_matching_prefetcher/util.hh"
 #include "mem/packet.hh"
 #include "mem/request.hh"
 #include "mem/ruby/protocol/CHI/Cache_Controller.hh"
@@ -48,7 +51,11 @@
 #include "sim/eventq.hh"
 
 #define DMP_MEMORY_MANAGER_DEBUG(...) \
-    DPRINTF(DifferentialMatchingPrefetcherMemoryRequestManagerDebug,\
+    DPRINTF( \
+      DifferentialMatchingPrefetcherMemoryRequestManagerDebug, "%s: ", \
+      owner->name().c_str() \
+    ); \
+    DPRINTFR(DifferentialMatchingPrefetcherMemoryRequestManagerDebug,\
             "(Memory Manager) " __VA_ARGS__)
 
 namespace gem5
@@ -75,6 +82,7 @@ class MemoryRequestBookkeeper
     Tick ready_tick;
     // Response data
     std::vector<uint8_t> response_data;
+
     // Don't use the constructor directly.
     // Use the factory method in MemoryRequestManager instead.
     MemoryRequestBookkeeper(
@@ -92,6 +100,10 @@ class MemoryRequestBookkeeper
       const Addr _request_paddr, const uint64_t _request_size,
       const RequestorID _requestor_id, const Addr _pc, const Tick _ready_tick
     );
+    void profileQueueEnteringTick();
+    void profileQueueLeavingTick();
+    Tick getQueueEnteringTick() const;
+    Tick getQueueingDuration() const;
     RequestPtr getRequest();
     PacketPtr getPacket();
     bool hasPhysicalAddress() const;
@@ -106,6 +118,8 @@ class MemoryRequestBookkeeper
     bool isReady() const;
 
   private:
+    Tick queue_entering_tick;
+    Tick queue_leaving_tick;
     RequestPtr request;
     PacketPtr packet;
     bool has_physical_address;
@@ -114,11 +128,11 @@ class MemoryRequestBookkeeper
 struct ReadyTickMemoryRequestComparator
 {
     bool operator()(
-        const std::pair<Tick, MemoryRequestBookkeeper*>& a,
-        const std::pair<Tick, MemoryRequestBookkeeper*>& b
+        const std::tuple<Tick, Addr, MemoryRequestBookkeeper*>& a,
+        const std::tuple<Tick, Addr, MemoryRequestBookkeeper*>& b
     ) const {
         // The request with the smaller ready tick should have higher priority.
-        return a.first > b.first;
+        return std::get<0>(a) > std::get<0>(b);
     }
 };
 
@@ -156,11 +170,13 @@ class MemoryRequestManager
     // The bookkeeper tracks the state of the memory request, and the set
     // of bookkeepers in outstanding_requests is the union of requests that are
     // pending translation, pending memory, and completed request queues.
+    // vaddr -> bookkeeper
     std::unordered_map<Addr, MemoryRequestBookkeeper*> outstanding_requests;
 
     // Mapping physical address to virtual address of the outstanding requests.
     // Used to map the memory response back to the outstanding request.
     // Should not be used as an address translation buffer.
+    // paddr -> vaddr
     std::unordered_map<Addr, Addr> paddr_to_vaddr;
 
     // Requests that are ready for address translation, but have not yet
@@ -171,10 +187,12 @@ class MemoryRequestManager
     std::deque<MemoryRequestBookkeeper*> pending_memory_queue;
     // Requests that have been completed (either successfully or
     // unsuccessfully), but the prefetch queue has not yet been notified.
-    std::priority_queue<
-      std::pair<Tick, MemoryRequestBookkeeper*>,
-      std::vector<std::pair<Tick, MemoryRequestBookkeeper*>>,
-      ReadyTickMemoryRequestComparator
+    // paddr -> bookkeeper
+    PriorityQueuedDict<
+      /*Priority*/ Tick,
+      /*Key*/ Addr,
+      /*Value*/ MemoryRequestBookkeeper*,
+      /*Comparator*/ ReadyTickMemoryRequestComparator
     > completed_request_queue;
 
     // Event handlers
@@ -214,6 +232,30 @@ class MemoryRequestManager
     void processCompletedRequestQueue();
     void scheduleSendAddressTranslationRequestsEvent();
     void scheduleProcessCompletedRequestQueueEvent();
+
+  public:
+    struct MemoryRequestManagerStats : public statistics::Group
+    {
+        PrefetchQueue* parent;
+        MemoryRequestManager* owner;
+        ClockDomain *clock_domain;
+        MemoryRequestManagerStats(
+          PrefetchQueue* _parent, MemoryRequestManager* _owner,
+          ClockDomain* _clock_domain
+        );
+        void regStats();
+        void preDumpStats();
+
+        statistics::Scalar num_memory_request_enqueued;
+        statistics::Scalar num_memory_request_issued;
+        statistics::Scalar num_local_cache_hits;
+        statistics::Scalar num_memory_request_completed;
+        statistics::Scalar num_memory_request_failed;
+        statistics::Histogram memory_request_queueing_duration_histogram;
+
+        statistics::Scalar num_memory_requests_stuck;
+        statistics::Histogram memory_request_stuck_duration_histogram;
+    } stats;
 };  // class MemoryRequestManager
 
 } // namespace dmp

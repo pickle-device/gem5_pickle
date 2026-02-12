@@ -55,12 +55,14 @@ class PrefetchRequest
     Tick end_address_translation_tick;
     Tick memory_request_issued_tick;
     Tick memory_request_complete_tick;
+    Tick queue_leaving_tick;
   public:
     // Metadata for this prefetch request
     Addr target_pc;
     Addr prefetch_vaddr;
     uint64_t size;
     uint64_t irt_id;
+    bool is_dropped;
 
     PrefetchRequest(
         const Addr _target_pc, const Addr _prefetch_vaddr,
@@ -73,11 +75,16 @@ class PrefetchRequest
     );
     uint64_t getResponse() const;
 
-    void profileQueueEnteringTick(const Tick tick);
-    void profileStartAddressTranslationTick(const Tick tick);
-    void profileEndAddressTranslationTick(const Tick tick);
-    void profileMemoryRequestIssuedTick(const Tick tick);
-    void profileMemoryRequestCompleteTick(const Tick tick);
+    void profileQueueEnteringTick();
+    void profileStartAddressTranslationTick();
+    void profileEndAddressTranslationTick();
+    void profileMemoryRequestIssuedTick();
+    void profileMemoryRequestCompleteTick();
+    void profileQueueLeavingTick();
+
+    Tick getQueueEnteringTick() const;
+
+    Tick getPrefetchLatency() const;
 };
 
 } // namespace dmp

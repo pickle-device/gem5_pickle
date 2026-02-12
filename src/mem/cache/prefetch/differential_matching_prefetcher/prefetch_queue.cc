@@ -28,10 +28,14 @@
 
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_queue.hh"
 
+#include <deque>
 #include <list>
 #include <tuple>
+#include <unordered_set>
 #include <utility>
 
+#include "base/statistics.hh"
+#include "base/stats/group.hh"
 #include "base/types.hh"
 #include "enums/CacheLevel.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
@@ -89,6 +93,40 @@ PrefetchQueue::PrefetchQueue(
 }
 
 void
+PrefetchQueue::regStats()
+{
+    ClockedObject::regStats();
+}
+
+
+void
+PrefetchQueue::preDumpStats()
+{
+    statistics::Group::preDumpStats();
+
+    inform("Predump stats for PrefetchQueue %s\n", name());
+    inform("Current prefetch queue size: %lu\n", getQueueSize());
+    inform("Current tick: %lu\n", curTick());
+
+    // Now that we are about to exit the simulation, we want to know if there
+    // are prefetches that got stuck in the queue and never got fulfilled.
+    const Tick cur_tick = curTick();
+    for (const auto& entry : prefetch_requests) {
+        const std::list<PrefetchRequest>& requests = entry.second;
+        for (const PrefetchRequest& request : requests) {
+            const Tick request_latency =
+                cur_tick - request.getQueueEnteringTick();
+            if (request_latency > cyclesToTicks(Cycles(100000))) {
+                stats.num_prefetch_requests_stuck++;
+                stats.prefetch_request_stuck_duration_histogram.sample(
+                    request_latency
+                );
+            }
+        }
+    }
+}
+
+void
 PrefetchQueue::setOwner(DifferentialMatchingPrefetcherInterface* dmp)
 {
     owner = dmp;
@@ -136,6 +174,7 @@ PrefetchQueue::enqueuePendingRequest(PrefetchRequest prefetch_request)
             "Coalescing prefetch request for vaddr 0x%llx\n",
             prefetch_request.prefetch_vaddr
         );
+        prefetch_request.profileQueueEnteringTick();
         existing_request.push_back(std::move(prefetch_request));
     } else {
         // Enqueue the new prefetch request
@@ -148,12 +187,16 @@ PrefetchQueue::enqueuePendingRequest(PrefetchRequest prefetch_request)
                 "request for vaddr 0x%llx\n",
                 prefetch_request.prefetch_vaddr
             );
+            prefetch_request.is_dropped = true;
+            prefetch_request.profileQueueLeavingTick();
+            stats.prefetch_queue_occupancy_histogram.sample(getQueueSize());
             return false;
         }
         DMP_PREFETCH_QUEUE_DEBUG(
             "Enqueuing new prefetch request for vaddr 0x%llx\n",
             prefetch_request.prefetch_vaddr
         );
+        prefetch_request.profileQueueEnteringTick();
         prefetch_requests[prefetch_vaddr_block_aligned].emplace_back(
             prefetch_request
         );
@@ -168,14 +211,22 @@ PrefetchQueue::enqueuePendingRequest(PrefetchRequest prefetch_request)
             );
         }
     }
+    stats.prefetch_queue_occupancy_histogram.sample(getQueueSize());
     return true;
+}
+
+uint64_t
+PrefetchQueue::getQueueSize() const
+{
+    const uint64_t current_size =
+        prefetch_requests.size() + countNumPendingNewRequestsAfterCoalescing();
+    return current_size;
 }
 
 bool
 PrefetchQueue::isFull() const
 {
-    const uint64_t current_size =
-        prefetch_requests.size() + pending_new_requests.size();
+    const uint64_t current_size = getQueueSize();
     return current_size >= queue_size;
 }
 
@@ -184,7 +235,7 @@ PrefetchQueue::processPendingNewPrefetchRequests()
 {
     while (!pending_new_requests.empty()) {
         PrefetchRequest prefetch_request = pending_new_requests.front();
-        pending_new_requests.pop();
+        pending_new_requests.pop_front();
         enqueuePendingRequest(prefetch_request);
     }
 }
@@ -262,11 +313,13 @@ PrefetchQueue::trackCacheHit(PacketPtr pkt)
         "Tracking cache hit for paddr 0x%llx (size %lu)\n",
         paddr, pkt->getSize()
     );
-    if (
-        prefetch_requests.find(block_aligned_paddr) != prefetch_requests.end()
-    ) {
-        notifyMemoryRequestCompleted(pkt);
-    }
+    //if (
+    //    prefetch_requests.find(block_aligned_paddr)
+    //      != prefetch_requests.end()
+    //) {
+    //    notifyMemoryRequestCompleted(pkt);
+    //}
+    notifyMemoryRequestCompleted(pkt);
 }
 
 void
@@ -287,11 +340,13 @@ PrefetchQueue::trackCacheFill(PacketPtr pkt)
         "Tracking cache fill for paddr 0x%llx (size %lu)\n",
         paddr, pkt->getSize()
     );
-    if (
-        prefetch_requests.find(block_aligned_paddr) != prefetch_requests.end()
-    ) {
-        notifyMemoryRequestCompleted(pkt);
-    }
+    //if (
+    //    prefetch_requests.find(block_aligned_paddr)
+    //          != prefetch_requests.end()
+    //) {
+    //    notifyMemoryRequestCompleted(pkt);
+    //}
+    notifyMemoryRequestCompleted(pkt);
 }
 
 void
@@ -326,6 +381,10 @@ PrefetchQueue::processCompletedPrefetchRequest(
         } else {
             stats.num_requests_fulfilled_by_prefetching++;
         }
+        prefetch_request.profileQueueLeavingTick();
+        stats.prefetch_request_latency_histogram.sample(
+            prefetch_request.getPrefetchLatency()
+        );
         const Addr request_vaddr = prefetch_request.prefetch_vaddr;
         const Addr target_pc = prefetch_request.target_pc;
         DMP_PREFETCH_QUEUE_DEBUG(
@@ -391,7 +450,7 @@ PrefetchQueue::processCompletedPrefetchRequest(
                 new_prefetch_requests.value()) {
                 //enqueuePendingRequest(new_request);
                 // TODO: fix this
-                pending_new_requests.push(new_request);
+                pending_new_requests.push_back(new_request);
                 scheduleProcessPendingNewPrefetchRequestsEvent();
                 owner->getStats().numDMPPrefetchesEmitted++;
             }
@@ -405,12 +464,25 @@ PrefetchQueue::processCompletedPrefetchRequest(
     }
 
     prefetch_requests.erase(prefetch_request_it);
+    stats.prefetch_queue_occupancy_histogram.sample(getQueueSize());
     // Remove the completed prefetch request from the queue
     DMP_PREFETCH_QUEUE_DEBUG(
         "Removing completed prefetch request for vaddr block 0x%llx from "
         "prefetch queue, queue size %lu\n",
         prefetch_vaddr_block_aligned, prefetch_requests.size()
     );
+}
+
+uint64_t
+PrefetchQueue::countNumPendingNewRequestsAfterCoalescing() const
+{
+    std::unordered_set<Addr> unique_block_aligned_addresses;
+    for (const auto& entry : pending_new_requests) {
+        unique_block_aligned_addresses.insert(
+            entry.prefetch_vaddr >> block_shift
+        );
+    }
+    return unique_block_aligned_addresses.size();
 }
 
 PrefetchQueue::PrefetchQueueStats::PrefetchQueueStats(
@@ -437,8 +509,44 @@ PrefetchQueue::PrefetchQueueStats::PrefetchQueueStats(
     ADD_STAT(
         num_requests_fulfilled_by_prefetching, statistics::units::Count::get(),
         "Number of prefetch requests fulfilled by prefetching"
+    ),
+    ADD_STAT(
+        prefetch_queue_occupancy_histogram, statistics::units::Count::get(),
+        "Histogram of the occupancy of the prefetch queue when a new request "
+        "is enqueued"
+    ),
+    ADD_STAT(
+        prefetch_request_latency_histogram, statistics::units::Tick::get(),
+        "Histogram of the latency of prefetch requests from enqueueing to "
+        "being fulfilled"
+    ),
+    ADD_STAT(
+        num_prefetch_requests_stuck, statistics::units::Count::get(),
+        "Number of prefetch requests that got stuck in the prefetch queue "
+        "for more than 100000 cycles and never got fulfilled"
+    ),
+    ADD_STAT(
+        prefetch_request_stuck_duration_histogram,
+        statistics::units::Tick::get(),
+        "Histogram of the duration that prefetch requests got stuck in the "
+        "prefetch queue without being fulfilled"
     )
 {
+}
+
+void
+PrefetchQueue::PrefetchQueueStats::regStats()
+{
+    statistics::Group::regStats();
+    prefetch_queue_occupancy_histogram
+        .init(16)
+        .flags(statistics::pdf);
+    prefetch_request_latency_histogram
+        .init(16)
+        .flags(statistics::pdf);
+    prefetch_request_stuck_duration_histogram
+        .init(16)
+        .flags(statistics::pdf);
 }
 
 }; // namespace dmp

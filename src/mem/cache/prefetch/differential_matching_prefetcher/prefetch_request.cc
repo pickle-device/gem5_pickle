@@ -46,10 +46,12 @@ PrefetchRequest::PrefetchRequest(
     end_address_translation_tick(0),
     memory_request_issued_tick(0),
     memory_request_complete_tick(0),
+    queue_leaving_tick(0),
     target_pc(_target_pc),
     prefetch_vaddr(_prefetch_vaddr),
     size(_size),
-    irt_id(_irt_id)
+    irt_id(_irt_id),
+    is_dropped(false)
 {
 }
 
@@ -94,6 +96,31 @@ uint64_t
 PrefetchRequest::getResponse() const
 {
     return response;
+}
+
+void
+PrefetchRequest::profileQueueEnteringTick()
+{
+    queue_entering_tick = curTick();
+}
+
+void
+PrefetchRequest::profileQueueLeavingTick()
+{
+    queue_leaving_tick = curTick();
+}
+
+Tick
+PrefetchRequest::getQueueEnteringTick() const
+{
+    return queue_entering_tick;
+}
+
+Tick
+PrefetchRequest::getPrefetchLatency() const
+{
+    Tick latency = queue_leaving_tick - queue_entering_tick;
+    return latency;
 }
 
 } // namespace dmp
