@@ -418,6 +418,7 @@ MemoryRequestManager::handleTranslationCompletion(
             request_propagation_delay_in_cycles
         )
     );
+    paddr_to_vaddr[bookkeeper->request_paddr] = bookkeeper->request_vaddr;
     pending_memory_queue.push_back(bookkeeper);
     scheduleSendAddressTranslationRequestsEvent();
 }
