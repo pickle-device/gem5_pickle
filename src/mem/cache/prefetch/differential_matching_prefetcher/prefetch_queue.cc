@@ -49,7 +49,7 @@
 #include "mem/ruby/common/DataBlock.hh"
 #include "mem/ruby/protocol/CHI/Cache_CacheEntry.hh"
 #include "mem/ruby/protocol/CHI/Cache_Controller.hh"
-#include "params/PrefetchQueue.hh"
+#include "params/DifferentialMatchingPrefetcherPrefetchQueue.hh"
 
 namespace gem5
 {
