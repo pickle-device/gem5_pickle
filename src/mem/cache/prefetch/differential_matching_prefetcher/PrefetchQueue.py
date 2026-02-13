@@ -57,6 +57,10 @@ class DifferentialMatchingPrefetcherPrefetchQueue(ClockedObject):
     clock_domain = Param.ClockDomain(
         Parent.any, "Clock domain for this prefetcher"
     )
+    associated_cpu = Param.BaseCPU(
+        "The CPU core that is local to this prefetch queue, used to get the "
+        "thread context for address translation."
+    )
     mmu = Param.BaseMMU("The MMU of the associated core")
     cache_level = Param.CacheLevel("Cache level for this prefetch queue")
 

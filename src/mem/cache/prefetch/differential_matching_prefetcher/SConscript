@@ -64,7 +64,9 @@ DebugFlag('DifferentialMatchingPrefetcherIndexQueueDebug')
 DebugFlag('DifferentialMatchingPrefetcherIndirectRelationTableDebug')
 DebugFlag('DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug')
 DebugFlag('DifferentialMatchingPrefetcherMemoryRequestManagerDebug')
+DebugFlag('DifferentialMatchingPrefetcherMemoryRequestManagerStuckDebug')
 DebugFlag('DifferentialMatchingPrefetcherPrefetchQueueDebug')
+DebugFlag('DifferentialMatchingPrefetcherPrefetchQueueStuckDebug')
 DebugFlag('DifferentialMatchingPrefetcherRangeTableDebug')
 DebugFlag('DifferentialMatchingPrefetcherStrideTrackerDebug')
 
@@ -85,5 +87,13 @@ CompoundFlag(
         'DifferentialMatchingPrefetcherRangeTableDebug',
         'DifferentialMatchingPrefetcherStrideTrackerDebug',
         'DifferentialMatchingPrefetcherPrefetchAgentDebug',
+    ]
+)
+
+CompoundFlag(
+    'DifferentialMatchingPrefetcherAllQueueStuckDebug',
+    [
+        'DifferentialMatchingPrefetcherMemoryRequestManagerStuckDebug',
+        'DifferentialMatchingPrefetcherPrefetchQueueStuckDebug',
     ]
 )

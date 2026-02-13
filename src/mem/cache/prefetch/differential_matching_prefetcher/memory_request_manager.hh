@@ -42,7 +42,9 @@
 #include "base/statistics.hh"
 #include "base/stats/group.hh"
 #include "base/types.hh"
+#include "cpu/thread_context.hh"
 #include "debug/DifferentialMatchingPrefetcherMemoryRequestManagerDebug.hh"
+#include "debug/DifferentialMatchingPrefetcherMemoryRequestManagerStuckDebug.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_request.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/util.hh"
 #include "mem/packet.hh"
@@ -59,6 +61,14 @@
     DPRINTFR(DifferentialMatchingPrefetcherMemoryRequestManagerDebug,\
             "(Memory Manager) " __VA_ARGS__)
 
+#define DMP_MEMORY_MANAGER_STUCK_DEBUG(...) \
+    DPRINTF( \
+      DifferentialMatchingPrefetcherMemoryRequestManagerStuckDebug, "%s: ", \
+      owner->owner->name().c_str() \
+    ); \
+    DPRINTFR(DifferentialMatchingPrefetcherMemoryRequestManagerStuckDebug,\
+            "(Memory Manager Stats) " __VA_ARGS__)
+
 namespace gem5
 {
 
@@ -69,6 +79,7 @@ namespace dmp
 {
 
 class PrefetchQueue;
+class MemoryRequestBookkeeper;
 
 // Callback when address translation is done without faults.
 using AddressTranslationDoneCallbackType = \
@@ -88,16 +99,17 @@ class MemoryRequestBookkeeper
     AddressTranslationDoneCallbackType translation_done_callback;
     AddressTranslationFaultCallbackType translation_fault_callback;
 
-    const Addr request_vaddr;
-    const Addr request_paddr;
-    const uint64_t request_size;
-    const RequestorID requestor_id;
-    const Addr pc;
+    Addr request_vaddr;
+    Addr request_paddr;
+    uint64_t request_size;
+    RequestorID requestor_id;
+    Addr pc;
     bool local_cache_hit;
     // The earliest time when the memory request is ready, i.e., can be issued
     Tick ready_tick;
     // Response data
     std::vector<uint8_t> response_data;
+    bool translation_fault;
 
     // Don't use the constructor directly.
     // Use the factory method in MemoryRequestManager instead.
@@ -111,14 +123,20 @@ class MemoryRequestBookkeeper
     ~MemoryRequestBookkeeper();
     // Factory method to create a MemoryRequestBookkeeper
     static MemoryRequestBookkeeper* createPrefetchRequestUsingVirtualAddr(
+      AddressTranslationDoneCallbackType _translation_done_callback,
+      AddressTranslationFaultCallbackType _translation_fault_callback,
       const Addr _request_vaddr, const uint64_t _request_size,
       const RequestorID _requestor_id, const Addr _pc, const Tick _ready_tick
     );
     static MemoryRequestBookkeeper* createPrefetchRequestUsingPhysicalAddr(
+      AddressTranslationDoneCallbackType _translation_done_callback,
+      AddressTranslationFaultCallbackType _translation_fault_callback,
       const Addr _request_paddr, const uint64_t _request_size,
       const RequestorID _requestor_id, const Addr _pc, const Tick _ready_tick
     );
     void profileQueueEnteringTick();
+    void profileTranslationStartingTick();
+    void profileTranslationFinishingTick();
     void profileQueueLeavingTick();
     Tick getQueueEnteringTick() const;
     Tick getQueueingDuration() const;
@@ -129,6 +147,7 @@ class MemoryRequestBookkeeper
     void setDataFromDataBlock(
       const ruby::DataBlock& data_block, const uint64_t cache_block_size
     );
+    void setTranslationResult(const Fault &fault, const RequestPtr &req);
     // Return true if the memory request has received response and is already
     // in the completed request queue, waiting for the prefetch queue to be
     // notified. Return false otherwise.
@@ -137,6 +156,8 @@ class MemoryRequestBookkeeper
 
   private:
     Tick queue_entering_tick;
+    Tick translation_starting_tick;
+    Tick translation_finishing_tick;
     Tick queue_leaving_tick;
     RequestPtr request;
     PacketPtr packet;
@@ -151,7 +172,7 @@ class AddressTranslationHandler : public BaseMMU::Translation
   public:
     AddressTranslationHandler(
         MemoryRequestBookkeeper* _bookkeeper,
-        const RequestorID& requestor_id
+        const RequestorID& _requestor_id
     ) : bookkeeper(_bookkeeper)
     {
         Request::Flags flags;
@@ -160,7 +181,7 @@ class AddressTranslationHandler : public BaseMMU::Translation
             /* vaddr */ vaddr,
             /* size */ bookkeeper->request_size,
             /* flags */ flags,
-            /* id */ requestor_id,
+            /* id */ _requestor_id,
             /* pc */ bookkeeper->pc,
             /* context id */ 0
         );
@@ -210,6 +231,7 @@ class MemoryRequestManager
     ClockDomain* clock_domain;
     uint64_t cache_block_size;
     RequestorID requestor_id;
+    ThreadContext* thread_context; // used for address translation
     BaseMMU* mmu;
     // we need cache controller to acquire data in local cache
     ruby::CHI::Cache_Controller* cache_controller;
@@ -257,11 +279,17 @@ class MemoryRequestManager
     EventFunctionWrapper process_pending_translation_queue_event;
     EventFunctionWrapper process_completed_request_event;
 
+    // Callbacks
+    AddressTranslationDoneCallbackType default_translation_done_callback;
+    AddressTranslationDoneCallbackType panic_if_translation_done_callback;
+    AddressTranslationFaultCallbackType default_translation_fault_callback;
+    AddressTranslationFaultCallbackType panic_if_translation_fault_callback;
   public:
     MemoryRequestManager(
       PrefetchQueue* _owner, ClockDomain* _clock_domain,
       uint64_t _cache_block_size, const RequestorID _requestor_id,
-      BaseMMU* _mmu, const Cycles _local_cache_data_access_delay_in_cycles,
+      ThreadContext* _thread_context, BaseMMU* _mmu,
+      const Cycles _local_cache_data_access_delay_in_cycles,
       const Cycles _request_propagation_delay
     );
     void setCacheController(ruby::CHI::Cache_Controller* _cache_controller);
@@ -283,7 +311,7 @@ class MemoryRequestManager
       MemoryRequestBookkeeper* bookkeeper, const Fault& fault
     );
     void errorIfTranslationComplete(MemoryRequestBookkeeper* bookkeeper);
-    void panicIfTranslationFaults(
+    void errorIfTranslationFault(
       MemoryRequestBookkeeper* bookkeeper, const Fault& fault
     );
 
@@ -318,7 +346,7 @@ class MemoryRequestManager
         statistics::Scalar num_memory_request_issued;
         statistics::Scalar num_local_cache_hits;
         statistics::Scalar num_memory_request_completed;
-        statistics::Scalar num_memory_request_failed;
+        statistics::Scalar num_memory_request_failed_due_to_translation_fault;
         statistics::Histogram memory_request_queueing_duration_histogram;
 
         statistics::Scalar num_memory_requests_stuck;

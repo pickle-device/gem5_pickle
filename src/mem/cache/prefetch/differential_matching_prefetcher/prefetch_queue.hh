@@ -41,7 +41,9 @@
 #include "base/statistics.hh"
 #include "base/stats/group.hh"
 #include "base/types.hh"
+#include "cpu/thread_context.hh"
 #include "debug/DifferentialMatchingPrefetcherPrefetchQueueDebug.hh"
+#include "debug/DifferentialMatchingPrefetcherPrefetchQueueStuckDebug.hh"
 #include "enums/PrefetchQueueReplacementPolicy.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/indirect_relation_table.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/memory_request_manager.hh"
@@ -58,6 +60,9 @@
 
 #define DMP_PREFETCH_QUEUE_DEBUG(...) \
     DPRINTF(DifferentialMatchingPrefetcherPrefetchQueueDebug,\
+            "(Prefetch Queue) " __VA_ARGS__)
+#define DMP_PREFETCH_QUEUE_STUCK_DEBUG(...) \
+    DPRINTF(DifferentialMatchingPrefetcherPrefetchQueueStuckDebug,\
             "(Prefetch Queue) " __VA_ARGS__)
 
 namespace gem5
@@ -92,10 +97,12 @@ class PrefetchQueue : public ClockedObject
 
     // This event is used to process the new prefetch requests generated after
     // processing the completed prefetch requests.
-    EventFunctionWrapper processPendingNewPrefetchRequestsEvent;
+    EventFunctionWrapper process_pending_new_prefetch_requests_event;
+
     // This event is used to send stride prefetch results from the L1 prefetch
     // queue to the DMP.
-    EventFunctionWrapper sendPrefetchedDataFromStridePrefetcherToDMPEvent;
+    EventFunctionWrapper
+      send_prefetched_data_from_stride_prefetcher_to_dmp_event;
 
     // The delay of getting data out of the local cache.
     Cycles local_cache_data_access_delay;
@@ -192,7 +199,8 @@ class PrefetchQueue : public ClockedObject
     void processCompletedPrefetchRequest(
       const Addr prefetch_vaddr_block_aligned,
       const std::vector<uint8_t>& response_data,
-      const bool is_prefetch_hit_in_local_cache
+      const bool is_prefetch_hit_in_local_cache,
+      const bool translation_fault
     );
 
     // This is for the MemoryRequestManager to tell the prefetcher proxy that
@@ -212,6 +220,7 @@ class PrefetchQueue : public ClockedObject
         statistics::Scalar num_enqueued_requests;
         statistics::Scalar num_requests_after_coalescing;
         statistics::Scalar num_dropped_requests_due_to_full_queue;
+        statistics::Scalar num_dropped_requests_due_to_translation_fault;
         statistics::Scalar num_requests_fulfilled_by_local_cache;
         statistics::Scalar num_requests_fulfilled_by_prefetching;
 

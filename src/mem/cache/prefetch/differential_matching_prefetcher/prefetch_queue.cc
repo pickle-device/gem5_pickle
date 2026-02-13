@@ -37,6 +37,10 @@
 #include "base/statistics.hh"
 #include "base/stats/group.hh"
 #include "base/types.hh"
+#include "cpu/base.hh"
+#include "cpu/thread_context.hh"
+#include "debug/DifferentialMatchingPrefetcherPrefetchQueueDebug.hh"
+#include "debug/DifferentialMatchingPrefetcherPrefetchQueueStuckDebug.hh"
 #include "enums/CacheLevel.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_request.hh"
@@ -67,11 +71,11 @@ PrefetchQueue::PrefetchQueue(
     queue_size(params.queue_size),
     cache_block_size(params.system->cacheLineSize()),
     block_shift(log2(params.system->cacheLineSize())),
-    processPendingNewPrefetchRequestsEvent(
+    process_pending_new_prefetch_requests_event(
         [this]{ processPendingNewPrefetchRequests(); },
         "Prefetch Queue Process Pending New Prefetch Requests Event"
     ),
-    sendPrefetchedDataFromStridePrefetcherToDMPEvent(
+    send_prefetched_data_from_stride_prefetcher_to_dmp_event(
         [this]{ processPendingStridePrefetchResults(); },
         "Prefetch Queue Process Pending Stride Prefetch Results Event"
     ),
@@ -83,6 +87,9 @@ PrefetchQueue::PrefetchQueue(
         /*clock_domain*/ params.clock_domain,
         /*cache_block_size*/ cache_block_size,
         /*requestor_id*/ params.system->getRequestorId(this),
+        /*thread_context*/ (params.associated_cpu == nullptr)
+            ? nullptr
+            : params.associated_cpu->getContext(0),
         /*mmu*/ params.mmu,
         /*local_cache_data_access_delay*/ local_cache_data_access_delay,
         /*request_propagation_delay*/ request_propagation_delay
@@ -104,11 +111,13 @@ PrefetchQueue::preDumpStats()
 {
     statistics::Group::preDumpStats();
 
-    DMP_PREFETCH_QUEUE_DEBUG("Predump stats for PrefetchQueue %s\n", name());
-    DMP_PREFETCH_QUEUE_DEBUG(
+    DMP_PREFETCH_QUEUE_STUCK_DEBUG(
+        "Predump stats for PrefetchQueue %s\n", name()
+    );
+    DMP_PREFETCH_QUEUE_STUCK_DEBUG(
         "Current prefetch queue size: %lu\n", getQueueSize()
     );
-    DMP_PREFETCH_QUEUE_DEBUG("Current tick: %lu\n", curTick());
+    DMP_PREFETCH_QUEUE_STUCK_DEBUG("Current tick: %lu\n", curTick());
 
     // Now that we are about to exit the simulation, we want to know if there
     // are prefetches that got stuck in the queue and never got fulfilled.
@@ -265,11 +274,11 @@ void
 PrefetchQueue::scheduleProcessPendingNewPrefetchRequestsEvent()
 {
     const bool event_already_scheduled =
-        processPendingNewPrefetchRequestsEvent.scheduled();
+        process_pending_new_prefetch_requests_event.scheduled();
     const bool has_pending_new_requests = !pending_new_requests.empty();
     if (!event_already_scheduled && has_pending_new_requests) {
         const Tick scheduled_tick = curTick() + cyclesToTicks(Cycles(1));
-        schedule(processPendingNewPrefetchRequestsEvent, scheduled_tick);
+        schedule(process_pending_new_prefetch_requests_event, scheduled_tick);
     }
 }
 
@@ -277,13 +286,14 @@ void
 PrefetchQueue::scheduleProcessPendingStridePrefetchResultsEvent()
 {
     const bool event_already_scheduled =
-        sendPrefetchedDataFromStridePrefetcherToDMPEvent.scheduled();
+        send_prefetched_data_from_stride_prefetcher_to_dmp_event.scheduled();
     const bool has_pending_stride_prefetch_results =
         !pending_stride_prefetch_results.empty();
     if (!event_already_scheduled && has_pending_stride_prefetch_results) {
         const Tick scheduled_tick = curTick() + cyclesToTicks(Cycles(1));
         schedule(
-            sendPrefetchedDataFromStridePrefetcherToDMPEvent, scheduled_tick
+            send_prefetched_data_from_stride_prefetcher_to_dmp_event,
+            scheduled_tick
         );
     }
 }
@@ -315,12 +325,6 @@ PrefetchQueue::trackCacheHit(PacketPtr pkt)
         "Tracking cache hit for paddr 0x%llx (size %lu)\n",
         paddr, pkt->getSize()
     );
-    //if (
-    //    prefetch_requests.find(block_aligned_paddr)
-    //      != prefetch_requests.end()
-    //) {
-    //    notifyMemoryRequestCompleted(pkt);
-    //}
     notifyMemoryRequestCompleted(pkt);
 }
 
@@ -342,12 +346,6 @@ PrefetchQueue::trackCacheFill(PacketPtr pkt)
         "Tracking cache fill for paddr 0x%llx (size %lu)\n",
         paddr, pkt->getSize()
     );
-    //if (
-    //    prefetch_requests.find(block_aligned_paddr)
-    //          != prefetch_requests.end()
-    //) {
-    //    notifyMemoryRequestCompleted(pkt);
-    //}
     notifyMemoryRequestCompleted(pkt);
 }
 
@@ -361,7 +359,8 @@ void
 PrefetchQueue::processCompletedPrefetchRequest(
     const Addr prefetch_vaddr_block_aligned,
     const std::vector<uint8_t>& response_data,
-    const bool is_prefetch_hit_in_local_cache
+    const bool is_prefetch_hit_in_local_cache,
+    const bool translation_fault
 )
 {
     auto prefetch_request_it = prefetch_requests.find(
@@ -378,12 +377,26 @@ PrefetchQueue::processCompletedPrefetchRequest(
 
     std::list<PrefetchRequest> &requests = prefetch_request_it->second;
     for (PrefetchRequest &prefetch_request : requests) {
-        if (is_prefetch_hit_in_local_cache) {
+        if (translation_fault) {
+            stats.num_dropped_requests_due_to_translation_fault++;
+            DMP_PREFETCH_QUEUE_DEBUG(
+                "Translation fault for prefetch request with vaddr 0x%llx, "
+                "pc 0x%llx. Dropping this prefetch request.\n",
+                prefetch_request.prefetch_vaddr, prefetch_request.target_pc
+            );
+        } else if (is_prefetch_hit_in_local_cache) {
             stats.num_requests_fulfilled_by_local_cache++;
         } else {
             stats.num_requests_fulfilled_by_prefetching++;
         }
         prefetch_request.profileQueueLeavingTick();
+
+        // We only want to track prefetch request latency for the requests that
+        // are fulfilled, so we don't track the latency for the requests that
+        // are dropped due to translation fault.
+        if (translation_fault) {
+            continue;
+        }
         stats.prefetch_request_latency_histogram.sample(
             prefetch_request.getPrefetchLatency()
         );
@@ -417,12 +430,6 @@ PrefetchQueue::processCompletedPrefetchRequest(
                 prefetch_vaddr_block_aligned, request_vaddr, target_pc,
                 prefetch_request.size, prefetch_request.getResponse()
             );
-            // TODO:: fix this
-            //owner->handleNewPrefetchedDataFromStridePrefetcher(
-            //    /*target_paddr*/ request_vaddr,
-            //    /*pc*/ target_pc,
-            //    /*data*/ prefetch_request.getResponse()
-            //);
             pending_stride_prefetch_results.push(
                 std::make_tuple(
                     request_vaddr, target_pc, prefetch_request.getResponse()
@@ -450,8 +457,6 @@ PrefetchQueue::processCompletedPrefetchRequest(
         if (new_prefetch_requests.has_value()) {
             for (const PrefetchRequest &new_request :
                 new_prefetch_requests.value()) {
-                //enqueuePendingRequest(new_request);
-                // TODO: fix this
                 pending_new_requests.push_back(new_request);
                 scheduleProcessPendingNewPrefetchRequestsEvent();
                 owner->getStats().numDMPPrefetchesEmitted++;
@@ -509,6 +514,11 @@ PrefetchQueue::PrefetchQueueStats::PrefetchQueueStats(
         num_dropped_requests_due_to_full_queue,
         statistics::units::Count::get(),
         "Number of prefetch requests dropped due to full prefetch queue"
+    ),
+    ADD_STAT(
+        num_dropped_requests_due_to_translation_fault,
+        statistics::units::Count::get(),
+        "Number of prefetch requests dropped due to translation fault"
     ),
     ADD_STAT(
         num_requests_fulfilled_by_local_cache, statistics::units::Count::get(),

@@ -38,6 +38,8 @@
 #include "base/statistics.hh"
 #include "base/stats/group.hh"
 #include "base/types.hh"
+#include "debug/DifferentialMatchingPrefetcherMemoryRequestManagerDebug.hh"
+#include "debug/DifferentialMatchingPrefetcherMemoryRequestManagerStuckDebug.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_queue.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/util.hh"
 #include "mem/packet.hh"
@@ -54,34 +56,6 @@ namespace prefetch
 namespace dmp
 {
 
-// Callback when address translation is done without faults.
-AddressTranslationDoneCallbackType default_translation_done_callback =
-  std::bind(
-    &MemoryRequestManager::handleTranslationCompletion,
-    this, std::placeholders::_1
-  );
-// Callback when address translation should not happen, i.e., when we work
-// directly with physical addresses.
-AddressTranslationDoneCallbackType panic_translation_done_callback =
-  std::bind(
-    &MemoryRequestManager::errorIfTranslationComplete,
-    this, std::placeholders::_1
-  );
-
-// Callback when address translation is done with faults.
-AddressTranslationFaultCallbackType default_translation_fault_callback =
-  std::bind(
-    &MemoryRequestManager::handleTranslationFault,
-    this, std::placeholders::_1, std::placeholders::_2
-  );
-// Callback when address translation should not happen, i.e., when we work
-// directly with physical addresses.
-AddressTranslationFaultCallbackType panic_translation_fault_callback =
-  std::bind(
-    &MemoryRequestManager::errorIfTranslationFault,
-    this, std::placeholders::_1, std::placeholders::_2
-  );
-
 MemoryRequestBookkeeper::MemoryRequestBookkeeper(
   AddressTranslationDoneCallbackType _translation_done_callback,
   AddressTranslationFaultCallbackType _translation_fault_callback,
@@ -93,7 +67,9 @@ MemoryRequestBookkeeper::MemoryRequestBookkeeper(
     request_vaddr(_request_vaddr), request_paddr(_request_paddr),
     request_size(_request_size), requestor_id(_requestor_id), pc(_pc),
     local_cache_hit(false), ready_tick(_ready_tick),
-    queue_entering_tick(0), queue_leaving_tick(0),
+    translation_fault(false),
+    queue_entering_tick(0), translation_starting_tick(0),
+    translation_finishing_tick(0), queue_leaving_tick(0),
     request(nullptr), packet(nullptr),
     has_physical_address(has_physical_address)
 {
@@ -109,6 +85,8 @@ MemoryRequestBookkeeper::~MemoryRequestBookkeeper()
 
 MemoryRequestBookkeeper*
 MemoryRequestBookkeeper::createPrefetchRequestUsingVirtualAddr(
+    AddressTranslationDoneCallbackType _translation_done_callback,
+    AddressTranslationFaultCallbackType _translation_fault_callback,
     const Addr _request_vaddr, const uint64_t _request_size,
     const RequestorID _requestor_id, const Addr _pc, const Tick _ready_tick
 )
@@ -116,8 +94,8 @@ MemoryRequestBookkeeper::createPrefetchRequestUsingVirtualAddr(
     // We don't have the physical address in this case, so we use a dummy
     // value, signifying that the physical address is not known yet.
     return new MemoryRequestBookkeeper(
-        /*request_done_callback*/ default_translation_done_callback,
-        /*request_fault_callback*/ default_translation_fault_callback,
+        /*translation_done_callback*/ _translation_done_callback,
+        /*translation_fault_callback*/ _translation_fault_callback,
         /*request_vaddr*/ _request_vaddr,
         /*request_paddr*/ 0xBADC0DE,
         /*request_size*/ _request_size,
@@ -130,6 +108,8 @@ MemoryRequestBookkeeper::createPrefetchRequestUsingVirtualAddr(
 
 MemoryRequestBookkeeper*
 MemoryRequestBookkeeper::createPrefetchRequestUsingPhysicalAddr(
+    AddressTranslationDoneCallbackType _translation_done_callback,
+    AddressTranslationFaultCallbackType _translation_fault_callback,
     const Addr _request_paddr, const uint64_t _request_size,
     const RequestorID _requestor_id, const Addr _pc, const Tick _ready_tick
 )
@@ -137,8 +117,8 @@ MemoryRequestBookkeeper::createPrefetchRequestUsingPhysicalAddr(
     // We don't have the virtual address in this case, so we use the physical
     // address for both virtual and physical addresses.
     return new MemoryRequestBookkeeper(
-        /*request_done_callback*/ panic_translation_done_callback,
-        /*request_fault_callback*/ panic_translation_fault_callback,
+        /*translation_done_callback*/ _translation_done_callback,
+        /*translation_fault_callback*/ _translation_fault_callback,
         /*request_vaddr*/ _request_paddr,
         /*request_paddr*/ _request_paddr,
         /*request_size*/ _request_size,
@@ -153,6 +133,18 @@ void
 MemoryRequestBookkeeper::profileQueueEnteringTick()
 {
     queue_entering_tick = curTick();
+}
+
+void
+MemoryRequestBookkeeper::profileTranslationStartingTick()
+{
+    translation_starting_tick = curTick();
+}
+
+void
+MemoryRequestBookkeeper::profileTranslationFinishingTick()
+{
+    translation_finishing_tick = curTick();
 }
 
 void
@@ -231,6 +223,22 @@ MemoryRequestBookkeeper::setDataFromDataBlock(
     response_data.assign(data_ptr, data_ptr + request_size);
 }
 
+void
+MemoryRequestBookkeeper::setTranslationResult(
+    const Fault &fault, const RequestPtr &req
+)
+{
+    profileTranslationFinishingTick();
+    if (fault) {
+        translation_fault = true;
+        translation_fault_callback(this, fault);
+    } else {
+        translation_fault = false;
+        request_paddr = req->getPaddr();
+        translation_done_callback(this);
+    }
+}
+
 bool
 MemoryRequestBookkeeper::isCompleted() const
 {
@@ -245,12 +253,16 @@ MemoryRequestBookkeeper::isReady() const
 
 MemoryRequestManager::MemoryRequestManager(
     PrefetchQueue* _owner, ClockDomain* _clock_domain,
-    uint64_t _cache_block_size, const RequestorID _requestor_id, BaseMMU* _mmu,
+    uint64_t _cache_block_size, const RequestorID _requestor_id,
+    ThreadContext* _thread_context, BaseMMU* _mmu,
     const Cycles _local_cache_data_access_delay_in_cycles,
     const Cycles _request_propagation_delay
-) : owner(_owner), clock_domain(_clock_domain),
+) : owner(_owner),
+    clock_domain(_clock_domain),
     cache_block_size(_cache_block_size),
-    requestor_id(_requestor_id), mmu(_mmu),
+    requestor_id(_requestor_id),
+    thread_context(_thread_context),
+    mmu(_mmu),
     cache_controller(nullptr),
     local_cache_data_access_delay_in_cycles(
         _local_cache_data_access_delay_in_cycles
@@ -261,14 +273,30 @@ MemoryRequestManager::MemoryRequestManager(
     completed_request_queue(0),
     process_pending_translation_queue_event(
         [this]{ processPendingTranslationQueue(); },
-        "DMP MemoryRequestManager Process Pending Translation Queue Event"
+        "MemoryRequestManager Process Pending Translation Queue Event"
     ),
     process_completed_request_event(
         [this]{ processCompletedRequestQueue(); },
-        "DMP MemoryRequestManager Process Completed Request Queue Event"
+        "MemoryRequestManager Process Completed Request Queue Event"
     ),
     stats(owner, this, clock_domain)
 {
+    default_translation_done_callback = std::bind(
+        &MemoryRequestManager::handleTranslationCompletion, this,
+        std::placeholders::_1
+    );
+    default_translation_fault_callback = std::bind(
+        &MemoryRequestManager::handleTranslationFault, this,
+        std::placeholders::_1, std::placeholders::_2
+    );
+    panic_if_translation_done_callback = std::bind(
+        &MemoryRequestManager::errorIfTranslationComplete, this,
+        std::placeholders::_1
+    );
+    panic_if_translation_fault_callback = std::bind(
+        &MemoryRequestManager::errorIfTranslationFault, this,
+        std::placeholders::_1, std::placeholders::_2
+    );
 }
 
 void
@@ -311,6 +339,8 @@ MemoryRequestManager::enqueuePrefetchRequestUsingVirtualAddr(
     // Create a bookkeeper for this prefetch request
     MemoryRequestBookkeeper* bookkeeper =
         MemoryRequestBookkeeper::createPrefetchRequestUsingVirtualAddr(
+            /*translation_done_callback*/ default_translation_done_callback,
+            /*translation_fault_callback*/ default_translation_fault_callback,
             /*_request_vaddr*/ block_aligned_vaddr,
             /*_request_size*/ cache_block_size,
             /*_requestor_id*/ requestor_id,
@@ -355,6 +385,8 @@ MemoryRequestManager::enqueuePrefetchRequestUsingPhysicalAddr(
     // Create a bookkeeper for this prefetch request
     MemoryRequestBookkeeper* bookkeeper =
         MemoryRequestBookkeeper::createPrefetchRequestUsingPhysicalAddr(
+            /*translation_done_callback*/ panic_if_translation_done_callback,
+            /*translation_fault_callback*/ panic_if_translation_fault_callback,
             /*_request_vaddr*/ block_aligned_vaddr,
             /*_request_size*/ cache_block_size,
             /*_requestor_id*/ requestor_id,
@@ -380,7 +412,14 @@ MemoryRequestManager::handleTranslationCompletion(
     MemoryRequestBookkeeper* bookkeeper
 )
 {
-    // TODO
+    bookkeeper->ready_tick = std::max(
+        bookkeeper->ready_tick,
+        curTick() + clock_domain->cyclesToTicks(
+            request_propagation_delay_in_cycles
+        )
+    );
+    pending_memory_queue.push_back(bookkeeper);
+    scheduleSendAddressTranslationRequestsEvent();
 }
 
 void
@@ -388,7 +427,18 @@ MemoryRequestManager::handleTranslationFault(
     MemoryRequestBookkeeper* bookkeeper, const Fault& fault
 )
 {
-    // TODO
+    bookkeeper->ready_tick = std::max(
+        bookkeeper->ready_tick,
+        curTick() + clock_domain->cyclesToTicks(
+            request_propagation_delay_in_cycles
+        )
+    );
+    completed_request_queue.push(
+        /*priority*/ bookkeeper->ready_tick,
+        /*key*/ bookkeeper->request_paddr,
+        /*value*/ bookkeeper
+    );
+    scheduleProcessCompletedRequestQueueEvent();
 }
 
 void
@@ -595,7 +645,34 @@ MemoryRequestManager::processMemoryResponse(PacketPtr pkt)
 void
 MemoryRequestManager::processPendingTranslationQueue()
 {
-    // TODO
+    // We send 1 address translation request per cycle.
+    if (!pending_translation_queue.empty()) {
+        auto bookkeeper = pending_translation_queue.front();
+        if (!bookkeeper->isReady()) {
+            // The requests in the pending translation queue are ordered by
+            // their ready ticks, so if the front request is not ready yet,
+            // then the rest of the requests in the queue are also not ready
+            // yet, and we can stop processing the pending translation queue
+            // for now.
+        } else {
+            pending_translation_queue.pop();
+            mmu->translateTiming(
+                /*req*/ bookkeeper->getRequest(),
+                /*tc*/ thread_context,
+                /*translation*/ new AddressTranslationHandler(
+                    /*_bookkeeper*/ bookkeeper,
+                    /*_requestor_id*/ requestor_id
+                ),
+                /*mode*/ BaseMMU::Read
+            );
+            bookkeeper->profileTranslationStartingTick();
+        }
+    }
+    // Schedule sending the next address translation request if there are still
+    // pending requests in the pending translation queue.
+    if (!pending_translation_queue.empty()) {
+        scheduleSendAddressTranslationRequestsEvent();
+    }
 }
 
 void
@@ -620,7 +697,8 @@ MemoryRequestManager::processCompletedRequestQueue()
         owner->processCompletedPrefetchRequest(
             /*prefetch_vaddr_block_aligned*/ bookkeeper->request_vaddr,
             /*response_data*/ bookkeeper->response_data,
-            /*is_prefetch_hit_in_local_cache*/ bookkeeper->local_cache_hit
+            /*is_prefetch_hit_in_local_cache*/ bookkeeper->local_cache_hit,
+            /*translation_fault*/ bookkeeper->translation_fault
         );
         DMP_MEMORY_MANAGER_DEBUG(
             "Removing completed request for vaddr 0x%llx from completed "
@@ -707,8 +785,9 @@ MemoryRequestManager::MemoryRequestManagerStats::MemoryRequestManagerStats(
         "local cache or received a response from the memory system)"
     ),
     ADD_STAT(
-        num_memory_request_failed, statistics::units::Count::get(),
-        "Number of memory requests that failed (e.g. page fault)"
+        num_memory_request_failed_due_to_translation_fault,
+        statistics::units::Count::get(),
+        "Number of memory requests that failed due to translation fault"
     ),
     ADD_STAT(
         memory_request_queueing_duration_histogram,
@@ -748,10 +827,10 @@ MemoryRequestManager::MemoryRequestManagerStats::preDumpStats()
 {
     statistics::Group::preDumpStats();
 
-    DMP_MEMORY_MANAGER_DEBUG(
+    DMP_MEMORY_MANAGER_STUCK_DEBUG(
         "Predump stats for MemoryRequestManager %s\n", parent->name()
     );
-    DMP_MEMORY_MANAGER_DEBUG("Current tick: %lu\n", curTick());
+    DMP_MEMORY_MANAGER_STUCK_DEBUG("Current tick: %lu\n", curTick());
 
     const Tick cur_tick = curTick();
     const Tick threshold = clock_domain->cyclesToTicks(Cycles(10000));
@@ -765,7 +844,7 @@ MemoryRequestManager::MemoryRequestManagerStats::preDumpStats()
             memory_request_stuck_duration_histogram.sample(
                 request_duration
             );
-            DMP_MEMORY_MANAGER_DEBUG(
+            DMP_MEMORY_MANAGER_STUCK_DEBUG(
                 "Memory request for vaddr 0x%llx has been outstanding since "
                 "tick %lld, which exceeds the threshold of %lld ticks. This "
                 "request is considered stuck.\n",
