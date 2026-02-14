@@ -156,6 +156,9 @@ class BaseCPUCore(AbstractCore):
             if interrupt_responce != None:
                 self.core.interrupts[0].int_requestor = interrupt_responce
 
+    def has_mmu(self) -> bool:
+        return True
+
     @overrides(AbstractCore)
     def get_mmu(self) -> BaseMMU:
         return self.core.mmu
