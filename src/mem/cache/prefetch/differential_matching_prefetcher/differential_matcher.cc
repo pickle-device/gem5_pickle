@@ -301,10 +301,9 @@ DifferentialMatcher::matchCandidate(
     int64_t match_shift_amount_index = 0;
     Addr target_base_vaddr = 0xBADC0FFEE; // Placeholder
     for (const auto &shift_amount : matching_shift_amounts) {
-
-        const std::vector<int64_t> shifted_index_diffs = (shift_amount > 0) ?
-            multiplyVectorByFactor(index_diffs, 1LL << shift_amount) : \
-            multiplyVectorByFactor(index_diffs, (-1LL) << shift_amount);
+        const std::vector<int64_t> shifted_index_diffs = (shift_amount >= 0) ?
+            multiplyVectorByFactor(index_diffs, 1LL << shift_amount) :
+            multiplyVectorByFactor(index_diffs, -(1LL << shift_amount));
         DMP_DIFFERENTIAL_MATCHER_DEBUG(
             "Matching with shift amount %lld:\n", shift_amount
         );

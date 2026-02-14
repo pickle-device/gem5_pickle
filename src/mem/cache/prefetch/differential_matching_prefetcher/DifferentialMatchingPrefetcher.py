@@ -104,7 +104,7 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
         8, "Number of tracked items per target table entry"
     )
     matching_shift_amounts = VectorParam.Int64(
-        [-4, -3, -2, -1, 1, 2, 3, 4],
+        [-4, -3, -2, -1, 0, 1, 2, 3, 4],
         "Shifting amounts for differential matching. A shift amount of "
         "\alpha means we match a[i] with (b[i] >> \alpha). Negative shift "
         "amounts are also supported, meaning a[i] is matched with "
