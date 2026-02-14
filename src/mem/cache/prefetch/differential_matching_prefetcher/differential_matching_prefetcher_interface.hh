@@ -29,6 +29,8 @@
 #ifndef __DMP_INTERFACE_HH__
 #define __DMP_INTERFACE_HH__
 
+#include <string>
+
 #include "base/statistics.hh"
 #include "base/stats/group.hh"
 #include "base/types.hh"
@@ -97,6 +99,8 @@ class DifferentialMatchingPrefetcherInterface
     // Allow other prefetchers to query whether DMP already prefetches for
     // a specific PC.
     virtual bool isATargetPC(const Addr pc) const = 0;
+    // Get the prefetcher name
+    virtual std::string getPrefetcherName() const = 0;
     // Get the stats
     virtual PrefetcherStats& getStats() = 0;
 };

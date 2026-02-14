@@ -90,7 +90,11 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
         p.stride_prefetch_pc_even_when_dmp_has_the_same_target_pc,
         /*_prefetcher_interface*/ this
     ),
-    index_queue(p.index_queue_size, IndexQueueReplacementPolicy::LowestScore),
+    index_queue(
+        /*_max_size*/ p.index_queue_size,
+        /*_replacement_policy*/ IndexQueueReplacementPolicy::LRU,
+        /*_prefetcher_interface*/ this
+    ),
     indirection_candidate_scoreboard(
         /*_max_num_entries*/ p.indirection_candidate_scoreboard_num_entries,
         /*_max_num_candidates*/
@@ -313,6 +317,12 @@ void
 DifferentialMatchingPrefetcher::regStats()
 {
     ProbeListenerObject::regStats();
+}
+
+std::string
+DifferentialMatchingPrefetcher::getPrefetcherName() const
+{
+    return this->name();
 }
 
 bool

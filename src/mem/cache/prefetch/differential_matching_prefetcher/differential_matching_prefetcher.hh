@@ -125,6 +125,8 @@ class DifferentialMatchingPrefetcher : \
     void regProbeListeners() override;
     void regStats() override;
 
+    std::string getPrefetcherName() const override;
+
   private:
     // What to do when an event happens?
     void processDetectionEvent();
