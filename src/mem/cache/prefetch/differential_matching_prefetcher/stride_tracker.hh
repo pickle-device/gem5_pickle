@@ -44,6 +44,8 @@
 
 #define DMP_STRIDE_TRACKER_DEBUG(...) \
     DPRINTF(DifferentialMatchingPrefetcherStrideTrackerDebug, \
+            "%s: ", prefetcher_interface->getPrefetcherName().c_str()); \
+    DPRINTFR(DifferentialMatchingPrefetcherStrideTrackerDebug, \
             "(Stride Tracker) " __VA_ARGS__)
 
 namespace gem5
@@ -65,11 +67,13 @@ class StrideTrackerEntry
     Addr previous_effective_address;
     SatCounter8 confidence;
     double confidence_threshold;
+    DifferentialMatchingPrefetcherInterface *prefetcher_interface;
   public:
     StrideTrackerEntry(
       const Addr _pc, const uint64_t _access_size,
       const Addr _block_address, const Tick _access_timestamp,
-      const double _confidence_threshold
+      const double _confidence_threshold,
+      DifferentialMatchingPrefetcherInterface *prefetcher_interface
     );
     void update(
       const Addr block_address, const Tick access_timestamp

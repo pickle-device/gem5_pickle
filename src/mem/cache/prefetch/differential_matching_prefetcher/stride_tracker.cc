@@ -42,14 +42,16 @@ namespace dmp
 
 StrideTrackerEntry::StrideTrackerEntry(
   const Addr _pc, const uint64_t _access_size, const Addr _block_address,
-  const Tick _access_timestamp, const double _confidence_threshold
+  const Tick _access_timestamp, const double _confidence_threshold,
+  DifferentialMatchingPrefetcherInterface *prefetcher_interface
 ) : pc(_pc),
     access_size(_access_size),
     access_timestamp(_access_timestamp),
     previous_stride(0),
     previous_effective_address(_block_address),
     confidence(/*bits*/3, /*initial_value*/4),
-    confidence_threshold(_confidence_threshold)
+    confidence_threshold(_confidence_threshold),
+    prefetcher_interface(prefetcher_interface)
 {
 }
 
@@ -151,7 +153,8 @@ StrideTracker::replaceLeastRecentlyUsedEntry(
 {
     if (stride_tracker.size() < capacity) {
         stride_tracker.emplace_back(
-            pc, access_size, paddr, access_timestamp, confidence_threshold
+            pc, access_size, paddr, access_timestamp, confidence_threshold,
+            prefetcher_interface
         );
         DMP_STRIDE_TRACKER_DEBUG(
             "Added new entry for PC %#x\n", pc
@@ -167,11 +170,14 @@ StrideTracker::replaceLeastRecentlyUsedEntry(
         }
     }
     // Replace the LRU entry with the new one
+    const Addr evicted_pc = lru_it->pc;
     *lru_it = StrideTrackerEntry(
-        pc, access_size, paddr, access_timestamp, confidence_threshold
+        pc, access_size, paddr, access_timestamp, confidence_threshold,
+        prefetcher_interface
     );
     DMP_STRIDE_TRACKER_DEBUG(
-        "Replaced LRU entry with new entry for PC %#x\n", pc
+        "Replaced LRU entry with new entry for PC %#x by evicting PC %#x\n",
+        pc, evicted_pc
     );
 }
 
