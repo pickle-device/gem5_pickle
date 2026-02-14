@@ -37,9 +37,14 @@
 #include "base/trace.hh"
 #include "base/types.hh"
 #include "debug/DifferentialMatchingPrefetcherIndexQueueDebug.hh"
+#include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
 
 #define DMP_INDEX_QUEUE_DEBUG(...) \
-    DPRINTF(DifferentialMatchingPrefetcherIndexQueueDebug, \
+    DPRINTF(\
+      DifferentialMatchingPrefetcherIndexQueueDebug, \
+      "%s: ", prefetcher_interface->getPrefetcherName().c_str() \
+    ); \
+    DPRINTFR(DifferentialMatchingPrefetcherIndexQueueDebug, \
             "(Index Queue) " __VA_ARGS__)
 
 namespace gem5
@@ -58,8 +63,12 @@ class IndexQueueEntry
     Tick access_timestamp;
     uint64_t tried_count;
     uint64_t matched_count;
+    DifferentialMatchingPrefetcherInterface *prefetcher_interface;
 
-    IndexQueueEntry(Addr _pc, Tick _access_timestamp);
+    IndexQueueEntry(
+      Addr _pc, Tick _access_timestamp,
+      DifferentialMatchingPrefetcherInterface *_prefetcher_interface
+    );
     void profileTried();
     void profileMatched();
     double getScore() const;
@@ -76,6 +85,7 @@ class IndexQueue
   private:
     const uint64_t max_size;
     const IndexQueueReplacementPolicy replacement_policy;
+    DifferentialMatchingPrefetcherInterface *prefetcher_interface;
     std::vector<IndexQueueEntry> index_queue;
     void replaceLeastRecentlyUsedEntry(
         const Addr pc, const Tick access_timestamp
@@ -85,7 +95,9 @@ class IndexQueue
     );
   public:
     IndexQueue(
-      uint64_t _max_size, IndexQueueReplacementPolicy _replacement_policy);
+      uint64_t _max_size, IndexQueueReplacementPolicy _replacement_policy,
+      DifferentialMatchingPrefetcherInterface *prefetcher_interface
+    );
     void add(const Addr pc, const Tick access_timestamp);
     bool isFull() const;
     // According to the paper's Section 4.3, DMP only picks the PC with the

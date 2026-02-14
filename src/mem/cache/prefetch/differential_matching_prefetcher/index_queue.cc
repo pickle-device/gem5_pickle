@@ -44,9 +44,12 @@ namespace prefetch
 namespace dmp
 {
 
-IndexQueueEntry::IndexQueueEntry(Addr _pc, Tick _access_timestamp)
-  : pc(_pc), access_timestamp(_access_timestamp),
-    tried_count(0), matched_count(0)
+IndexQueueEntry::IndexQueueEntry(
+    Addr _pc, Tick _access_timestamp,
+    DifferentialMatchingPrefetcherInterface *_prefetcher_interface
+) : pc(_pc), access_timestamp(_access_timestamp),
+    tried_count(0), matched_count(0),
+    prefetcher_interface(_prefetcher_interface)
 {
 }
 
@@ -73,8 +76,10 @@ IndexQueueEntry::getScore() const
 }
 
 IndexQueue::IndexQueue(
-    uint64_t _max_size, IndexQueueReplacementPolicy _replacement_policy
-) : max_size(_max_size), replacement_policy(_replacement_policy)
+    uint64_t _max_size, IndexQueueReplacementPolicy _replacement_policy,
+    DifferentialMatchingPrefetcherInterface *_prefetcher_interface
+) : max_size(_max_size), replacement_policy(_replacement_policy),
+    prefetcher_interface(_prefetcher_interface)
 {
     index_queue.reserve(max_size);
 }
@@ -96,7 +101,9 @@ IndexQueue::replaceLeastRecentlyUsedEntry(
     }
 
     // replace the LRU entry
-    *lru_it = std::move(IndexQueueEntry(pc, access_timestamp));
+    *lru_it = std::move(IndexQueueEntry(
+        pc, access_timestamp, prefetcher_interface
+    ));
 }
 
 void
@@ -114,7 +121,9 @@ IndexQueue::replaceLowestScoreEntry(const Addr pc, const Tick access_timestamp)
     }
 
     // replace the lowest score entry
-    *lowest_score_it = std::move(IndexQueueEntry(pc, access_timestamp));
+    *lowest_score_it = std::move(IndexQueueEntry(
+        pc, access_timestamp, prefetcher_interface
+    ));
 }
 
 void
@@ -137,7 +146,7 @@ IndexQueue::add(const Addr pc, const Tick access_timestamp)
 
     // If the PC was not found and if there is still space, add the new entry
     if (index_queue.size() < max_size) {
-        index_queue.emplace_back(pc, access_timestamp);
+        index_queue.emplace_back(pc, access_timestamp, prefetcher_interface);
         return;
     }
 
