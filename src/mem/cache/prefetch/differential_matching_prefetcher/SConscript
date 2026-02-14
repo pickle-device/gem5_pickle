@@ -59,7 +59,7 @@ Source('tracking_entry_with_filters.cc')
 
 DebugFlag('DifferentialMatchingPrefetcherCacheObserverDebug')
 DebugFlag('DifferentialMatchingPrefetcherDebug')
-DebugFlag('DifferentialMatchingPrefetcherDifferentMatcherDebug')
+DebugFlag('DifferentialMatchingPrefetcherDifferentialMatcherDebug')
 DebugFlag('DifferentialMatchingPrefetcherIndexQueueDebug')
 DebugFlag('DifferentialMatchingPrefetcherIndirectRelationTableDebug')
 DebugFlag('DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug')
@@ -78,7 +78,7 @@ CompoundFlag(
     'DifferentialMatchingPrefetcherAllDebug',
     [
         'DifferentialMatchingPrefetcherDebug',
-        'DifferentialMatchingPrefetcherDifferentMatcherDebug',
+        'DifferentialMatchingPrefetcherDifferentialMatcherDebug',
         'DifferentialMatchingPrefetcherIndexQueueDebug',
         'DifferentialMatchingPrefetcherIndirectRelationTableDebug',
         'DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug',

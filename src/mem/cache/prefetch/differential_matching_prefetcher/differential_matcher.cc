@@ -33,7 +33,7 @@
 
 #include "base/trace.hh"
 #include "base/types.hh"
-#include "debug/DifferentialMatchingPrefetcherDifferentMatcherDebug.hh"
+#include "debug/DifferentialMatchingPrefetcherDifferentialMatcherDebug.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
 
 namespace gem5

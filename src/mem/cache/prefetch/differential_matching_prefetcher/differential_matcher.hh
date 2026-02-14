@@ -37,12 +37,12 @@
 
 #include "base/logging.hh"
 #include "base/types.hh"
-#include "debug/DifferentialMatchingPrefetcherDifferentMatcherDebug.hh"
+#include "debug/DifferentialMatchingPrefetcherDifferentialMatcherDebug.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/tracking_entry_with_filters.hh"
 
 #define DMP_DIFFERENTIAL_MATCHER_DEBUG(...) \
-    DPRINTF(DifferentialMatchingPrefetcherDifferentMatcherDebug, \
+    DPRINTF(DifferentialMatchingPrefetcherDifferentialMatcherDebug, \
             "(Matcher) " __VA_ARGS__)
 
 namespace gem5
