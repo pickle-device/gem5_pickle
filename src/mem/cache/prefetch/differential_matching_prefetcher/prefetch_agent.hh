@@ -83,6 +83,11 @@ class PrefetchAgent : public prefetch::Base
     // This function is called by the prefetcher proxy to determine when the
     // next prefetch request will be ready to be issued.
     Tick nextPrefetchReadyTime() const override;
+  private:
+    // Determines whether we want to observe this cache access.
+    bool isObservable(
+      const CacheAccessProbeArg &arg, const bool is_miss, const bool has_data
+    ) const;
 };  // class PrefetchAgent
 
 }; // namespace dmp

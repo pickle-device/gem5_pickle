@@ -46,6 +46,9 @@ PrefetchAgent::PrefetchAgent(const PrefetchAgentParams& params)
 void
 PrefetchAgent::notify(const CacheAccessProbeArg &acc, const PrefetchInfo &pfi)
 {
+    if (!isObservable(acc, pfi.isCacheMiss(), pfi.requestHasData())) {
+        return;
+    }
     const Addr vaddr = pfi.getAddr();
     const Addr paddr = acc.pkt->req->getPaddr();
     const Addr pc = acc.pkt->req->getPC();
@@ -66,6 +69,9 @@ PrefetchAgent::notify(const CacheAccessProbeArg &acc, const PrefetchInfo &pfi)
 void
 PrefetchAgent::notifyFill(const CacheAccessProbeArg &acc)
 {
+    if (!isObservable(acc, false, acc.pkt->hasData())) {
+        return;
+    }
     const Addr paddr = acc.pkt->req->getPaddr();
     const Addr pc = acc.pkt->req->getPC();
     DMP_PREFETCH_AGENT_CACHE_OBSERVER_DEBUG(
@@ -104,6 +110,43 @@ PrefetchAgent::nextPrefetchReadyTime() const
         );
     }
     return next_ready_tick;
+}
+
+bool
+PrefetchAgent::isObservable(
+    const CacheAccessProbeArg &arg, const bool is_miss, const bool has_data
+) const
+{
+    const bool has_vaddr = arg.pkt->req->hasVaddr();
+    const bool has_pc = arg.pkt->req->hasPC();
+    const bool is_uncacheable = arg.pkt->req->isUncacheable();
+    const bool is_instruction = arg.pkt->req->isInstFetch();
+
+    if (!is_miss && !has_data) {
+        // We only care about cache hits/fills with data, as we want to track
+        // them in the matcher.
+        return false;
+    }
+
+    PacketPtr pkt = arg.pkt;
+
+    if (pkt == nullptr) {
+        return false;
+    }
+
+    if (pkt->cmd == MemCmd::CleanEvict) {
+        return false;
+    }
+
+    // We only want to observe data cache accesses that,
+    // - have virtual address
+    // - have PC (so we can track them in the matcher)
+    // - not be uncacheable, e.g., I/O accesses
+    // - not be instruction fetches, as we are doing data prefetching
+    if (has_vaddr && has_pc && !is_uncacheable && !is_instruction) {
+        return true;
+    }
+    return false;
 }
 
 }  // namespace dmp

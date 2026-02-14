@@ -320,8 +320,20 @@ DifferentialMatchingPrefetcher::isObservable(
     const SimpleCacheAccessProbeArg &arg
 )
 {
-    // We only observe data access with virtual address
-    return arg.req->hasVaddr();
+    const bool has_vaddr = arg.req->hasVaddr();
+    const bool has_pc = arg.req->hasPC();
+    const bool is_uncacheable = arg.req->isUncacheable();
+    const bool is_instruction = arg.req->isInstFetch();
+
+    // We only want to observe data cache accesses that,
+    // - have virtual address
+    // - have PC (so we can track them in the matcher)
+    // - not be uncacheable, e.g., I/O accesses
+    // - not be instruction fetches, as we are doing data prefetching
+    if (has_vaddr && has_pc && !is_uncacheable && !is_instruction) {
+        return true;
+    }
+    return false;
 }
 
 void
@@ -330,6 +342,10 @@ DifferentialMatchingPrefetcher::observeL1CacheHit(
 )
 {
     if (!isObservable(arg)) {
+        return;
+    }
+
+    if (!arg.hasCacheFillData()) {
         return;
     }
 
