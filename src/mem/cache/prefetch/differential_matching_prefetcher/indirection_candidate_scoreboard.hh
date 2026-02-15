@@ -98,7 +98,7 @@ struct PcPairHash
 
 class IndirectionCandidateScoreboard
 {
-  public:
+  private:
     // Maximum number of entries in the scoreboard
     const uint64_t max_num_entries;
     // Maximum number of candidates per entry
@@ -113,10 +113,11 @@ class IndirectionCandidateScoreboard
     std::vector<IndirectionCandidateScoreboardEntry> scoreboard;
     DifferentialMatchingPrefetcherInterface *prefetcher_interface;
 
+  public:
     IndirectionCandidateScoreboard(
       const uint64_t _max_num_entries, const uint64_t _max_num_candidates,
       const uint64_t _sample_window_size,
-      bool _deprioritize_previously_unsuccessful_match,
+      const bool _deprioritize_previously_unsuccessful_match,
       DifferentialMatchingPrefetcherInterface *_prefetcher_interface
     );
     // Return true if the scoreboard is full.
