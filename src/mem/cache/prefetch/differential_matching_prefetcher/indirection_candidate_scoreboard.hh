@@ -41,7 +41,10 @@
 
 #define DMP_ICS_DEBUG(...) \
     DPRINTF(DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug,\
-            "(ICS) " __VA_ARGS__)
+            "%s: ", prefetcher_interface->getPrefetcherName().c_str()); \
+    DPRINTFR(\
+      DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug,\
+      "(ICS) " __VA_ARGS__)
 
 namespace gem5
 {
@@ -71,10 +74,12 @@ class IndirectionCandidateScoreboardEntry
     Addr index_pc;
     std::vector<CandidateEntry> candidates;
     uint64_t tracked_l1_cache_miss_count;
+    DifferentialMatchingPrefetcherInterface* prefetcher_interface;
   public:
     IndirectionCandidateScoreboardEntry(
         const Addr index_pc, const uint64_t _capacity,
-        const uint64_t _sample_window_size
+        const uint64_t _sample_window_size,
+        DifferentialMatchingPrefetcherInterface* _prefetcher_interface
     );
     Addr getIndexPC() const;
     void trackL1CacheMiss(const Addr target_pc);

@@ -36,6 +36,7 @@
 #include "base/logging.hh"
 #include "base/types.hh"
 #include "debug/DifferentialMatchingPrefetcherIndirectionCandidateScoreboardDebug.hh"
+#include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
 
 namespace gem5
 {
@@ -60,9 +61,11 @@ CandidateEntry::profileL1CacheMiss()
 
 IndirectionCandidateScoreboardEntry::IndirectionCandidateScoreboardEntry(
   const Addr _index_pc, const uint64_t _capacity,
-  const uint64_t _sample_window_size
+  const uint64_t _sample_window_size,
+  DifferentialMatchingPrefetcherInterface* _prefetcher_interface
 ) : max_num_candidates(_capacity), sample_window_size(_sample_window_size),
-    index_pc(_index_pc), candidates(), tracked_l1_cache_miss_count(0)
+    index_pc(_index_pc), candidates(), tracked_l1_cache_miss_count(0),
+    prefetcher_interface(_prefetcher_interface)
 {
     candidates.reserve(max_num_candidates);
 }
@@ -82,12 +85,6 @@ IndirectionCandidateScoreboardEntry::trackL1CacheMiss(const Addr target_pc)
     }
 
     tracked_l1_cache_miss_count++;
-    //DMP_ICS_DEBUG(
-    //    "Tracking L1 cache miss for Index PC %#x: Target PC %#x, "
-    //    "Total tracked L1 cache misses: %lu/%lu\n",
-    //    index_pc, target_pc, tracked_l1_cache_miss_count,
-    //    sample_window_size
-    //);
 
     // Check if the PC is already in the candidates list
     for (auto &candidate : candidates) {
@@ -134,7 +131,6 @@ IndirectionCandidateScoreboard::IndirectionCandidateScoreboard(
     deprioritize_previously_unsuccessful_match(
         _deprioritize_previously_unsuccessful_match
     ),
-    scoreboard(),
     prefetcher_interface(_prefetcher_interface)
 {
     scoreboard.reserve(max_num_entries);
@@ -150,7 +146,7 @@ bool
 IndirectionCandidateScoreboard::addEntry(const Addr index_pc)
 {
     // If the index PC already exists, do nothing
-    for (const auto &entry : scoreboard) {
+    for (auto &entry : scoreboard) {
         if (entry.getIndexPC() == index_pc) {
             return false;
         }
@@ -159,7 +155,7 @@ IndirectionCandidateScoreboard::addEntry(const Addr index_pc)
     // If the scoreboard is not full, add a new entry
     if (!isFull()) {
         scoreboard.emplace_back(
-            index_pc, max_num_entries, sample_window_size
+            index_pc, max_num_entries, sample_window_size, prefetcher_interface
         );
         DMP_ICS_DEBUG("Added index PC %#x to ICS\n", index_pc);
         // If still not full, notify the prefetcher interface that ICS has
