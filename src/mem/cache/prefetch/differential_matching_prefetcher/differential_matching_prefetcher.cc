@@ -335,6 +335,15 @@ DifferentialMatchingPrefetcher::isObservable(
     const bool is_uncacheable = arg.req->isUncacheable();
     const bool is_instruction = arg.req->isInstFetch();
 
+    // https://developer.arm.com/documentation/101811/0105/Address-spaces/
+    // Size-of-virtual-addresses
+    //const bool is_in_kernel_address_space = (has_vaddr && has_pc) ?
+    //    (bits(arg.req->getVaddr(), 63, 48) == 0xFFFF) : false;
+    //if (is_in_kernel_address_space) {
+    //    // We don't want to track kernel address accesses.
+    //    return false;
+    //}
+
     // We only want to observe data cache accesses that,
     // - have virtual address
     // - have PC (so we can track them in the matcher)

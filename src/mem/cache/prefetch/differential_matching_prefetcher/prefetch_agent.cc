@@ -28,6 +28,8 @@
 
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_agent.hh"
 
+#include "base/bitfield.hh"
+
 namespace gem5
 {
 
@@ -121,6 +123,15 @@ PrefetchAgent::isObservable(
     const bool has_pc = arg.pkt->req->hasPC();
     const bool is_uncacheable = arg.pkt->req->isUncacheable();
     const bool is_instruction = arg.pkt->req->isInstFetch();
+
+    // https://developer.arm.com/documentation/101811/0105/Address-spaces/
+    // Size-of-virtual-addresses
+    //const bool is_in_kernel_address_space = (has_vaddr && has_pc) ?
+    //    (bits(arg.pkt->req->getVaddr(), 63, 48) == 0xFFFF) : false;
+    //if (is_in_kernel_address_space) {
+    //    // We don't want to track kernel address accesses.
+    //    return false;
+    //}
 
     if (!is_miss && !has_data) {
         // We only care about cache hits/fills with data, as we want to track
