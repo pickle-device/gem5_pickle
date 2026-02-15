@@ -43,6 +43,8 @@
 
 #define DMP_DIFFERENTIAL_MATCHER_DEBUG(...) \
     DPRINTF(DifferentialMatchingPrefetcherDifferentialMatcherDebug, \
+            "%s: ", prefetcher_interface->getPrefetcherName().c_str()); \
+    DPRINTFR(DifferentialMatchingPrefetcherDifferentialMatcherDebug, \
             "(Matcher) " __VA_ARGS__)
 
 namespace gem5

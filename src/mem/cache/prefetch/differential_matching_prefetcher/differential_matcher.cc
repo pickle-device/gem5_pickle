@@ -107,8 +107,21 @@ DifferentialMatcher::addCandidate(const Addr index_pc, const Addr target_pc)
     const bool is_full = isFull();
     const bool has_similar_candidate = \
         hasCandidate(index_pc, target_pc) || hasCandidate(target_pc, index_pc);
-    if (is_full || has_similar_candidate) {
+    if (is_full) {
+        DMP_DIFFERENTIAL_MATCHER_DEBUG(
+            "Cannot add candidate pair (Index PC %#x, Target PC %#x) because "
+            "the candidate table is full.\n",
+            index_pc, target_pc
+        );
         return false; // Cannot add new candidate
+    }
+    if (has_similar_candidate) {
+        DMP_DIFFERENTIAL_MATCHER_DEBUG(
+            "Candidate pair (Index PC %#x, Target PC %#x) or its reverse "
+            "already exists. Not adding a new candidate.\n",
+            index_pc, target_pc
+        );
+        return false; // Similar candidate already exists
     }
     CandidatePcPair pc_pair = std::make_pair(index_pc, target_pc);
     TrackingPair tracking_pair = std::make_pair(
