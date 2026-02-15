@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "base/types.hh"
+#include "sim/cur_tick.hh"
 
 namespace gem5
 {
@@ -49,6 +50,7 @@ class TrackingEntryWithRepetitionFilter
   public:
     Addr pc;
     uint64_t max_num_tracked_items;
+    Tick previous_update_tick;
     // Tracked items: pair of <item, size>
     // For index PC, item is data value, and size is data size (in bytes)
     std::vector<std::pair<Addr, uint64_t>> tracked_items;
@@ -69,6 +71,7 @@ class TrackingEntryWithRepetitionFilterAndRangeFilter
     uint64_t max_num_tracked_items;
     Addr previous_tracked_item;
     Addr previous_size;
+    Tick previous_update_tick;
     // Tracked items: pair of <item, size>
     // For target PC, the item is effective virtual address, and size is the
     // range size (in number of items).

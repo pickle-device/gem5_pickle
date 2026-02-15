@@ -45,7 +45,8 @@ TrackingEntryWithRepetitionFilter::TrackingEntryWithRepetitionFilter(
     const Addr _pc,
     const uint64_t _max_num_tracked_items
 ) : pc(_pc),
-    max_num_tracked_items(_max_num_tracked_items)
+    max_num_tracked_items(_max_num_tracked_items),
+    previous_update_tick(curTick())
 {
     tracked_items.reserve(max_num_tracked_items);
 }
@@ -55,6 +56,7 @@ TrackingEntryWithRepetitionFilter::addItem(
     const Addr item, const uint64_t size
 )
 {
+    previous_update_tick = curTick();
     // If we have already tracked the maximum number of items, we do not add
     // more
     if (tracked_items.size() >= max_num_tracked_items) {
@@ -82,7 +84,8 @@ TrackingEntryWithRepetitionFilterAndRangeFilter::\
 ) : pc(_pc),
     max_num_tracked_items(_max_num_tracked_items),
     previous_tracked_item(0),
-    previous_size(0)
+    previous_size(0),
+    previous_update_tick(curTick())
 {
     tracked_items.reserve(max_num_tracked_items);
 }
@@ -92,6 +95,7 @@ TrackingEntryWithRepetitionFilterAndRangeFilter::addItem(
     const Addr item, const uint64_t size
 )
 {
+    previous_update_tick = curTick();
     // If we have already tracked the maximum number of items, we do not add
     // more
     if (tracked_items.size() >= max_num_tracked_items) {
