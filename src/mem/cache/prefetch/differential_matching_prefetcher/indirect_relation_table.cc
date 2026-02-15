@@ -37,6 +37,7 @@
 #include "base/trace.hh"
 #include "base/types.hh"
 #include "debug/DifferentialMatchingPrefetcherIndirectRelationTableDebug.hh"
+#include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_request.hh"
 #include "sim/cur_tick.hh"
 
@@ -50,12 +51,14 @@ namespace dmp
 {
 
 RangeTableEntry::RangeTableEntry(
-  const Addr _target_pc
+  const Addr _target_pc,
+  DifferentialMatchingPrefetcherInterface* _prefetcher_interface
 ) : target_pc(_target_pc),
     total_count(0),
     prev_effective_address(0),
     prev_access_size(0),
-    current_range_count(0)
+    current_range_count(0),
+    prefetcher_interface(_prefetcher_interface)
 {
     range_counters.fill(0);
 
@@ -191,7 +194,8 @@ IndirectRelationTableEntry::IndirectRelationTableEntry(
   const Addr _target_base_vaddr,
   const uint64_t _shift_amount,
   const AccessType _index_access_type,
-  const AccessType _target_access_type
+  const AccessType _target_access_type,
+  DifferentialMatchingPrefetcherInterface* _prefetcher_interface
 ) : id(next_id++),
     index_pc(_index_pc),
     target_pc(_target_pc),
@@ -199,7 +203,7 @@ IndirectRelationTableEntry::IndirectRelationTableEntry(
     shift_amount(_shift_amount),
     index_access_type(_index_access_type),
     target_access_type(_target_access_type),
-    range_table_entry(_target_pc),
+    range_table_entry(_target_pc, _prefetcher_interface),
     prev_access_tick(curTick())
 {
 }
@@ -255,10 +259,11 @@ IndirectRelationTableEntry::getPrefetchesIfIndexPcMatches(
 
 IndirectRelationTable::IndirectRelationTable(
   const uint64_t _max_num_indirect_relation_entries,
-  const uint64_t _max_num_range_table_entries
+  const uint64_t _max_num_range_table_entries,
+  DifferentialMatchingPrefetcherInterface* _prefetcher_interface
 ) : max_num_indirect_relation_entries(_max_num_indirect_relation_entries),
     max_num_range_table_entries(_max_num_range_table_entries),
-    entries()
+    prefetcher_interface(_prefetcher_interface)
 {
     entries.reserve(max_num_indirect_relation_entries);
 }
@@ -312,7 +317,7 @@ IndirectRelationTable::addEntry(
     } else {
         entries.emplace_back(
             index_pc, target_pc, target_base_vaddr, shift_amount,
-            index_access_type, target_access_type
+            index_access_type, target_access_type, prefetcher_interface
         );
     }
 
@@ -449,7 +454,7 @@ IndirectRelationTable::replaceLeastRecentlyUsedEntry(
         );
         *lru_it = IndirectRelationTableEntry(
             index_pc, target_pc, target_base_vaddr, shift_amount,
-            index_access_type, target_access_type
+            index_access_type, target_access_type, prefetcher_interface
         );
     }
 }

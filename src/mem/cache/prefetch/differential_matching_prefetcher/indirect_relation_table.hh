@@ -43,10 +43,16 @@
 #define DMP_IRT_DEBUG(...) \
     DPRINTF(\
         DifferentialMatchingPrefetcherIndirectRelationTableDebug, \
+        "%s: ", prefetcher_interface->getPrefetcherName().c_str()); \
+    DPRINTFR(\
+        DifferentialMatchingPrefetcherIndirectRelationTableDebug, \
         "(IRT) " __VA_ARGS__)
 
 #define DMP_RT_DEBUG(...) \
     DPRINTF(\
+        DifferentialMatchingPrefetcherRangeTableDebug, \
+        "%s: ", prefetcher_interface->getPrefetcherName().c_str()); \
+    DPRINTFR(\
         DifferentialMatchingPrefetcherRangeTableDebug, \
         "(RT) " __VA_ARGS__)
 
@@ -68,8 +74,12 @@ class RangeTableEntry
     Addr prev_effective_address;
     Addr prev_access_size;
     uint64_t current_range_count;
+    DifferentialMatchingPrefetcherInterface* prefetcher_interface;
   public:
-    RangeTableEntry(const Addr _target_pc);
+    RangeTableEntry(
+      const Addr _target_pc,
+      DifferentialMatchingPrefetcherInterface* _prefetcher_interface
+    );
     void profileL1CacheAccess(
         const Addr effective_address, const Addr size
     );
@@ -95,6 +105,7 @@ class IndirectRelationTableEntry
     AccessType target_access_type;
     RangeTableEntry range_table_entry;
     Tick prev_access_tick;
+    DifferentialMatchingPrefetcherInterface* prefetcher_interface;
   public:
     IndirectRelationTableEntry(
         const Addr _index_pc,
@@ -102,7 +113,8 @@ class IndirectRelationTableEntry
         const Addr _target_base_vaddr,
         const uint64_t _shift_amount,
         const AccessType _index_access_type,
-        const AccessType _target_access_type
+        const AccessType _target_access_type,
+        DifferentialMatchingPrefetcherInterface* _prefetcher_interface
     );
     uint64_t getId() const;
     std::optional<std::vector<PrefetchRequest>> \
@@ -117,10 +129,12 @@ class IndirectRelationTable
     const uint64_t max_num_indirect_relation_entries;
     const uint64_t max_num_range_table_entries;
     std::vector<IndirectRelationTableEntry> entries;
+    DifferentialMatchingPrefetcherInterface* prefetcher_interface;
   public:
     IndirectRelationTable(
       const uint64_t _max_num_indirect_relation_entries,
-      const uint64_t _max_num_range_table_entries
+      const uint64_t _max_num_range_table_entries,
+      DifferentialMatchingPrefetcherInterface* _prefetcher_interface
     );
     void addEntry(
         const Addr index_pc,
