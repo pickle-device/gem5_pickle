@@ -114,7 +114,7 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
         16, "Number of entries in the indirect relation table (IRT)"
     )
     range_table_num_entries = Param.Unsigned(
-        4, "Number of entries in the range table"
+        8, "Number of entries in the range table (paper says 4)"
     )
 
     # Stride prefetcher parameters
