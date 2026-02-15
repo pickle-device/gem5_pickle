@@ -101,7 +101,7 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
         16, "Number of entries in the target table"
     )
     tracked_items_per_target_table_entry = Param.Unsigned(
-        8, "Number of tracked items per target table entry"
+        16, "Number of tracked items per target table entry (paper says 8)"
     )
     matching_shift_amounts = VectorParam.Int64(
         [-4, -3, -2, -1, 0, 1, 2, 3, 4],
@@ -160,4 +160,24 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
         "we lower the score that target PC the next time, allowing the ICS to "
         "allow other PCs to be proposed. This is done by decreasing the "
         "weight of the unsuccessful target PC in the ICS.",
+    )
+    evict_stuck_entries_patch = Param.Bool(
+        True,
+        "In the paper, there's no mention how the IndexTable and the "
+        "TargetTable entries are evicted. (In our implementation, the tables "
+        " are in the DifferentialMatcher) We find that some entries in the "
+        "tables can stay for a long time even when they are no longer "
+        "relevant. E.g., when a kernel function is no longer hot, the PC "
+        "pairs related to that kernel function can linger in the tables, "
+        "preventing new candidates from being added. This patch implements a "
+        "mechanism to evict entries in both tables that are not active for "
+        "more than 100000 cycles.",
+    )
+    stuck_entry_eviction_threshold_cycles = Param.Cycles(
+        10000,
+        "The threshold for evicting stuck entries in the IndexTable and "
+        "TargetTable. If an entry in the IndexTable or TargetTable has not "
+        "been updated for more than this number of cycles, it will be "
+        "evicted. This is only effective when evict_stuck_entries_patch is "
+        "True.",
     )

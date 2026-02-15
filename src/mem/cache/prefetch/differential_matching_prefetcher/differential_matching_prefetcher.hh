@@ -97,7 +97,6 @@ class DifferentialMatchingPrefetcher : \
     PrefetchQueue *stride_prefetch_queue;
     ruby::AbstractController *l1_controller;
     ruby::AbstractController *l2_controller;
-    EventFunctionWrapper process_detection_event;
     const bool enable_dmp_prefetching;
 
   // prefetcher parameters
@@ -128,9 +127,6 @@ class DifferentialMatchingPrefetcher : \
     std::string getPrefetcherName() const override;
 
   private:
-    // What to do when an event happens?
-    void processDetectionEvent();
-    void scheduleHandleDetectionEvent();
     // Helper functions for processing events
     void promoteIndexPcFromIqToIcs();
     void addIndirectionCandidateToDifferentialMatcher(

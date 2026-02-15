@@ -51,6 +51,9 @@ DifferentialMatcher::DifferentialMatcher(
     const uint64_t _max_num_target_table_entries,
     const uint64_t _max_num_tracked_items_per_target_table_entry,
     const std::vector<int64_t> &_matching_shift_amounts,
+    bool evict_stuck_entries,
+    const Cycles stuck_entry_eviction_threshold_cycles,
+    ClockDomain* _clock_domain,
     DifferentialMatchingPrefetcherInterface *_prefetcher_interface
 ) : max_num_index_table_entries(_max_num_index_table_entries),
     max_num_tracked_items_per_index_table_entry(
@@ -61,6 +64,11 @@ DifferentialMatcher::DifferentialMatcher(
         _max_num_tracked_items_per_target_table_entry
     ),
     matching_shift_amounts(_matching_shift_amounts),
+    evict_stuck_entries(evict_stuck_entries),
+    stuck_entry_eviction_threshold_cycles(
+        stuck_entry_eviction_threshold_cycles
+    ),
+    clock_domain(_clock_domain),
     prefetcher_interface(_prefetcher_interface)
 {
     panic_if(
@@ -91,6 +99,43 @@ DifferentialMatcher::isFull() const
     return candidate_index_target_pc.size() >= max_num_index_table_entries;
 }
 
+void
+DifferentialMatcher::stuckEntriesRemovalService()
+{
+    if (!evict_stuck_entries) {
+        return;
+    }
+    std::vector<CandidatePcPair> candidates_to_remove;
+    const Tick current_tick = curTick();
+    const Tick minimum_age_for_eviction = clock_domain->cyclesToTicks(
+            stuck_entry_eviction_threshold_cycles
+        );
+    for (
+        const auto &[
+            candidate_pair, tracking_entries
+        ] : candidate_index_target_pc
+    ) {
+        const TrackingPair &tracking_pair = tracking_entries;
+        const IndexPcTrackingEntry &index_entry = tracking_pair.first;
+        const TargetPcTrackingEntry &target_entry = tracking_pair.second;
+        const Tick index_entry_age =
+            current_tick - index_entry.previous_update_tick;
+        const Tick target_entry_age =
+            current_tick - target_entry.previous_update_tick;
+        if (index_entry_age >= minimum_age_for_eviction &&
+            target_entry_age >= minimum_age_for_eviction) {
+            candidates_to_remove.push_back(candidate_pair);
+        }
+    }
+    for (const auto &candidate_pair : candidates_to_remove) {
+        candidate_index_target_pc.erase(candidate_pair);
+        DMP_DIFFERENTIAL_MATCHER_DEBUG(
+            "Removed stuck candidate pair: Index PC %#x, Target PC %#x\n",
+            candidate_pair.first, candidate_pair.second
+        );
+    }
+}
+
 bool
 DifferentialMatcher::hasCandidate(
     const Addr index_pc, const Addr target_pc
@@ -107,6 +152,9 @@ DifferentialMatcher::addCandidate(const Addr index_pc, const Addr target_pc)
     const bool is_full = isFull();
     const bool has_similar_candidate = \
         hasCandidate(index_pc, target_pc) || hasCandidate(target_pc, index_pc);
+    if (is_full && evict_stuck_entries) {
+        stuckEntriesRemovalService();
+    }
     if (is_full) {
         DMP_DIFFERENTIAL_MATCHER_DEBUG(
             "Cannot add candidate pair (Index PC %#x, Target PC %#x) because "
@@ -261,13 +309,13 @@ DifferentialMatcher::matchCandidate(
 
     std::vector<int64_t> target_diffs;
     const auto &target_filtered_items = target_entry.tracked_items;
-    const size_t max_range_counter = std::max_element(
-        target_filtered_items.begin(),
-        target_filtered_items.end(),
-        [](const auto &a, const auto &b) {
-            return a.second < b.second;
-        }
-    )->second;
+    //const size_t max_range_counter = std::max_element(
+    //    target_filtered_items.begin(),
+    //    target_filtered_items.end(),
+    //    [](const auto &a, const auto &b) {
+    //        return a.second < b.second;
+    //    }
+    //)->second;
     for (size_t i = 1; i < target_filtered_items.size(); ++i) {
         const int64_t curr_eff_addr = static_cast<int64_t>(
             target_filtered_items[i].first
@@ -313,6 +361,7 @@ DifferentialMatcher::matchCandidate(
     bool match_found = false;
     int64_t match_shift_amount_index = 0;
     Addr target_base_vaddr = 0xBADC0FFEE; // Placeholder
+    uint64_t max_range_counter = 1;
     for (const auto &shift_amount : matching_shift_amounts) {
         const std::vector<int64_t> shifted_index_diffs = (shift_amount >= 0) ?
             multiplyVectorByFactor(index_diffs, 1LL << shift_amount) :
@@ -338,6 +387,13 @@ DifferentialMatcher::matchCandidate(
                         idx_diff1, idx_diff2, idx_diff3,
                         tgt_diff1, tgt_diff2, tgt_diff3
                     );
+                    max_range_counter = std::max({
+                        max_range_counter,
+                        target_filtered_items[j].second,
+                        target_filtered_items[j + 1].second,
+                        target_filtered_items[j + 2].second,
+                        target_filtered_items[j + 3].second,
+                    });
                     match_found = true;
                     match_shift_amount_index = shift_amount;
                     if (shift_amount >= 0) {

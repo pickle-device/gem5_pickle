@@ -62,9 +62,6 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
     stride_prefetch_queue(p.stride_prefetch_queue),
     l1_controller(p.l1_controller),
     l2_controller(p.l2_controller),
-    process_detection_event(
-        [this]{processDetectionEvent();}, name() + ".process_detection_event"
-    ),
     enable_dmp_prefetching(p.enable_dmp_prefetching),
     index_queue_size(p.index_queue_size),
     indirection_candidate_scoreboard_num_entries(
@@ -117,6 +114,12 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
         p.tracked_items_per_target_table_entry,
         /*_matching_shift_amounts*/
         p.matching_shift_amounts,
+        /*_evict_stuck_entries*/
+        p.evict_stuck_entries_patch,
+        /*_stuck_entry_eviction_threshold_cycles*/
+        p.stuck_entry_eviction_threshold_cycles,
+        /*_clock_domain*/
+        p.clock_domain,
         /*_prefetcher_interface*/
         this
     ),
@@ -124,7 +127,9 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
         /*_max_num_indirect_relation_entries*/
         p.indirect_relation_table_num_entries,
         /*_max_num_range_table_entries*/
-        p.range_table_num_entries
+        p.range_table_num_entries,
+        /*_prefetcher_interface*/
+        this
     ),
     stats(this)
 {
@@ -146,24 +151,6 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
     stride_prefetch_queue->setCacheController(l1_controller);
     stride_prefetch_queue->setIndirectRelationTable(nullptr);
     stride_tracker.setPrefetchQueue(stride_prefetch_queue);
-}
-
-void
-DifferentialMatchingPrefetcher::processDetectionEvent()
-{
-    // Here, we move candidate PC around the components
-    promoteIndexPcFromIqToIcs(); // IQ -> ICS
-}
-
-void
-DifferentialMatchingPrefetcher::scheduleHandleDetectionEvent()
-{
-    if (!process_detection_event.scheduled()) {
-        schedule(
-            process_detection_event,
-            curTick() + clock_domain->cyclesToTicks(Cycles(1))
-        );
-    }
 }
 
 void

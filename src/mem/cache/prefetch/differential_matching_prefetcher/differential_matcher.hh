@@ -40,6 +40,7 @@
 #include "debug/DifferentialMatchingPrefetcherDifferentialMatcherDebug.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/tracking_entry_with_filters.hh"
+#include "sim/clock_domain.hh"
 
 #define DMP_DIFFERENTIAL_MATCHER_DEBUG(...) \
     DPRINTF(DifferentialMatchingPrefetcherDifferentialMatcherDebug, \
@@ -70,6 +71,9 @@ class DifferentialMatcher
     const uint64_t max_num_target_table_entries;
     const uint64_t max_num_tracked_items_per_target_table_entry;
     const std::vector<int64_t> matching_shift_amounts;
+    const bool evict_stuck_entries;
+    const Cycles stuck_entry_eviction_threshold_cycles;
+    ClockDomain* clock_domain;
     DifferentialMatchingPrefetcherInterface *prefetcher_interface;
   public:
     DifferentialMatcher(
@@ -80,12 +84,17 @@ class DifferentialMatcher
       // Shifting amounts for differential matching
       // A shift amount of \alpha means we match a[i] with (b[i] >> \alpha)
       const std::vector<int64_t> &_matching_shift_amounts,
+      bool evict_stuck_entries,
+      const Cycles stuck_entry_eviction_threshold_cycles,
+      ClockDomain* _clock_domain,
       DifferentialMatchingPrefetcherInterface *_prefetcher_interface
     );
     ~DifferentialMatcher() = default;
 
     bool isEmpty() const;
     bool isFull() const;
+
+    void stuckEntriesRemovalService();
 
     bool hasCandidate(const Addr index_pc, const Addr target_pc) const;
 
