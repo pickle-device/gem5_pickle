@@ -268,7 +268,7 @@ MemoryRequestManager::MemoryRequestManager(
         _local_cache_data_access_delay_in_cycles
     ),
     request_propagation_delay_in_cycles(_request_propagation_delay),
-    skip_address_translation(_mmu != nullptr),
+    skip_address_translation(_mmu == nullptr),
     previous_local_cache_access_completion_tick(0),
     completed_request_queue(0),
     process_pending_translation_queue_event(
