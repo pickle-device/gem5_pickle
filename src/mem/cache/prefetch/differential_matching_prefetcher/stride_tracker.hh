@@ -33,6 +33,7 @@
 #include <optional>
 #include <vector>
 
+#include "base/addr_range.hh"
 #include "base/logging.hh"
 #include "base/sat_counter.hh"
 #include "base/trace.hh"
@@ -86,7 +87,7 @@ class StrideTracker
   private:
     const uint64_t capacity;
     const double confidence_threshold;
-    const Addr memory_size_in_bytes;
+    const AddrRangeList memory_ranges;
     const uint64_t cache_block_size;
     const uint64_t prefetch_distance;
     const uint64_t prefetch_degree;
@@ -107,7 +108,7 @@ class StrideTracker
   public:
     StrideTracker(
       const uint64_t _capacity, const double _confidence_threshold,
-      const Addr _memory_size_in_bytes, const uint64_t _cache_block_size,
+      const AddrRangeList _memory_ranges, const uint64_t _cache_block_size,
       const uint64_t _prefetch_distance, const uint64_t _prefetch_degree,
       const bool _can_cross_page, const Addr _page_size_in_bytes,
       const bool _stride_prefetch_pc_even_when_dmp_has_the_same_target_pc,

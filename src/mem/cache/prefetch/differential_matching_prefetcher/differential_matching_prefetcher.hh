@@ -33,6 +33,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "base/addr_range.hh"
 #include "base/cache/associative_cache.hh"
 #include "base/sat_counter.hh"
 #include "base/statistics.hh"
@@ -92,7 +93,7 @@ class DifferentialMatchingPrefetcher : \
     System *system;
     const uint64_t cache_line_size;
     ClockDomain *clock_domain;
-    const Addr memory_size_in_bytes;
+    const AddrRangeList memory_ranges;
     PrefetchQueue *dmp_prefetch_queue;
     PrefetchQueue *stride_prefetch_queue;
     ruby::AbstractController *l1_controller;

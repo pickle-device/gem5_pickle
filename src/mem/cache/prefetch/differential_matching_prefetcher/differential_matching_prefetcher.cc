@@ -30,6 +30,7 @@
 
 #include <cassert>
 
+#include "base/addr_range.hh"
 #include "base/intmath.hh"
 #include "base/logging.hh"
 #include "base/random.hh"
@@ -57,7 +58,7 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
 ) : ProbeListenerObject(p), system(p.system),
     cache_line_size(p.system->cacheLineSize()),
     clock_domain(p.clock_domain),
-    memory_size_in_bytes(p.memory_size),
+    memory_ranges(p.memory_ranges.begin(), p.memory_ranges.end()),
     dmp_prefetch_queue(p.dmp_prefetch_queue),
     stride_prefetch_queue(p.stride_prefetch_queue),
     l1_controller(p.l1_controller),
@@ -77,7 +78,7 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
     stride_tracker(
         /*capacity*/ p.stride_prefetcher_num_entries,
         /*_confidence_threshold*/ 0.5,
-        /*_memory_size_in_bytes*/ p.memory_size,
+        /*_memory_ranges*/ memory_ranges,
         /*_cache_block_size*/ p.system->cacheLineSize(),
         /*_prefetch_distance*/ p.stride_prefetcher_distance,
         /*_prefetch_degree*/ p.stride_prefetcher_degree,
@@ -136,7 +137,7 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
     // We use 1KiB as a placeholder value for memory size because the actual
     // memory size is not known at the time of prefetcher construction in
     // Python. The actual memory size must be set later.
-    panic_if(memory_size_in_bytes == 1024, "Memory size must be set");
+    panic_if(memory_ranges.empty(), "Memory ranges must be set");
     panic_if(l1_controller == nullptr,
             "L1 controller pointer passed to DMP prefetcher is null");
     panic_if(l2_controller == nullptr,
@@ -499,13 +500,29 @@ DifferentialMatchingPrefetcher::handleNewPrefetchedDataFromStridePrefetcher(
                 target_paddr, pc, new_prefetch.prefetch_vaddr
             );
             if (enable_dmp_prefetching) {
-                if (new_prefetch.prefetch_vaddr >= memory_size_in_bytes) {
+                //if (new_prefetch.prefetch_vaddr >= memory_size_in_bytes) {
+                //    stats.numDMPPrefetchesDroppedDueToOutOfMemoryBounds++;
+                //    DMP_PREFETCHER_DEBUG(
+                //        "Dropping DMP prefetch request due to out of memory "
+                //        "bounds: "
+                //        "prefetch_vaddr=%#x, memory_size_in_bytes=%#x\n",
+                //        new_prefetch.prefetch_vaddr, memory_size_in_bytes
+                //    );
+                //    continue;
+                //}
+                bool is_out_of_bounds = true;
+                for (const AddrRange &range : memory_ranges) {
+                    if (range.contains(new_prefetch.prefetch_vaddr)) {
+                        is_out_of_bounds = false;
+                        break;
+                    }
+                }
+                if (is_out_of_bounds) {
                     stats.numDMPPrefetchesDroppedDueToOutOfMemoryBounds++;
                     DMP_PREFETCHER_DEBUG(
                         "Dropping DMP prefetch request due to out of memory "
-                        "bounds: "
-                        "prefetch_vaddr=%#x, memory_size_in_bytes=%#x\n",
-                        new_prefetch.prefetch_vaddr, memory_size_in_bytes
+                        "bounds: prefetch_vaddr=%#x\n",
+                        new_prefetch.prefetch_vaddr
                     );
                     continue;
                 }

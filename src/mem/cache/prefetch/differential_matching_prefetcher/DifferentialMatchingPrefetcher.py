@@ -37,9 +37,12 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
 
     system = Param.System(Parent.any, "System this prefetcher belongs to")
     clock_domain = Param.ClockDomain("Clock domain for this prefetcher")
-    memory_size = Param.MemorySize(
-        "Size of memory, i.e., RAM. Used to avoid going out-of-bounds when "
-        "generating prefetches."
+    memory_ranges = VectorParam.AddrRange(
+        [],
+        "The memory ranges of the system. This is used to determine whether a "
+        "prefetch address is out of bounds when generating prefetches. If the "
+        "prefetch address is out of bounds, the prefetcher will not generate "
+        "a prefetch for that address.",
     )
     dmp_prefetch_queue = Param.DifferentialMatchingPrefetcherPrefetchQueue(
         "The prefetch queue serving as the backend of this prefetcher"
@@ -118,6 +121,9 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
     )
 
     # Stride prefetcher parameters
+    stride_prefetcher_num_entries = Param.Unsigned(
+        64, "Number of entries in the stride prefetcher table"
+    )
     stride_prefetcher_distance = Param.Unsigned(
         2, "Distance for the stride prefetcher used in DMP"
     )
