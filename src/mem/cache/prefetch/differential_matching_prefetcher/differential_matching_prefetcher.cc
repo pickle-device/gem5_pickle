@@ -75,7 +75,7 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
         p.ics_deprioritize_on_unsuccessful_matching_patch
     ),
     stride_tracker(
-        /*capacity*/ p.index_queue_size,
+        /*capacity*/ p.stride_prefetcher_num_entries,
         /*_confidence_threshold*/ 0.5,
         /*_memory_size_in_bytes*/ p.memory_size,
         /*_cache_block_size*/ p.system->cacheLineSize(),
