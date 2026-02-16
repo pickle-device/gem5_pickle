@@ -500,32 +500,8 @@ DifferentialMatchingPrefetcher::handleNewPrefetchedDataFromStridePrefetcher(
                 target_paddr, pc, new_prefetch.prefetch_vaddr
             );
             if (enable_dmp_prefetching) {
-                //if (new_prefetch.prefetch_vaddr >= memory_size_in_bytes) {
-                //    stats.numDMPPrefetchesDroppedDueToOutOfMemoryBounds++;
-                //    DMP_PREFETCHER_DEBUG(
-                //        "Dropping DMP prefetch request due to out of memory "
-                //        "bounds: "
-                //        "prefetch_vaddr=%#x, memory_size_in_bytes=%#x\n",
-                //        new_prefetch.prefetch_vaddr, memory_size_in_bytes
-                //    );
-                //    continue;
-                //}
-                bool is_out_of_bounds = true;
-                for (const AddrRange &range : memory_ranges) {
-                    if (range.contains(new_prefetch.prefetch_vaddr)) {
-                        is_out_of_bounds = false;
-                        break;
-                    }
-                }
-                if (is_out_of_bounds) {
-                    stats.numDMPPrefetchesDroppedDueToOutOfMemoryBounds++;
-                    DMP_PREFETCHER_DEBUG(
-                        "Dropping DMP prefetch request due to out of memory "
-                        "bounds: prefetch_vaddr=%#x\n",
-                        new_prefetch.prefetch_vaddr
-                    );
-                    continue;
-                }
+                // We don't need to check for memory bounds here as we're
+                // working with virtual addresses.
                 dmp_prefetch_queue->enqueuePendingRequest(new_prefetch);
             }
         }
