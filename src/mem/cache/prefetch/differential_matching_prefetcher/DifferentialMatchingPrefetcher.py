@@ -101,7 +101,7 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
         16, "Number of entries in the target table"
     )
     tracked_items_per_target_table_entry = Param.Unsigned(
-        16, "Number of tracked items per target table entry (paper says 8)"
+        4, "Number of tracked items per target table entry"
     )
     matching_shift_amounts = VectorParam.Int64(
         [-4, -3, -2, -1, 0, 1, 2, 3, 4],

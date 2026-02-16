@@ -449,8 +449,8 @@ IndirectRelationTable::replaceLeastRecentlyUsedEntry(
     if (lru_it != entries.end()) {
         DMP_IRT_DEBUG(
             "Replacing least recently used IndirectRelationTableEntry: "
-            "previously accessed %llu\n",
-            lru_it->prev_access_tick
+            "index_pc: %#x, target_pc: %#x, previously accessed %llu\n",
+            lru_it->index_pc, lru_it->target_pc, lru_it->prev_access_tick
         );
         *lru_it = IndirectRelationTableEntry(
             index_pc, target_pc, target_base_vaddr, shift_amount,
