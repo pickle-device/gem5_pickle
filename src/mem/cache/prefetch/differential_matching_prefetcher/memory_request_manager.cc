@@ -412,6 +412,11 @@ MemoryRequestManager::handleTranslationCompletion(
     MemoryRequestBookkeeper* bookkeeper
 )
 {
+    DMP_MEMORY_MANAGER_DEBUG(
+        "Handling address translation completion for "
+        "vaddr 0x%llx, paddr 0x%llx\n",
+        bookkeeper->request_vaddr, bookkeeper->request_paddr
+    );
     bookkeeper->ready_tick = std::max(
         bookkeeper->ready_tick,
         curTick() + clock_domain->cyclesToTicks(
@@ -428,6 +433,11 @@ MemoryRequestManager::handleTranslationFault(
     MemoryRequestBookkeeper* bookkeeper, const Fault& fault
 )
 {
+    DMP_MEMORY_MANAGER_DEBUG(
+        "Handling address translation fault for vaddr 0x%llx\n",
+        bookkeeper->request_vaddr
+    );
+    stats.num_translation_faults++;
     bookkeeper->ready_tick = std::max(
         bookkeeper->ready_tick,
         curTick() + clock_domain->cyclesToTicks(
@@ -436,7 +446,9 @@ MemoryRequestManager::handleTranslationFault(
     );
     completed_request_queue.push(
         /*priority*/ bookkeeper->ready_tick,
-        /*key*/ bookkeeper->request_paddr,
+        // use vaddr with the highest bit set as the key to avoid conflict with
+        // normal requests that use paddr as the key. TODO: Fix this!
+        /*key*/ bookkeeper->request_vaddr + (1ULL << 63),
         /*value*/ bookkeeper
     );
     scheduleProcessCompletedRequestQueueEvent();
