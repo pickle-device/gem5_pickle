@@ -71,7 +71,7 @@ PrefetchAgent::notify(const CacheAccessProbeArg &acc, const PrefetchInfo &pfi)
 void
 PrefetchAgent::notifyFill(const CacheAccessProbeArg &acc)
 {
-    if (!isObservable(acc, false, acc.pkt->hasData())) {
+    if (!isObservable(acc, false, acc.pkt->hasRespData())) {
         return;
     }
     const Addr paddr = acc.pkt->req->getPaddr();
@@ -133,7 +133,7 @@ PrefetchAgent::isObservable(
     //    return false;
     //}
 
-    if (!is_miss && !has_data) {
+    if (is_miss || !has_data) {
         // We only care about cache hits/fills with data, as we want to track
         // them in the matcher.
         return false;
