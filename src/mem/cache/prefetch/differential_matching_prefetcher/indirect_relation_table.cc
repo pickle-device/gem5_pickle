@@ -207,7 +207,8 @@ IndirectRelationTableEntry::IndirectRelationTableEntry(
     index_access_type(_index_access_type),
     target_access_type(_target_access_type),
     range_table_entry(_target_pc, _prefetcher_interface),
-    prev_access_tick(curTick())
+    prev_access_tick(curTick()),
+    prefetcher_interface(_prefetcher_interface)
 {
 }
 
