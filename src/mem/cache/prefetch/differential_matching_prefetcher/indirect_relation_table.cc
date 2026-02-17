@@ -195,8 +195,11 @@ IndirectRelationTableEntry::IndirectRelationTableEntry(
   const uint64_t _shift_amount,
   const AccessType _index_access_type,
   const AccessType _target_access_type,
+  const uint64_t _cache_block_size,
   DifferentialMatchingPrefetcherInterface* _prefetcher_interface
 ) : id(next_id++),
+    cache_block_size(_cache_block_size),
+    block_shift(log2(_cache_block_size)),
     index_pc(_index_pc),
     target_pc(_target_pc),
     target_base_vaddr(_target_base_vaddr),
@@ -224,14 +227,22 @@ IndirectRelationTableEntry::getPrefetchesIfIndexPcMatches(
         std::vector<PrefetchRequest> prefetch_requests;
         // Generate prefetch requests based on data_from_index_pc
         if (target_access_type == AccessType::Single) {
-            Addr prefetch_vaddr = target_base_vaddr +
+            const Addr prefetch_vaddr = target_base_vaddr +
                 (data_from_index_pc << shift_amount);
-            prefetch_requests.emplace_back(
-                /*target_pc*/ target_pc,
-                /*prefetch_vaddr*/ prefetch_vaddr,
-                /*size*/ 1ULL << shift_amount,
-                /*irt_id*/ id
-            );
+            const uint64_t prefetch_size = 1ULL << shift_amount;
+            if (!sameBlock(
+                prefetch_vaddr, prefetch_vaddr + prefetch_size - 1
+            )) {
+                PrefetcherStats &stats = prefetcher_interface->getStats();
+                stats.numDMPPrefetchesDroppedDueToCrossBlockAccesses++;
+            } else {
+                prefetch_requests.emplace_back(
+                    /*target_pc*/ target_pc,
+                    /*prefetch_vaddr*/ prefetch_vaddr,
+                    /*size*/ prefetch_size,
+                    /*irt_id*/ id
+                );
+            }
         } else if (target_access_type == AccessType::Range) {
             // For range access, we can prefetch a range of addresses
             const uint64_t predicted_range_size =
@@ -242,14 +253,22 @@ IndirectRelationTableEntry::getPrefetchesIfIndexPcMatches(
                 id, index_pc, data_from_index_pc, predicted_range_size
             );
             for (uint64_t i = 0; i < predicted_range_size; i++) {
-                Addr prefetch_vaddr = target_base_vaddr +
-                    ((data_from_index_pc + i) << shift_amount);
-                prefetch_requests.emplace_back(
-                    /*target_pc*/ target_pc,
-                    /*prefetch_vaddr*/ prefetch_vaddr,
-                    /*size*/ 1ULL << shift_amount,
-                    /*irt_id*/ id
-                );
+                const Addr prefetch_vaddr = target_base_vaddr +
+                    (data_from_index_pc << shift_amount);
+                const uint64_t prefetch_size = 1ULL << shift_amount;
+                if (!sameBlock(
+                    prefetch_vaddr, prefetch_vaddr + prefetch_size - 1
+                )) {
+                    PrefetcherStats &stats = prefetcher_interface->getStats();
+                    stats.numDMPPrefetchesDroppedDueToCrossBlockAccesses++;
+                } else {
+                    prefetch_requests.emplace_back(
+                        /*target_pc*/ target_pc,
+                        /*prefetch_vaddr*/ prefetch_vaddr,
+                        /*size*/ prefetch_size,
+                        /*irt_id*/ id
+                    );
+                }
             }
         }
         return prefetch_requests;
@@ -257,12 +276,20 @@ IndirectRelationTableEntry::getPrefetchesIfIndexPcMatches(
     return std::nullopt;
 }
 
+bool
+IndirectRelationTableEntry::sameBlock(const Addr addr1, const Addr addr2) const
+{
+    return (addr1 >> block_shift) == (addr2 >> block_shift);
+}
+
 IndirectRelationTable::IndirectRelationTable(
   const uint64_t _max_num_indirect_relation_entries,
   const uint64_t _max_num_range_table_entries,
+  const uint64_t _cache_block_size,
   DifferentialMatchingPrefetcherInterface* _prefetcher_interface
 ) : max_num_indirect_relation_entries(_max_num_indirect_relation_entries),
     max_num_range_table_entries(_max_num_range_table_entries),
+    cache_block_size(_cache_block_size),
     prefetcher_interface(_prefetcher_interface)
 {
     entries.reserve(max_num_indirect_relation_entries);
@@ -317,7 +344,8 @@ IndirectRelationTable::addEntry(
     } else {
         entries.emplace_back(
             index_pc, target_pc, target_base_vaddr, shift_amount,
-            index_access_type, target_access_type, prefetcher_interface
+            index_access_type, target_access_type, cache_block_size,
+            prefetcher_interface
         );
     }
 
@@ -454,7 +482,8 @@ IndirectRelationTable::replaceLeastRecentlyUsedEntry(
         );
         *lru_it = IndirectRelationTableEntry(
             index_pc, target_pc, target_base_vaddr, shift_amount,
-            index_access_type, target_access_type, prefetcher_interface
+            index_access_type, target_access_type, cache_block_size,
+            prefetcher_interface
         );
     }
 }

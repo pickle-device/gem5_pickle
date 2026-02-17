@@ -112,6 +112,7 @@ StrideTracker::StrideTracker(
     prefetch_degree(_prefetch_degree),
     can_cross_page(_can_cross_page),
     page_size_in_bytes(_page_size_in_bytes),
+    block_shift(log2(_cache_block_size)),
     page_shift(log2(_page_size_in_bytes)),
     stride_prefetch_pc_even_when_dmp_has_the_same_target_pc(
         _stride_prefetch_pc_even_when_dmp_has_the_same_target_pc
@@ -265,6 +266,20 @@ StrideTracker::emitPrefetches(
                     "Emitting prefetch for PC %#x to address %#x\n",
                     pc, prefetch_address
                 );
+                // Check if the prefetch spans across cache blocks, and if so,
+                // we currently don't emit such prefetches to avoid complexity.
+                if (!sameBlock(
+                    prefetch_address, prefetch_address + entry.access_size - 1
+                )) {
+                    PrefetcherStats &stats = prefetcher_interface->getStats();
+                    stats.numStridePrefetchesDroppedDueToCrossBlockAccesses++;
+                    DMP_STRIDE_TRACKER_DEBUG(
+                        "Not emitting prefetch for PC %#x to address %#x as "
+                        "it spans across cache blocks (access size %lu)\n",
+                        pc, prefetch_address, entry.access_size
+                    );
+                    continue;
+                }
                 // Enqueue the prefetch request
                 recentPrefetchAddresses.push(prefetch_address);
                 prefetch_queue->enqueuePendingRequest(
@@ -286,6 +301,12 @@ bool
 StrideTracker::samePage(const Addr addr1, const Addr addr2) const
 {
     return (addr1 >> page_shift) == (addr2 >> page_shift);
+}
+
+bool
+StrideTracker::sameBlock(const Addr addr1, const Addr addr2) const
+{
+    return (addr1 >> block_shift) == (addr2 >> block_shift);
 }
 
 } // namespace dmp

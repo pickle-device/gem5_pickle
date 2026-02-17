@@ -39,6 +39,7 @@
 #include "debug/DifferentialMatchingPrefetcherRangeTableDebug.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher_interface.hh"
 #include "mem/cache/prefetch/differential_matching_prefetcher/prefetch_request.hh"
+#include "mem/cache/prefetch/differential_matching_prefetcher/util.hh"
 
 #define DMP_IRT_DEBUG(...) \
     DPRINTF(\
@@ -96,6 +97,8 @@ class IndirectRelationTableEntry
   private:
     static uint64_t next_id;
     uint64_t id;
+    uint64_t cache_block_size;
+    uint64_t block_shift;
   public:
     Addr index_pc;
     Addr target_pc;
@@ -114,6 +117,7 @@ class IndirectRelationTableEntry
         const uint64_t _shift_amount,
         const AccessType _index_access_type,
         const AccessType _target_access_type,
+        const uint64_t _cache_block_size,
         DifferentialMatchingPrefetcherInterface* _prefetcher_interface
     );
     uint64_t getId() const;
@@ -121,6 +125,8 @@ class IndirectRelationTableEntry
         getPrefetchesIfIndexPcMatches(
         const Addr index_pc, const int64_t data_from_index_pc
     );
+  private:
+    bool sameBlock(const Addr addr1, const Addr addr2) const;
 };
 
 class IndirectRelationTable
@@ -129,11 +135,13 @@ class IndirectRelationTable
     const uint64_t max_num_indirect_relation_entries;
     const uint64_t max_num_range_table_entries;
     std::vector<IndirectRelationTableEntry> entries;
+    const uint64_t cache_block_size;
     DifferentialMatchingPrefetcherInterface* prefetcher_interface;
   public:
     IndirectRelationTable(
       const uint64_t _max_num_indirect_relation_entries,
       const uint64_t _max_num_range_table_entries,
+      const uint64_t _cache_block_size,
       DifferentialMatchingPrefetcherInterface* _prefetcher_interface
     );
     void addEntry(

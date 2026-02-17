@@ -129,6 +129,8 @@ DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
         p.indirect_relation_table_num_entries,
         /*_max_num_range_table_entries*/
         p.range_table_num_entries,
+        /*_cache_block_size*/
+        p.system->cacheLineSize(),
         /*_prefetcher_interface*/
         this
     ),

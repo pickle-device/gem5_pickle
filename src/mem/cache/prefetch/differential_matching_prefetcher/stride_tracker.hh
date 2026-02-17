@@ -93,6 +93,7 @@ class StrideTracker
     const uint64_t prefetch_degree;
     const bool can_cross_page;
     const Addr page_size_in_bytes;
+    const uint64_t block_shift;
     const uint64_t page_shift;
     const bool stride_prefetch_pc_even_when_dmp_has_the_same_target_pc;
     std::vector<StrideTrackerEntry> stride_tracker;
@@ -124,6 +125,7 @@ class StrideTracker
       const Addr pc, const Addr paddr, const Tick access_timestamp
     );
     bool samePage(const Addr addr1, const Addr addr2) const;
+    bool sameBlock(const Addr addr1, const Addr addr2) const;
 };
 
 } // namespace dmp

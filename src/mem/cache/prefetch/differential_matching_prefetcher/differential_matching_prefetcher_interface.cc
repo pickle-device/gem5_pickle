@@ -66,6 +66,11 @@ PrefetcherStats::PrefetcherStats(statistics::Group *parent)
         "Number of stride prefetches dropped due to out of memory bounds"
     ),
     ADD_STAT(
+        numStridePrefetchesDroppedDueToCrossBlockAccesses,
+        statistics::units::Count::get(),
+        "Number of stride prefetches dropped due to cross-block accesses"
+    ),
+    ADD_STAT(
         numDMPPrefetchesEmitted, statistics::units::Count::get(),
         "Number of DMP prefetches emitted"
     ),
@@ -73,6 +78,11 @@ PrefetcherStats::PrefetcherStats(statistics::Group *parent)
         numDMPPrefetchesDroppedDueToOutOfMemoryBounds,
         statistics::units::Count::get(),
         "Number of DMP prefetches dropped due to out of memory bounds"
+    ),
+    ADD_STAT(
+        numDMPPrefetchesDroppedDueToCrossBlockAccesses,
+        statistics::units::Count::get(),
+        "Number of DMP prefetches dropped due to cross-block accesses"
     )
 {
 }

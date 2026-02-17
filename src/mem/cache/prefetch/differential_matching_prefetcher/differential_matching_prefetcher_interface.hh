@@ -59,8 +59,10 @@ struct PrefetcherStats : public statistics::Group
   statistics::Scalar numStridePrefetchesSentToIRT;
   statistics::Scalar numStridePrefetchesEmitted;
   statistics::Scalar numStridePrefetchesDroppedDueToOutOfMemoryBounds;
+  statistics::Scalar numStridePrefetchesDroppedDueToCrossBlockAccesses;
   statistics::Scalar numDMPPrefetchesEmitted;
   statistics::Scalar numDMPPrefetchesDroppedDueToOutOfMemoryBounds;
+  statistics::Scalar numDMPPrefetchesDroppedDueToCrossBlockAccesses;
 }; // struct PrefetcherStats
 
 class DifferentialMatchingPrefetcherInterface

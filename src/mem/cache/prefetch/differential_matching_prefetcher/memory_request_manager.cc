@@ -437,7 +437,7 @@ MemoryRequestManager::handleTranslationFault(
         "Handling address translation fault for vaddr 0x%llx\n",
         bookkeeper->request_vaddr
     );
-    stats.num_translation_faults++;
+    stats.num_memory_request_failed_due_to_translation_fault++;
     bookkeeper->ready_tick = std::max(
         bookkeeper->ready_tick,
         curTick() + clock_domain->cyclesToTicks(
