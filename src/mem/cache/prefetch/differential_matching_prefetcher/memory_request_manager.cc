@@ -585,13 +585,28 @@ MemoryRequestManager::processMemoryResponse(PacketPtr pkt)
     const Addr paddr = pkt->req->getPaddr();
     const Addr block_aligned_paddr = paddr & ~(cache_block_size - 1);
     assert(block_aligned_paddr % cache_block_size == 0);
-    const Addr vaddr = pkt->req->getVaddr();
-    const Addr block_aligned_vaddr = vaddr & ~(cache_block_size - 1);
+    //const Addr vaddr = pkt->req->getVaddr();
+    //const Addr block_aligned_vaddr = vaddr & ~(cache_block_size - 1);
 
     DMP_MEMORY_MANAGER_DEBUG(
-        "Processing memory response for paddr 0x%llx, vaddr 0x%llx\n",
-        block_aligned_paddr, block_aligned_vaddr
+        "Processing memory response for paddr 0x%llx\n",
+        block_aligned_paddr
     );
+    auto paddr_to_vaddr_it = paddr_to_vaddr.find(block_aligned_paddr);
+    if (paddr_to_vaddr_it == paddr_to_vaddr.end()) {
+        // This should never happen, as we should only receive memory responses
+        // for requests that we have sent out, and all sent out requests should
+        // be in paddr_to_vaddr.
+        DMP_MEMORY_MANAGER_DEBUG(
+            "Received memory response for paddr 0x%llx, but no mapping from "
+            "paddr to vaddr is found. This should never happen, probably "
+            "indicates a bug.\n",
+            block_aligned_paddr
+        );
+        return;
+    }
+    const Addr block_aligned_vaddr = paddr_to_vaddr_it->second;
+
     auto bookkeeper_it = outstanding_requests.find(block_aligned_vaddr);
     if (bookkeeper_it == outstanding_requests.end()) {
         // This should never happen, as we should only receive memory responses
@@ -600,7 +615,7 @@ MemoryRequestManager::processMemoryResponse(PacketPtr pkt)
         DMP_MEMORY_MANAGER_DEBUG(
             "Received memory response for paddr 0x%llx, but no outstanding "
             "request found for this address.\n",
-            block_aligned_vaddr
+            block_aligned_paddr
         );
         paddr_to_vaddr.erase(block_aligned_paddr);
         return;
