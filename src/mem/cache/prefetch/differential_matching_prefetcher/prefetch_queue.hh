@@ -152,6 +152,7 @@ class PrefetchQueue : public ClockedObject
     std::queue<std::tuple<Addr, Addr, uint64_t>>
       pending_stride_prefetch_results;
 
+    QueuedSet<Addr> recentlyIssuedPrefetches;
   public:
     PARAMS(DifferentialMatchingPrefetcherPrefetchQueue);
     PrefetchQueue(

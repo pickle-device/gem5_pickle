@@ -61,6 +61,7 @@ struct PrefetcherStats : public statistics::Group
   statistics::Scalar numStridePrefetchesDroppedDueToOutOfMemoryBounds;
   statistics::Scalar numStridePrefetchesDroppedDueToCrossBlockAccesses;
   statistics::Scalar numDMPPrefetchesEmitted;
+  statistics::Scalar numDMPPrefetchesDroppedDueToRepeatedPrefetches;
   statistics::Scalar numDMPPrefetchesDroppedDueToOutOfMemoryBounds;
   statistics::Scalar numDMPPrefetchesDroppedDueToCrossBlockAccesses;
 }; // struct PrefetcherStats

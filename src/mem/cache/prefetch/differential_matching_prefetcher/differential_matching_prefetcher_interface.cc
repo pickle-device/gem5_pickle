@@ -75,6 +75,12 @@ PrefetcherStats::PrefetcherStats(statistics::Group *parent)
         "Number of DMP prefetches emitted"
     ),
     ADD_STAT(
+        numDMPPrefetchesDroppedDueToRepeatedPrefetches,
+        statistics::units::Count::get(),
+        "Number of DMP prefetches dropped due to repeated prefetches, i.e., "
+        "a prefetch that has been issued repeatedly for the same address"
+    ),
+    ADD_STAT(
         numDMPPrefetchesDroppedDueToOutOfMemoryBounds,
         statistics::units::Count::get(),
         "Number of DMP prefetches dropped due to out of memory bounds"

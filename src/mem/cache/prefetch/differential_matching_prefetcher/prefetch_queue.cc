@@ -95,6 +95,7 @@ PrefetchQueue::PrefetchQueue(
         /*request_propagation_delay*/ request_propagation_delay
     ),
     indirect_relation_table(nullptr),
+    recentlyIssuedPrefetches(/*capacity*/ 64),
     stats(this)
 {
 }
@@ -457,7 +458,28 @@ PrefetchQueue::processCompletedPrefetchRequest(
         if (new_prefetch_requests.has_value()) {
             for (const PrefetchRequest &new_request :
                 new_prefetch_requests.value()) {
+                const Addr new_prefetch_vaddr = new_request.prefetch_vaddr;
+                if (recentlyIssuedPrefetches.contains(new_prefetch_vaddr)) {
+                    PrefetcherStats& stats = owner->getStats();
+                    stats.numDMPPrefetchesDroppedDueToRepeatedPrefetches++;
+                    DMP_PREFETCH_QUEUE_DEBUG(
+                        "Dropping new prefetch request generated from IRT for "
+                        "index pc 0x%llx, target pc 0x%llx, vaddr 0x%llx, "
+                        "because a prefetch request for the same address has "
+                        "been issued recently.\n",
+                        target_pc, new_request.target_pc,
+                        new_request.prefetch_vaddr
+                    );
+                    continue;
+                }
+                recentlyIssuedPrefetches.push(new_prefetch_vaddr);
                 pending_new_requests.push_back(new_request);
+                DMP_PREFETCH_QUEUE_DEBUG(
+                    "Generated new prefetch request from IRT for index pc "
+                    "0x%llx, target pc 0x%llx, vaddr 0x%llx\n",
+                    target_pc, new_request.target_pc,
+                    new_request.prefetch_vaddr
+                );
                 scheduleProcessPendingNewPrefetchRequestsEvent();
                 owner->getStats().numDMPPrefetchesEmitted++;
             }
