@@ -150,8 +150,7 @@ bool
 DifferentialMatcher::addCandidate(const Addr index_pc, const Addr target_pc)
 {
     const bool is_full = isFull();
-    const bool has_similar_candidate = \
-        hasCandidate(index_pc, target_pc) || hasCandidate(target_pc, index_pc);
+    const bool has_similar_candidate = hasCandidate(index_pc, target_pc);
     if (is_full && evict_stuck_entries) {
         stuckEntriesRemovalService();
     }
