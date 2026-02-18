@@ -255,7 +255,7 @@ IndirectRelationTableEntry::getPrefetchesIfIndexPcMatches(
             );
             for (uint64_t i = 0; i < predicted_range_size; i++) {
                 const Addr prefetch_vaddr = target_base_vaddr +
-                    (data_from_index_pc << shift_amount);
+                    ((data_from_index_pc + i) << shift_amount);
                 const uint64_t prefetch_size = 1ULL << shift_amount;
                 if (!sameBlock(
                     prefetch_vaddr, prefetch_vaddr + prefetch_size - 1
