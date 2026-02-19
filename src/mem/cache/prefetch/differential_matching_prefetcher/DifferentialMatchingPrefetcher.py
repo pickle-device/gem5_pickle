@@ -34,6 +34,7 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
     type = "DifferentialMatchingPrefetcher"
     cxx_class = "gem5::prefetch::dmp::DifferentialMatchingPrefetcher"
     cxx_header = "mem/cache/prefetch/differential_matching_prefetcher/differential_matching_prefetcher.hh"
+    cxx_exports = [PyBindMethod("addEventProbe")]
 
     system = Param.System(Parent.any, "System this prefetcher belongs to")
     clock_domain = Param.ClockDomain("Clock domain for this prefetcher")
@@ -187,3 +188,27 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
         "evicted. This is only effective when evict_stuck_entries_patch is "
         "True.",
     )
+
+    # overriding the SimObject method to add probe listeners for the probes
+    # that DMP is interested in
+    def setCpuSequencer(self, cpu_sequencer):
+        self._cpu_sequencer = cpu_sequencer
+
+    def setL1Controller(self, l1_controller):
+        self._l1_controller = l1_controller
+
+    def regProbeListeners(self):
+        # add probe listener for CPU requests. This is used to feed the access
+        # stream to DMP.
+        self.getCCObject().addEventProbe(
+            self._cpu_sequencer.getCCObject(), "cpu data access"
+        )
+        self.getCCObject().addEventProbe(
+            self._l1_controller.getCCObject(), "DataMovementHit"
+        )
+        self.getCCObject().addEventProbe(
+            self._l1_controller.getCCObject(), "DataMovementMiss"
+        )
+        self.getCCObject().addEventProbe(
+            self._l1_controller.getCCObject(), "DataMovementWriteback"
+        )

@@ -74,6 +74,34 @@ namespace prefetch
 namespace dmp
 {
 
+class CpuRequestListener : public ProbeListenerArgBase<RequestPtr>
+{
+  private:
+    DifferentialMatchingPrefetcher *owner;
+  public:
+    CpuRequestListener(
+      DifferentialMatchingPrefetcher *_owner, ProbeManager *_probe_manager,
+      const char *name
+    );
+    void notify(const RequestPtr &arg) override;
+};
+
+class CacheAccessListener
+  : public ProbeListenerArgBase<SimpleCacheAccessProbeArg>
+{
+  private:
+    DifferentialMatchingPrefetcher *owner;
+    bool is_hit;
+    bool is_miss;
+    bool is_fill;
+  public:
+    CacheAccessListener(
+      DifferentialMatchingPrefetcher *_owner, ProbeManager *_probe_manager,
+      const char *_name, bool _is_hit, bool _is_miss, bool _is_fill
+    );
+    void notify(const SimpleCacheAccessProbeArg &arg) override;
+};
+
 /**
  * Implementation of the Differential-Matching Prefetcher (DMP).
  *
@@ -122,8 +150,8 @@ class DifferentialMatchingPrefetcher : \
       const DifferentialMatchingPrefetcherParams &p
     );
     ~DifferentialMatchingPrefetcher() override = default;
-    void regProbeListeners() override;
     void regStats() override;
+    void addEventProbe(SimObject *obj, const char *name);
 
     std::string getPrefetcherName() const override;
 
@@ -135,7 +163,7 @@ class DifferentialMatchingPrefetcher : \
     );
 
   // L1 cache data access observers
-  private:
+  public:
     // Determine whether the prefetcher should observe this access.
     bool isObservable(const SimpleCacheAccessProbeArg &arg);
     // Observing an L1 hit
@@ -144,6 +172,9 @@ class DifferentialMatchingPrefetcher : \
     void observeL1CacheMiss(const SimpleCacheAccessProbeArg &arg);
     // Observing an L1 fill (writeback)
     void observeL1CacheFill(const SimpleCacheAccessProbeArg &arg);
+    // Observing CPU request
+    void observeCpuRequest(const RequestPtr req);
+
   // Events from prefetcher components
   private:
     // Here, we receive a new stride detection from the Stride Tracker.

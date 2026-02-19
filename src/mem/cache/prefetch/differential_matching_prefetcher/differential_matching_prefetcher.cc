@@ -53,6 +53,56 @@ namespace prefetch
 namespace dmp
 {
 
+CpuRequestListener::CpuRequestListener(
+    DifferentialMatchingPrefetcher *_owner, ProbeManager *_probe_manager,
+    const char *name
+) : ProbeListenerArgBase<RequestPtr>(_probe_manager, name),
+    owner(_owner)
+{}
+
+void
+CpuRequestListener::notify(const RequestPtr &arg)
+{
+    owner->observeCpuRequest(arg);
+}
+
+CacheAccessListener::CacheAccessListener(
+    DifferentialMatchingPrefetcher *_owner, ProbeManager *_probe_manager,
+    const char *_name, bool _is_hit, bool _is_miss, bool _is_fill
+) : ProbeListenerArgBase<SimpleCacheAccessProbeArg>(_probe_manager, _name),
+    owner(_owner), is_hit(_is_hit), is_miss(_is_miss), is_fill(_is_fill)
+{
+    if (is_hit) {
+        panic_if(is_miss, "Cache access cannot be both hit and miss");
+        panic_if(is_fill, "Cache access cannot be both hit and fill");
+    }
+    if (is_miss) {
+        panic_if(is_hit, "Cache access cannot be both hit and miss");
+        panic_if(is_fill, "Cache access cannot be both miss and fill");
+    }
+    if (is_fill) {
+        panic_if(is_hit, "Cache access cannot be both hit and fill");
+        panic_if(is_miss, "Cache access cannot be both miss and fill");
+    }
+    if (!is_hit && !is_miss && !is_fill) {
+        panic("Cache access must be either hit, miss or fill");
+    }
+}
+
+void
+CacheAccessListener::notify(const SimpleCacheAccessProbeArg &arg)
+{
+    if (is_hit) {
+        owner->observeL1CacheHit(arg);
+    } else if (is_miss) {
+        owner->observeL1CacheMiss(arg);
+    } else if (is_fill) {
+        owner->observeL1CacheFill(arg);
+    } else {
+        panic("Invalid cache access type observed in CacheAccessListener");
+    }
+}
+
 DifferentialMatchingPrefetcher::DifferentialMatchingPrefetcher(
     const DifferentialMatchingPrefetcherParams &p
 ) : ProbeListenerObject(p), system(p.system),
@@ -274,39 +324,71 @@ DifferentialMatchingPrefetcher::handleDifferentialMatchResult(
     }
 };
 
-void
-DifferentialMatchingPrefetcher::regProbeListeners()
-{
-    typedef ProbeListenerArg<
-        DifferentialMatchingPrefetcher, SimpleCacheAccessProbeArg
-    > DataAccessListener;
-    ProbeManager *pm = l1_controller->getProbeManager();
-    listeners.push_back(new DataAccessListener(
-        this,
-        "DataMovementHit",
-        &DifferentialMatchingPrefetcher::observeL1CacheHit
-    ));
-    pm->addListener("DataMovementHit", *(listeners.back()));
-
-    listeners.push_back(new DataAccessListener(
-        this,
-        "DataMovementMiss",
-        &DifferentialMatchingPrefetcher::observeL1CacheMiss
-    ));
-    pm->addListener("DataMovementMiss", *(listeners.back()));
-
-    listeners.push_back(new DataAccessListener(
-        this,
-        "DataMovementWriteback",
-        &DifferentialMatchingPrefetcher::observeL1CacheFill
-    ));
-    pm->addListener("DataMovementWriteback", *(listeners.back()));
-}
+//void
+//DifferentialMatchingPrefetcher::regProbeListeners()
+//{
+//    typedef ProbeListenerArg<
+//        DifferentialMatchingPrefetcher, SimpleCacheAccessProbeArg
+//    > DataAccessListener;
+//    ProbeManager *pm = l1_controller->getProbeManager();
+//    listeners.push_back(new DataAccessListener(
+//        this,
+//        "DataMovementHit",
+//        &DifferentialMatchingPrefetcher::observeL1CacheHit
+//    ));
+//    pm->addListener("DataMovementHit", *(listeners.back()));
+//
+//    listeners.push_back(new DataAccessListener(
+//        this,
+//        "DataMovementMiss",
+//        &DifferentialMatchingPrefetcher::observeL1CacheMiss
+//    ));
+//    pm->addListener("DataMovementMiss", *(listeners.back()));
+//
+//    listeners.push_back(new DataAccessListener(
+//        this,
+//        "DataMovementWriteback",
+//        &DifferentialMatchingPrefetcher::observeL1CacheFill
+//    ));
+//    pm->addListener("DataMovementWriteback", *(listeners.back()));
+//}
 
 void
 DifferentialMatchingPrefetcher::regStats()
 {
     ProbeListenerObject::regStats();
+}
+
+void
+DifferentialMatchingPrefetcher::addEventProbe(
+    SimObject *obj, const char *event_name
+)
+{
+    ProbeManager *pm = obj->getProbeManager();
+    if (strcmp(event_name, "cpu data access") == 0) {
+        listeners.push_back(new CpuRequestListener(this, pm, event_name));
+        pm->addListener(event_name, *(listeners.back()));
+    } else if (strcmp(event_name, "DataMovementHit") == 0) {
+        listeners.push_back(new CacheAccessListener(
+            this, pm, event_name, /*is_hit*/ true, /*is_miss*/ false,
+            /*is_fill*/ false
+        ));
+        pm->addListener(event_name, *(listeners.back()));
+    } else if (strcmp(event_name, "DataMovementMiss") == 0) {
+        listeners.push_back(new CacheAccessListener(
+            this, pm, event_name, /*is_hit*/ false, /*is_miss*/ true,
+            /*is_fill*/ false
+        ));
+        pm->addListener(event_name, *(listeners.back()));
+    } else if (strcmp(event_name, "DataMovementWriteback") == 0) {
+        listeners.push_back(new CacheAccessListener(
+            this, pm, event_name, /*is_hit*/ false, /*is_miss*/ false,
+            /*is_fill*/ true
+        ));
+        pm->addListener(event_name, *(listeners.back()));
+    } else {
+        panic("Unsupported event name for DMP prefetcher: %s", event_name);
+    }
 }
 
 std::string
@@ -401,7 +483,7 @@ DifferentialMatchingPrefetcher::observeL1CacheMiss(
     stats.numPrefetchableL1CacheMisses++;
 
     DMP_CACHE_OBSERVER_DEBUG(
-        "DMP L1 Cache MISS observed: paddr=%#x, vaddr=%#x, size=%d, pc=%#x, "
+        "L1 Cache MISS observed: paddr=%#x, vaddr=%#x, size=%d, pc=%#x, "
         "hasData=%d\n",
         arg.req->getPaddr(), arg.req->getVaddr(), arg.req->getSize(),
         arg.req->getPC(), arg.hasCacheFillData()
@@ -442,7 +524,7 @@ DifferentialMatchingPrefetcher::observeL1CacheFill(
     }
 
     DMP_CACHE_OBSERVER_DEBUG(
-        "DMP L1 Cache FILL observed: paddr=%#x, vaddr=%#x, size=%d, pc=%#x, "
+        "L1 Cache FILL observed: paddr=%#x, vaddr=%#x, size=%d, pc=%#x, "
         "hasData=%d\n",
         arg.req->getPaddr(), arg.req->getVaddr(), arg.req->getSize(),
         arg.req->getPC(), arg.hasCacheFillData()
@@ -457,6 +539,37 @@ DifferentialMatchingPrefetcher::observeL1CacheFill(
             arg.req->getSize()
         );
 
+    }
+}
+
+void
+DifferentialMatchingPrefetcher::observeCpuRequest(const RequestPtr req)
+{
+    const bool has_vaddr = req->hasVaddr();
+    const bool has_pc = req->hasPC();
+    const bool is_uncacheable = req->isUncacheable();
+    const bool is_instruction = req->isInstFetch();
+
+    DMP_CACHE_OBSERVER_DEBUG(
+        "CPU request observed: paddr=%#x, vaddr=%#x, size=%d, pc=%#x\n",
+        req->getPaddr(), req->getVaddr(), req->getSize(), req->getPC()
+    );
+
+    if (!has_vaddr || !has_pc || is_uncacheable || is_instruction) {
+        // We only want to observe data cache accesses that,
+        // - have virtual address
+        // - have PC (so we can track them in the matcher)
+        // - not be uncacheable, e.g., I/O accesses
+        // - not be instruction fetches, as we are doing data prefetching
+        return;
+    }
+
+    if (!differential_matcher.isEmpty()) {
+        differential_matcher.trackCpuRequest(
+            req->getPC(),
+            req->getVaddr(),
+            req->getSize()
+        );
     }
 }
 
