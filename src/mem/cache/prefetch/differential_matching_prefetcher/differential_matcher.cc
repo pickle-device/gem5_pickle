@@ -208,19 +208,19 @@ DifferentialMatcher::trackL1CacheHit(
             // This is an index PC cache hit
             index_entry.addItem(data, request_size);
         }
-        if (pc == target_pc) {
-            // This is a target PC cache hit
-            target_entry.addItem(effective_vaddr, request_size);
-            if (target_entry.isFull()) {
-                has_full_target_entry = true;
-            }
-        }
+        //if (pc == target_pc) {
+        //    // This is a target PC cache hit
+        //    target_entry.addItem(effective_vaddr, request_size);
+        //    if (target_entry.isFull()) {
+        //        has_full_target_entry = true;
+        //    }
+        //}
     }
 
     // If any target entry is full, we try to match candidates
-    if (has_full_target_entry) {
-        tryMatchingCandidates();
-    }
+    //if (has_full_target_entry) {
+    //    tryMatchingCandidates();
+    //}
 }
 
 void
@@ -228,27 +228,27 @@ DifferentialMatcher::trackL1CacheMiss(
     const Addr pc, const Addr effective_vaddr, const uint64_t request_size
 )
 {
-    bool has_full_target_entry = false;
-
-    // We only track target PC cache misses
-    for (
-        auto &[candidate_pair, tracking_entries] : candidate_index_target_pc
-    ) {
-        const Addr target_pc = candidate_pair.second;
-        TargetPcTrackingEntry &target_entry = tracking_entries.second;
-        if (pc == target_pc) {
-            // This is a target PC cache miss
-            target_entry.addItem(effective_vaddr, request_size);
-            if (target_entry.isFull()) {
-                has_full_target_entry = true;
-            }
-        }
-    }
-
-    // If any target entry is full, we try to match candidates
-    if (has_full_target_entry) {
-        tryMatchingCandidates();
-    }
+    //bool has_full_target_entry = false;
+//
+    //// We only track target PC cache misses
+    //for (
+    //    auto &[candidate_pair, tracking_entries] : candidate_index_target_pc
+    //) {
+    //    const Addr target_pc = candidate_pair.second;
+    //    TargetPcTrackingEntry &target_entry = tracking_entries.second;
+    //    if (pc == target_pc) {
+    //        // This is a target PC cache miss
+    //        target_entry.addItem(effective_vaddr, request_size);
+    //        if (target_entry.isFull()) {
+    //            has_full_target_entry = true;
+    //        }
+    //    }
+    //}
+//
+    //// If any target entry is full, we try to match candidates
+    //if (has_full_target_entry) {
+    //    tryMatchingCandidates();
+    //}
 }
 
 void
@@ -267,6 +267,30 @@ DifferentialMatcher::trackL1CacheFill(
             // This is an index PC cache fill
             index_entry.addItem(data, request_size);
         }
+    }
+}
+
+void
+DifferentialMatcher::trackCpuRequest(
+    const Addr pc, const Addr effective_vaddr, const uint64_t request_size
+)
+{
+    bool has_full_target_entry = false;
+    for (
+        auto &[candidate_pair, tracking_entries] : candidate_index_target_pc
+    ) {
+        const Addr target_pc = candidate_pair.second;
+        TargetPcTrackingEntry &target_entry = tracking_entries.second;
+        if (pc == target_pc) {
+            // This is a target PC CPU request
+            target_entry.addItem(effective_vaddr, request_size);
+            if (target_entry.isFull()) {
+                has_full_target_entry = true;
+            }
+        }
+    }
+    if (has_full_target_entry) {
+        tryMatchingCandidates();
     }
 }
 

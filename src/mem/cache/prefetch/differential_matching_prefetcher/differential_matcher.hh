@@ -118,6 +118,9 @@ class DifferentialMatcher
       const Addr pc, const Addr effective_vaddr, const uint64_t data,
       const uint64_t request_size
     );
+    void trackCpuRequest(
+      const Addr pc, const Addr effective_vaddr, const uint64_t request_size
+    );
     void matchCandidate(const Addr index_pc, const Addr target_pc) const;
 
   private:
