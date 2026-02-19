@@ -45,6 +45,8 @@
 #include <cassert>
 #include <string>
 
+#include "mem/packet.hh"
+#include "mem/request.hh"
 #include "mem/ruby/common/MachineID.hh"
 #include "mem/ruby/network/MessageBuffer.hh"
 #include "mem/ruby/protocol/RequestStatus.hh"
@@ -215,7 +217,7 @@ class RubyPort : public ClockedObject
 
     std::vector<MemResponsePort *> response_ports;
     ProbePointArg<RequestPtr> *ppDataRequest;
-    ProbePointArg<RequestPtr> *ppDataResponse;
+    ProbePointArg<PacketPtr> *ppDataResponse;
 
   private:
     bool onRetryList(MemResponsePort * port)

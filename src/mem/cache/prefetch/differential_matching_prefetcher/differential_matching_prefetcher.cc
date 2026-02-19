@@ -558,7 +558,7 @@ DifferentialMatchingPrefetcher::observeL1CacheFill(
 }
 
 void
-DifferentialMatchingPrefetcher::observeOutgoingCpuRequest(const RequestPtr req)
+DifferentialMatchingPrefetcher::observeCpuOutgoingRequest(const RequestPtr req)
 {
     const bool has_vaddr = req->hasVaddr();
     const bool has_pc = req->hasPC();
@@ -589,18 +589,19 @@ DifferentialMatchingPrefetcher::observeOutgoingCpuRequest(const RequestPtr req)
 }
 
 void
-DifferentialMatchingPrefetcher::observeIncomingCpuResponse(
+DifferentialMatchingPrefetcher::observeCpuIncomingResponse(
     const PacketPtr pkt
 )
 {
-    const bool has_vaddr = req->hasVaddr();
-    const bool has_pc = req->hasPC();
-    const bool is_uncacheable = req->isUncacheable();
-    const bool is_instruction = req->isInstFetch();
+    const bool has_vaddr = pkt->req->hasVaddr();
+    const bool has_pc = pkt->req->hasPC();
+    const bool is_uncacheable = pkt->req->isUncacheable();
+    const bool is_instruction = pkt->req->isInstFetch();
 
     DMP_CACHE_OBSERVER_DEBUG(
         "CPU response observed: paddr=%#x, vaddr=%#x, size=%d, pc=%#x\n",
-        req->getPaddr(), req->getVaddr(), req->getSize(), req->getPC()
+        pkt->req->getPaddr(), pkt->req->getVaddr(), pkt->req->getSize(),
+        pkt->req->getPC()
     );
 
     if (!has_vaddr || !has_pc || is_uncacheable || is_instruction) {
@@ -614,16 +615,16 @@ DifferentialMatchingPrefetcher::observeIncomingCpuResponse(
 
     uint64_t data = 0;
     const uint8_t* data_ptr = pkt->getConstPtr<uint8_t>();
-    for (unsigned i = 0; i < req->getSize(); ++i) {
+    for (unsigned i = 0; i < pkt->req->getSize(); ++i) {
         data |= static_cast<uint64_t>(data_ptr[i]) << (i*8);
     }
 
     if (!differential_matcher.isEmpty()) {
         differential_matcher.trackCpuIncomingResponse(
-            req->getPC(),
-            req->getVaddr(),
+            pkt->req->getPC(),
+            pkt->req->getVaddr(),
             data,
-            req->getSize()
+            pkt->req->getSize()
         );
     }
 }
