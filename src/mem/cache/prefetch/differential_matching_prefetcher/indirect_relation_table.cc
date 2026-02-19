@@ -332,6 +332,15 @@ IndirectRelationTable::addEntry(
         return;
     }
 
+    if (detectCycle(index_pc, target_pc)) {
+        DMP_IRT_DEBUG(
+            "Adding entry with Index PC %#x and Target PC %#x will create a "
+            "cycle. Not adding this entry.\n",
+            index_pc, target_pc
+        );
+        return;
+    }
+
     // If the table is full, we need to replace an existing entry.
     // If we have reached the capacity of range table entries, and the new
     // entry is a range type, we only consider replacing existing range type
@@ -437,6 +446,38 @@ IndirectRelationTable::getCurrentNumRangeTableEntries() const
         }
     }
     return count;
+}
+
+bool
+IndirectRelationTable::detectCycle(
+    const Addr index_pc, const Addr target_pc
+) const
+{
+    // Basically, we'll do a BFS starting from target_pc, and see if we can
+    // reach back to index_pc.
+    std::vector<Addr> visited_pcs;
+    visited_pcs.reserve(entries.size());
+    visited_pcs.push_back(target_pc);
+    uint64_t idx = 0;
+    while (idx < visited_pcs.size()) {
+        const Addr current_pc = visited_pcs[idx];
+        idx++;
+        // Continue the BFS by adding the target_pc of the current entry
+        for (const auto &entry : entries) {
+            if (entry.index_pc == current_pc) {
+                if (entry.target_pc == index_pc) {
+                    // We found a cycle
+                    return true;
+                }
+                if (std::find(
+                    visited_pcs.begin(), visited_pcs.end(), entry.target_pc
+                ) == visited_pcs.end()) {
+                    visited_pcs.push_back(entry.target_pc);
+                }
+            }
+        }
+    }
+    return false;
 }
 
 void

@@ -165,6 +165,13 @@ class IndirectRelationTable
   private:
     bool isFull() const;
     uint64_t getCurrentNumRangeTableEntries() const;
+    // Detect if adding a new entry with the given index_pc and target_pc will
+    // create a cycle in the relation graph. A cycle means that we can start
+    // from an index_pc, and follow the target_pc to find another entry whose
+    // index_pc is the same as the original index_pc. Such a cycle can cause
+    // infinite prefetching and should be avoided.
+    // ** Note: ** This is not mentioned in the paper.
+    bool detectCycle(const Addr index_pc, const Addr target_pc) const;
     // Replace the least recently used entry in the table.
     // Note that, we have a small number of range table entries (which are part
     // of the indirect relation table entries), we use LRU as the replacement
