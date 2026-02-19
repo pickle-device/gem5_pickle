@@ -231,9 +231,15 @@ StrideTracker::emitPrefetches(
                 }
             }
             const int64_t stride = entry.previous_stride;
+            const uint64_t access_size = entry.access_size;
+            // Guarantee that we prefetch at least prefetch_degree cache blocks
+            const uint64_t num_elements_to_prefetch = \
+                (stride < cache_block_size) ?
+                prefetch_degree * cache_block_size / access_size
+                    : prefetch_degree;
             for (
                 uint64_t i = prefetch_distance;
-                i <= prefetch_distance + prefetch_degree;
+                i < prefetch_distance + num_elements_to_prefetch;
                 ++i
             ) {
                 const Addr prefetch_address = current_paddr + i * stride;

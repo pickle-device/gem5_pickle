@@ -90,7 +90,7 @@ class StrideTracker
     const AddrRangeList memory_ranges;
     const uint64_t cache_block_size;
     const uint64_t prefetch_distance;
-    const uint64_t prefetch_degree;
+    const uint64_t prefetch_degree; // how many cache blocks to prefetch
     const bool can_cross_page;
     const Addr page_size_in_bytes;
     const uint64_t block_shift;
