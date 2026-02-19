@@ -218,8 +218,6 @@ bool RubyPort::MemRequestPort::recvTimingResp(PacketPtr pkt)
     // attempt to send the response in the next cycle
     port->schedTimingResp(pkt, curTick() + owner.m_ruby_system->clockPeriod());
 
-    owner.ppDataResponse->notify(pkt);
-
     return true;
 }
 

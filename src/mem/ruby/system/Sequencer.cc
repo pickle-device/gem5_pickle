@@ -555,6 +555,8 @@ Sequencer::writeCallback(Addr address, DataBlock& data,
                         initialRequestTime, forwardRequestTime,
                         firstResponseTime, !ruby_request);
         }
+
+        ppDataResponse->notify(seq_req.pkt);
         seq_req_list.pop_front();
     }
 
@@ -782,6 +784,8 @@ Sequencer::hitCallback(SequencerRequest* srequest, DataBlock& data,
         assert(testerSenderState);
         testerSenderState->subBlock.mergeFrom(data);
     }
+
+    ppDataResponse->notify(pkt);
 
     RubySystem *rs = m_ruby_system;
     if (m_ruby_system->getWarmupEnabled()) {
