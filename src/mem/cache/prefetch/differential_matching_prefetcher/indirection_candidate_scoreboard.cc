@@ -312,7 +312,7 @@ IndirectionCandidateScoreboard::\
                 }
                 DMP_ICS_DEBUG(
                     "Index PC %#x Candidate PC %#x Original Score %lu "
-                    "Adjusted Score %lu\n",
+                    "Adjusted Score %f\n",
                     index_pc, candidate_pc, original_score, adjusted_score
                 );
                 if (adjusted_score > highest_adjusted_score) {

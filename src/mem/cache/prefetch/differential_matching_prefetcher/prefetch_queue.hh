@@ -236,10 +236,10 @@ class PrefetchQueue : public ClockedObject
 
 };  // class PrefetchQueue
 
-}; // namespace dmp
+} // namespace dmp
 
-}; // namespace prefetch
+} // namespace prefetch
 
-}; // namespace gem5
+} // namespace gem5
 
 #endif // __DMP_PREFETCH_QUEUE_HH__

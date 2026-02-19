@@ -159,7 +159,6 @@ RangeTableEntry::rangeSizeToBin(const uint64_t range_size) const
         default:
             return 8;
     }
-    return 8; // Should not reach here
 }
 
 uint64_t
@@ -185,7 +184,6 @@ RangeTableEntry::binToPredictedRangeSize(const uint64_t bin) const
         default:
             return 32; // For bin 8 and above
     }
-    return 32; // Should not reach here
 }
 
 IndirectRelationTableEntry::IndirectRelationTableEntry(
