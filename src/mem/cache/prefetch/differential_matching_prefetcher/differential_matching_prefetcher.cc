@@ -472,14 +472,14 @@ DifferentialMatchingPrefetcher::observeL1CacheHit(
     const Addr paddr = arg.req->getPaddr();
     const Tick access_timestamp = curTick();
     stride_tracker.track(pc, access_size, paddr, access_timestamp);
-    //if (!differential_matcher.isEmpty()) {
-    //    differential_matcher.trackL1CacheHit(
-    //        pc,
-    //        arg.req->getVaddr(), // matcher tracks effective virtual address
-    //        getDataFromProbe(arg),
-    //        arg.req->getSize()
-    //    );
-    //}
+    if (!differential_matcher.isEmpty()) {
+        differential_matcher.trackL1CacheHit(
+            pc,
+            arg.req->getVaddr(), // matcher tracks effective virtual address
+            getDataFromProbe(arg),
+            arg.req->getSize()
+        );
+    }
     indirect_relation_table.trackL1CacheAccess(
         arg.req->getPC(),
         arg.req->getVaddr(),
@@ -510,13 +510,13 @@ DifferentialMatchingPrefetcher::observeL1CacheMiss(
     const Tick access_timestamp = curTick();
     stride_tracker.track(pc, access_size, paddr, access_timestamp);
     indirection_candidate_scoreboard.trackL1CacheMiss(pc);
-    //if (!differential_matcher.isEmpty()) {
-    //    differential_matcher.trackL1CacheMiss(
-    //        pc,
-    //        arg.req->getVaddr(), // matcher tracks effective virtual address
-    //        arg.req->getSize()
-    //    );
-    //}
+    if (!differential_matcher.isEmpty()) {
+        differential_matcher.trackL1CacheMiss(
+            pc,
+            arg.req->getVaddr(), // matcher tracks effective virtual address
+            arg.req->getSize()
+        );
+    }
     indirect_relation_table.trackL1CacheAccess(
         arg.req->getPC(),
         arg.req->getVaddr(),
@@ -546,15 +546,14 @@ DifferentialMatchingPrefetcher::observeL1CacheFill(
         arg.req->getPC(), arg.hasCacheFillData()
     );
 
-    //if (!differential_matcher.isEmpty()) {
-    //    differential_matcher.trackL1CacheFill(
-    //        arg.req->getPC(),
-    //        arg.req->getVaddr(), // matcher tracks effective virtual address
-    //        getDataFromProbe(arg),
-    //        arg.req->getSize()
-    //    );
-//
-    //}
+    if (!differential_matcher.isEmpty()) {
+        differential_matcher.trackL1CacheFill(
+            arg.req->getPC(),
+            arg.req->getVaddr(), // matcher tracks effective virtual address
+            getDataFromProbe(arg),
+            arg.req->getSize()
+        );
+    }
 }
 
 void
@@ -619,14 +618,14 @@ DifferentialMatchingPrefetcher::observeCpuIncomingResponse(
         data |= static_cast<uint64_t>(data_ptr[i]) << (i*8);
     }
 
-    if (!differential_matcher.isEmpty()) {
-        differential_matcher.trackCpuIncomingResponse(
-            pkt->req->getPC(),
-            pkt->req->getVaddr(),
-            data,
-            pkt->req->getSize()
-        );
-    }
+    //if (!differential_matcher.isEmpty()) {
+    //    differential_matcher.trackCpuIncomingResponse(
+    //        pkt->req->getPC(),
+    //        pkt->req->getVaddr(),
+    //        data,
+    //        pkt->req->getSize()
+    //    );
+    //}
 }
 
 void
