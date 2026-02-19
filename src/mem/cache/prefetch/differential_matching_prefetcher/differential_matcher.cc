@@ -78,7 +78,7 @@ DifferentialMatcher::DifferentialMatcher(
     );
     panic_if(
         _max_num_tracked_items_per_target_table_entry <= 3,
-        "We expecet to have minimum 4 tracked items per target table entry "
+        "We expect to have minimum 4 tracked items per target table entry "
         "to produce at least 3 diffs."
     );
     panic_if(
@@ -308,13 +308,6 @@ DifferentialMatcher::matchCandidate(
 
     std::vector<int64_t> target_diffs;
     const auto &target_filtered_items = target_entry.tracked_items;
-    //const size_t max_range_counter = std::max_element(
-    //    target_filtered_items.begin(),
-    //    target_filtered_items.end(),
-    //    [](const auto &a, const auto &b) {
-    //        return a.second < b.second;
-    //    }
-    //)->second;
     for (size_t i = 1; i < target_filtered_items.size(); ++i) {
         const int64_t curr_eff_addr = static_cast<int64_t>(
             target_filtered_items[i].first

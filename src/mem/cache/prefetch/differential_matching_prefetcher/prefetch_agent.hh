@@ -90,10 +90,10 @@ class PrefetchAgent : public prefetch::Base
     ) const;
 };  // class PrefetchAgent
 
-}; // namespace dmp
+} // namespace dmp
 
-}; // namespace prefetch
+} // namespace prefetch
 
-}; // namespace gem5
+} // namespace gem5
 
 #endif // __PREFETCH_AGENT_HH__

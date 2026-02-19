@@ -321,7 +321,6 @@ void
 PrefetchQueue::trackCacheHit(PacketPtr pkt)
 {
     const Addr paddr = pkt->req->getPaddr();
-    const Addr block_aligned_paddr = paddr & ~(cache_block_size - 1);
     DMP_PREFETCH_QUEUE_DEBUG(
         "Tracking cache hit for paddr 0x%llx (size %lu)\n",
         paddr, pkt->getSize()
@@ -342,7 +341,6 @@ void
 PrefetchQueue::trackCacheFill(PacketPtr pkt)
 {
     const Addr paddr = pkt->req->getPaddr();
-    const Addr block_aligned_paddr = paddr & ~(cache_block_size - 1);
     DMP_PREFETCH_QUEUE_DEBUG(
         "Tracking cache fill for paddr 0x%llx (size %lu)\n",
         paddr, pkt->getSize()
@@ -589,8 +587,8 @@ PrefetchQueue::PrefetchQueueStats::regStats()
         .flags(statistics::pdf);
 }
 
-}; // namespace dmp
+} // namespace dmp
 
-}; // namespace prefetch
+} // namespace prefetch
 
-}; // namespace gem5
+} // namespace gem5

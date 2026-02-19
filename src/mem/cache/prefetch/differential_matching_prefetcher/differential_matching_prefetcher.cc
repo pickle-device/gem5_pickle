@@ -355,16 +355,12 @@ DifferentialMatchingPrefetcher::observeL1CacheHit(
     }
 
     if (!arg.hasCacheFillData()) {
-        return;
-    }
-
-    stats.numPrefetchableL1CacheHits++;
-
-    if (!arg.hasCacheFillData()) {
         // We only care about cache hits with data
         warn("DMP Prefetcher observed L1 cache hit without data");
         return;
     }
+
+    stats.numPrefetchableL1CacheHits++;
 
     DMP_CACHE_OBSERVER_DEBUG(
         "DMP L1 Cache HIT observed: paddr=%#x, vaddr=%#x, size=%d, pc=%#x, "
