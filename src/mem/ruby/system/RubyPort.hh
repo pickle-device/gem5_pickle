@@ -214,7 +214,8 @@ class RubyPort : public ClockedObject
     System* system;
 
     std::vector<MemResponsePort *> response_ports;
-    ProbePointArg<RequestPtr> *ppDataAccess;
+    ProbePointArg<RequestPtr> *ppDataRequest;
+    ProbePointArg<RequestPtr> *ppDataResponse;
 
   private:
     bool onRetryList(MemResponsePort * port)

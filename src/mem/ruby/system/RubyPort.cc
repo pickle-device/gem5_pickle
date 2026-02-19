@@ -104,8 +104,11 @@ RubyPort::init()
 void
 RubyPort::regProbePoints()
 {
-    ppDataAccess = new ProbePointArg<RequestPtr>(
-        this->getProbeManager(), "cpu data access"
+    ppDataRequest = new ProbePointArg<RequestPtr>(
+        this->getProbeManager(), "cpu outgoing data request"
+    );
+    ppDataResponse = new ProbePointArg<PacketPtr>(
+        this->getProbeManager(), "cpu incoming data response"
     );
 }
 
@@ -215,6 +218,8 @@ bool RubyPort::MemRequestPort::recvTimingResp(PacketPtr pkt)
     // attempt to send the response in the next cycle
     port->schedTimingResp(pkt, curTick() + owner.m_ruby_system->clockPeriod());
 
+    owner.ppDataResponse->notify(pkt);
+
     return true;
 }
 
@@ -308,7 +313,7 @@ RubyPort::MemResponsePort::recvTimingReq(PacketPtr pkt)
     if (requestStatus == RequestStatus_Issued) {
         DPRINTF(RubyPort, "Request %s 0x%x issued\n", pkt->cmdString(),
                 pkt->getAddr());
-        owner.ppDataAccess->notify(pkt->req);
+        owner.ppDataRequest->notify(pkt->req);
         return true;
     }
 

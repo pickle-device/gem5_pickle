@@ -61,9 +61,22 @@ CpuRequestListener::CpuRequestListener(
 {}
 
 void
-CpuRequestListener::notify(const RequestPtr &arg)
+CpuRequestListener::notify(const RequestPtr &req)
 {
-    owner->observeCpuRequest(arg);
+    owner->observeCpuOutgoingRequest(req);
+}
+
+CpuResponseListener::CpuResponseListener(
+    DifferentialMatchingPrefetcher *_owner, ProbeManager *_probe_manager,
+    const char *name
+) : ProbeListenerArgBase<PacketPtr>(_probe_manager, name),
+    owner(_owner)
+{}
+
+void
+CpuResponseListener::notify(const PacketPtr &pkt)
+{
+    owner->observeCpuIncomingResponse(pkt);
 }
 
 CacheAccessListener::CacheAccessListener(
@@ -365,8 +378,11 @@ DifferentialMatchingPrefetcher::addEventProbe(
 )
 {
     ProbeManager *pm = obj->getProbeManager();
-    if (strcmp(event_name, "cpu data access") == 0) {
+    if (strcmp(event_name, "cpu outgoing data request") == 0) {
         listeners.push_back(new CpuRequestListener(this, pm, event_name));
+        pm->addListener(event_name, *(listeners.back()));
+    } else if (strcmp(event_name, "cpu incoming data response") == 0) {
+        listeners.push_back(new CpuResponseListener(this, pm, event_name));
         pm->addListener(event_name, *(listeners.back()));
     } else if (strcmp(event_name, "DataMovementHit") == 0) {
         listeners.push_back(new CacheAccessListener(
@@ -456,14 +472,14 @@ DifferentialMatchingPrefetcher::observeL1CacheHit(
     const Addr paddr = arg.req->getPaddr();
     const Tick access_timestamp = curTick();
     stride_tracker.track(pc, access_size, paddr, access_timestamp);
-    if (!differential_matcher.isEmpty()) {
-        differential_matcher.trackL1CacheHit(
-            pc,
-            arg.req->getVaddr(), // matcher tracks effective virtual address
-            getDataFromProbe(arg),
-            arg.req->getSize()
-        );
-    }
+    //if (!differential_matcher.isEmpty()) {
+    //    differential_matcher.trackL1CacheHit(
+    //        pc,
+    //        arg.req->getVaddr(), // matcher tracks effective virtual address
+    //        getDataFromProbe(arg),
+    //        arg.req->getSize()
+    //    );
+    //}
     indirect_relation_table.trackL1CacheAccess(
         arg.req->getPC(),
         arg.req->getVaddr(),
@@ -494,13 +510,13 @@ DifferentialMatchingPrefetcher::observeL1CacheMiss(
     const Tick access_timestamp = curTick();
     stride_tracker.track(pc, access_size, paddr, access_timestamp);
     indirection_candidate_scoreboard.trackL1CacheMiss(pc);
-    if (!differential_matcher.isEmpty()) {
-        differential_matcher.trackL1CacheMiss(
-            pc,
-            arg.req->getVaddr(), // matcher tracks effective virtual address
-            arg.req->getSize()
-        );
-    }
+    //if (!differential_matcher.isEmpty()) {
+    //    differential_matcher.trackL1CacheMiss(
+    //        pc,
+    //        arg.req->getVaddr(), // matcher tracks effective virtual address
+    //        arg.req->getSize()
+    //    );
+    //}
     indirect_relation_table.trackL1CacheAccess(
         arg.req->getPC(),
         arg.req->getVaddr(),
@@ -530,20 +546,19 @@ DifferentialMatchingPrefetcher::observeL1CacheFill(
         arg.req->getPC(), arg.hasCacheFillData()
     );
 
-    if (!differential_matcher.isEmpty()) {
-
-        differential_matcher.trackL1CacheFill(
-            arg.req->getPC(),
-            arg.req->getVaddr(), // matcher tracks effective virtual address
-            getDataFromProbe(arg),
-            arg.req->getSize()
-        );
-
-    }
+    //if (!differential_matcher.isEmpty()) {
+    //    differential_matcher.trackL1CacheFill(
+    //        arg.req->getPC(),
+    //        arg.req->getVaddr(), // matcher tracks effective virtual address
+    //        getDataFromProbe(arg),
+    //        arg.req->getSize()
+    //    );
+//
+    //}
 }
 
 void
-DifferentialMatchingPrefetcher::observeCpuRequest(const RequestPtr req)
+DifferentialMatchingPrefetcher::observeOutgoingCpuRequest(const RequestPtr req)
 {
     const bool has_vaddr = req->hasVaddr();
     const bool has_pc = req->hasPC();
@@ -565,9 +580,49 @@ DifferentialMatchingPrefetcher::observeCpuRequest(const RequestPtr req)
     }
 
     if (!differential_matcher.isEmpty()) {
-        differential_matcher.trackCpuRequest(
+        differential_matcher.trackCpuOutgoingRequest(
             req->getPC(),
             req->getVaddr(),
+            req->getSize()
+        );
+    }
+}
+
+void
+DifferentialMatchingPrefetcher::observeIncomingCpuResponse(
+    const PacketPtr pkt
+)
+{
+    const bool has_vaddr = req->hasVaddr();
+    const bool has_pc = req->hasPC();
+    const bool is_uncacheable = req->isUncacheable();
+    const bool is_instruction = req->isInstFetch();
+
+    DMP_CACHE_OBSERVER_DEBUG(
+        "CPU response observed: paddr=%#x, vaddr=%#x, size=%d, pc=%#x\n",
+        req->getPaddr(), req->getVaddr(), req->getSize(), req->getPC()
+    );
+
+    if (!has_vaddr || !has_pc || is_uncacheable || is_instruction) {
+        // We only want to observe data cache accesses that,
+        // - have virtual address
+        // - have PC (so we can track them in the matcher)
+        // - not be uncacheable, e.g., I/O accesses
+        // - not be instruction fetches, as we are doing data prefetching
+        return;
+    }
+
+    uint64_t data = 0;
+    const uint8_t* data_ptr = pkt->getConstPtr<uint8_t>();
+    for (unsigned i = 0; i < req->getSize(); ++i) {
+        data |= static_cast<uint64_t>(data_ptr[i]) << (i*8);
+    }
+
+    if (!differential_matcher.isEmpty()) {
+        differential_matcher.trackCpuIncomingResponse(
+            req->getPC(),
+            req->getVaddr(),
+            data,
             req->getSize()
         );
     }

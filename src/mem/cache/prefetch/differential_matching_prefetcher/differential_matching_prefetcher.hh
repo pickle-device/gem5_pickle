@@ -74,6 +74,7 @@ namespace prefetch
 namespace dmp
 {
 
+// Listen to requests sent from CPU to cache.
 class CpuRequestListener : public ProbeListenerArgBase<RequestPtr>
 {
   private:
@@ -83,9 +84,23 @@ class CpuRequestListener : public ProbeListenerArgBase<RequestPtr>
       DifferentialMatchingPrefetcher *_owner, ProbeManager *_probe_manager,
       const char *name
     );
-    void notify(const RequestPtr &arg) override;
+    void notify(const RequestPtr &req) override;
 };
 
+// Listen to responses sent from cache to CPU.
+class CpuResponseListener : public ProbeListenerArgBase<PacketPtr>
+{
+  private:
+    DifferentialMatchingPrefetcher *owner;
+  public:
+    CpuResponseListener(
+      DifferentialMatchingPrefetcher *_owner, ProbeManager *_probe_manager,
+      const char *name
+    );
+    void notify(const PacketPtr &pkt) override;
+};
+
+// Listen to cache events (hit/miss/fill).
 class CacheAccessListener
   : public ProbeListenerArgBase<SimpleCacheAccessProbeArg>
 {
@@ -173,7 +188,9 @@ class DifferentialMatchingPrefetcher : \
     // Observing an L1 fill (writeback)
     void observeL1CacheFill(const SimpleCacheAccessProbeArg &arg);
     // Observing CPU request
-    void observeCpuRequest(const RequestPtr req);
+    void observeCpuOutgoingRequest(const RequestPtr req);
+    // Observing CPU response
+    void observeCpuIncomingResponse(const PacketPtr pkt);
 
   // Events from prefetcher components
   private:

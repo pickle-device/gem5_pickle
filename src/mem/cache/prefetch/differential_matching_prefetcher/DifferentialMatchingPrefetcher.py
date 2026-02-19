@@ -201,7 +201,10 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
         # add probe listener for CPU requests. This is used to feed the access
         # stream to DMP.
         self.getCCObject().addEventProbe(
-            self._cpu_sequencer.getCCObject(), "cpu data access"
+            self._cpu_sequencer.getCCObject(), "cpu outgoing data request"
+        )
+        self.getCCObject().addEventProbe(
+            self._cpu_sequencer.getCCObject(), "cpu incoming data response"
         )
         self.getCCObject().addEventProbe(
             self._l1_controller.getCCObject(), "DataMovementHit"
