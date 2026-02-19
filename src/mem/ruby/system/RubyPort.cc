@@ -50,6 +50,7 @@
 #include "mem/ruby/slicc_interface/AbstractController.hh"
 #include "mem/simple_mem.hh"
 #include "sim/full_system.hh"
+#include "sim/probe/probe.hh"
 #include "sim/system.hh"
 
 namespace gem5
@@ -98,6 +99,14 @@ RubyPort::init()
     if (gotAddrRanges == 0 && FullSystem) {
         pioResponsePort.sendRangeChange();
     }
+}
+
+void
+RubyPort::regProbePoints()
+{
+    ppDataAccess = new ProbePointArg<RequestPtr>(
+        this->getProbeManager(), "cpu data access"
+    );
 }
 
 Port &
@@ -299,6 +308,7 @@ RubyPort::MemResponsePort::recvTimingReq(PacketPtr pkt)
     if (requestStatus == RequestStatus_Issued) {
         DPRINTF(RubyPort, "Request %s 0x%x issued\n", pkt->cmdString(),
                 pkt->getAddr());
+        owner.ppDataAccess->notify(pkt->req);
         return true;
     }
 

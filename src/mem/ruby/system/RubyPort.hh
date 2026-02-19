@@ -52,6 +52,7 @@
 #include "mem/tport.hh"
 #include "params/RubyPort.hh"
 #include "sim/clocked_object.hh"
+#include "sim/probe/probe.hh"
 
 namespace gem5
 {
@@ -158,6 +159,7 @@ class RubyPort : public ClockedObject
     typedef RubyPortParams Params;
     RubyPort(const Params &p);
     virtual ~RubyPort() {}
+    void regProbePoints() override;
 
     void init() override;
 
@@ -212,6 +214,7 @@ class RubyPort : public ClockedObject
     System* system;
 
     std::vector<MemResponsePort *> response_ports;
+    ProbePointArg<RequestPtr> *ppDataAccess;
 
   private:
     bool onRetryList(MemResponsePort * port)
