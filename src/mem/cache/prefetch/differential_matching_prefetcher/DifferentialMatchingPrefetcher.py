@@ -137,8 +137,8 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
     # +-------------------------+----------------------------------------------
     # |                         | Stride prefetcher prefetches all detected
     # |                         | stride except for the PCs that are in the
-    # |          False          | middle of any relation chain in DMP.
-    # |                         | This means DMP prefetches being prioritized
+    # |                         | middle of any relation chain in DMP.
+    # |          False          | This means DMP prefetches being prioritized
     # |                         | over the stride prefetcher, but there won't
     # |                         | be overlapping prefetches between stride and
     # |                         | DMP prefetchers.

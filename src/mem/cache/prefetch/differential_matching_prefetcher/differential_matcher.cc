@@ -197,25 +197,25 @@ DifferentialMatcher::trackL1CacheHit(
 //
     //// We track index PC hits with data, and target PC hits with effective
     //// virtual addresses.
-    for (
-        auto &[candidate_pair, tracking_entries] : candidate_index_target_pc
-    ) {
-        const Addr index_pc = candidate_pair.first;
-        //const Addr target_pc = candidate_pair.second;
-        IndexPcTrackingEntry &index_entry = tracking_entries.first;
-        //TargetPcTrackingEntry &target_entry = tracking_entries.second;
-        if (pc == index_pc) {
-            // This is an index PC cache hit
-            index_entry.addItem(data, request_size);
-        }
-        //if (pc == target_pc) {
-        //    // This is a target PC cache hit
-        //    target_entry.addItem(effective_vaddr, request_size);
-        //    if (target_entry.isFull()) {
-        //        has_full_target_entry = true;
-        //    }
-        //}
-    }
+    //for (
+    //    auto &[candidate_pair, tracking_entries] : candidate_index_target_pc
+    //) {
+    //    const Addr index_pc = candidate_pair.first;
+    //    //const Addr target_pc = candidate_pair.second;
+    //    IndexPcTrackingEntry &index_entry = tracking_entries.first;
+    //    //TargetPcTrackingEntry &target_entry = tracking_entries.second;
+    //    if (pc == index_pc) {
+    //        // This is an index PC cache hit
+    //        index_entry.addItem(data, request_size);
+    //    }
+    //    //if (pc == target_pc) {
+    //    //    // This is a target PC cache hit
+    //    //    target_entry.addItem(effective_vaddr, request_size);
+    //    //    if (target_entry.isFull()) {
+    //    //        has_full_target_entry = true;
+    //    //    }
+    //    //}
+    //}
 
     // If any target entry is full, we try to match candidates
     //if (has_full_target_entry) {
@@ -258,16 +258,16 @@ DifferentialMatcher::trackL1CacheFill(
 )
 {
     // We only track index PC cache fills with data
-    for (
-        auto &[candidate_pair, tracking_entries] : candidate_index_target_pc
-    ) {
-        const Addr index_pc = candidate_pair.first;
-        IndexPcTrackingEntry &index_entry = tracking_entries.first;
-        if (pc == index_pc) {
-            // This is an index PC cache fill
-            index_entry.addItem(data, request_size);
-        }
-    }
+    //for (
+    //    auto &[candidate_pair, tracking_entries] : candidate_index_target_pc
+    //) {
+    //    const Addr index_pc = candidate_pair.first;
+    //    IndexPcTrackingEntry &index_entry = tracking_entries.first;
+    //    if (pc == index_pc) {
+    //        // This is an index PC cache fill
+    //        index_entry.addItem(data, request_size);
+    //    }
+    //}
 }
 
 void
