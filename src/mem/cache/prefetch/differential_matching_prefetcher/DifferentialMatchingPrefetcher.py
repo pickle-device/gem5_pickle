@@ -126,10 +126,12 @@ class DifferentialMatchingPrefetcher(ProbeListenerObject):
         64, "Number of entries in the stride prefetcher table"
     )
     stride_prefetcher_distance = Param.Unsigned(
-        2, "Distance for the stride prefetcher used in DMP"
+        0, "Distance for the stride prefetcher used in DMP"
     )
     stride_prefetcher_degree = Param.Unsigned(
-        16, "Degree for the stride prefetcher used in DMP"
+        4,
+        "How many **cache blocks** the stride prefetcher can prefetch per "
+        "detected stride pattern.",
     )
     # The following two parameters are for controlling the interaction between
     # the stride prefetcher and the DMP.
