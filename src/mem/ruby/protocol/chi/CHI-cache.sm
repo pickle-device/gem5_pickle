@@ -840,6 +840,9 @@ machine(MachineType:Cache, "Cache coherency protocol") :
   // Interface to the data movement tracker
   RubyDataMovementTrackerProxy dmvProxy, constructor="this";
 
+  // Interface to the directory entry tracker
+  RubyDirEntryTrackerProxy dirEntryTrackerProxy, constructor="this";
+
   // DVM data
   // Queue of non-sync operations that haven't been Comp-d yet.
   // Before a Sync operation can start, this queue must be emptied

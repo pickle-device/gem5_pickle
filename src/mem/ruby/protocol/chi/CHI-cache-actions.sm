@@ -3449,11 +3449,18 @@ action(Deallocate_CacheBlock, desc="") {
 action(Allocate_DirEntry, desc="") {
   assert(directory.isTagPresent(address) == false);
   directory.allocate(address);
+
+  // Probe point for notifying directory entry allocation
+  assert(is_valid(tbe));
+  dirEntryTrackerProxy.notifyDirEntryAllocation(address, tbe.seqReq);
 }
 
 action(Deallocate_DirEntry, desc="") {
   assert(directory.isTagPresent(address));
   directory.deallocate(address);
+
+  // Probe point for notifying directory entry deallocation
+  dirEntryTrackerProxy.notifyDirEntryDeallocation(address);
 }
 
 action(CheckCacheFill, desc="") {

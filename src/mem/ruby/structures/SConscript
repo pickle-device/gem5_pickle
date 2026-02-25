@@ -55,9 +55,12 @@ Source('PersistentTable.cc')
 Source('RubyPrefetcher.cc')
 Source('RubyPrefetcherProxy.cc')
 Source('RubyDataMovementTrackerProxy.cc')
+Source('RubyDirEntryTrackerProxy.cc')
 Source('TimerTable.cc')
 Source('BankedArray.cc')
 Source('ALUFreeListArray.cc')
 Source('TBEStorage.cc')
 if env['CONF']['RUBY_PROTOCOL_CHI']:
     Source('MN_TBETable.cc')
+
+DebugFlag('RubyDirEntryTrackerProxyDebug')

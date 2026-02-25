@@ -408,6 +408,7 @@ class AbstractController : public ClockedObject, public Consumer
 
     friend class RubyPrefetcherProxy;
     friend class RubyDataMovementTrackerProxy;
+    friend class RubyDirEntryTrackerProxy;
 
   protected:
     const NodeID m_version;
