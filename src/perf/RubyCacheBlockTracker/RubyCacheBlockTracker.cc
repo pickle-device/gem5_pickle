@@ -91,13 +91,40 @@ RubyCacheBlockTracker::addEventProbe(SimObject *obj, const char *event_name)
         );
         obj_pm->addListener(event_name, *(listeners.back()));
     } else if (strcmp(event_name, "DataMovementWriteback") == 0) {
+        // TODO: double check if we need to track this event
         listeners.push_back(
-            new DataMovementListener(this, obj_pm, event_name, true, false)
+            new DataMovementListener(
+                /* owner */ this,
+                /* probe_manager */ obj_pm,
+                /* event_name */ event_name,
+                /* is_cache_fill */ true,
+                /* is_cache_fill_from_evict */ false,
+                /* is_cache_evict */ false
+            )
+        );
+        obj_pm->addListener(event_name, *(listeners.back()));
+    } else if (strcmp(event_name, "DataMovementWritebackFromEviction") == 0) {
+        listeners.push_back(
+            new DataMovementListener(
+                /* owner */ this,
+                /* probe_manager */ obj_pm,
+                /* event_name */ event_name,
+                /* is_cache_fill */ false,
+                /* is_cache_fill_from_evict */ true,
+                /* is_cache_evict */ false
+            )
         );
         obj_pm->addListener(event_name, *(listeners.back()));
     } else if (strcmp(event_name, "DataMovementEviction") == 0) {
         listeners.push_back(
-            new DataMovementListener(this, obj_pm, event_name, false, true)
+            new DataMovementListener(
+                /* owner */ this,
+                /* probe_manager */ obj_pm,
+                /* event_name */ event_name,
+                /* is_cache_fill */ false,
+                /* is_cache_fill_from_evict */ false,
+                /* is_cache_evict */ true
+            )
         );
         obj_pm->addListener(event_name, *(listeners.back()));
     } else {
@@ -111,6 +138,72 @@ void
 RubyCacheBlockTracker::processCpuRequest(const RequestPtr &req)
 {
     // TODO
+    RUBY_CACHE_BLOCK_TRACKER_DEBUG(
+        "Processing CPU request: addr=0x%lx, size=%d, requestor_id=%d\n",
+        req->hasPaddr() ? req->getPaddr() : 0,
+        req->hasSize() ? req->getSize() : 0,
+        req->requestorId()
+    );
+}
+
+void
+RubyCacheBlockTracker::processDirEntryAllocation(
+    const Addr &addr, const RequestPtr &req
+)
+{
+    // TODO
+    RUBY_CACHE_BLOCK_TRACKER_DEBUG(
+        "Processing directory entry allocation: addr=0x%lx, size=%d, "
+        "requestor_id=%d\n",
+        addr,
+        req->hasSize() ? req->getSize() : 0,
+        req->requestorId()
+    );
+}
+
+void
+RubyCacheBlockTracker::processDirEntryDeallocation(const Addr &addr)
+{
+    // TODO
+    RUBY_CACHE_BLOCK_TRACKER_DEBUG(
+        "Processing directory entry deallocation: addr=0x%lx\n", addr
+    );
+}
+
+void
+RubyCacheBlockTracker::processCacheFill(
+    const SimpleCacheAccessProbeArg &arg
+)
+{
+    // TODO
+    RUBY_CACHE_BLOCK_TRACKER_DEBUG(
+        "Processing cache fill: addr=0x%lx, size=%d, requestor_id=%d\n",
+        arg.req->getPaddr(),
+        arg.req->getSize(),
+        arg.req->requestorId()
+    );
+}
+
+void
+RubyCacheBlockTracker::processCacheFillFromEviction(
+    const SimpleCacheAccessProbeArg &arg
+)
+{
+    // TODO
+    RUBY_CACHE_BLOCK_TRACKER_DEBUG(
+        "Processing cache fill from eviction: addr=0x%lx\n", arg.eviction_addr
+    );
+}
+
+void
+RubyCacheBlockTracker::processCacheEviction(
+    const SimpleCacheAccessProbeArg &arg
+)
+{
+    // TODO
+    RUBY_CACHE_BLOCK_TRACKER_DEBUG(
+        "Processing cache eviction: addr=0x%lx\n", arg.eviction_addr
+    );
 }
 
 RubyCacheBlockTracker::
@@ -148,7 +241,7 @@ RubyCacheBlockTracker::DirEntryAllocationListener::notify(
     const std::pair<Addr, RequestPtr> &arg
 )
 {
-    // TODO
+    owner->processDirEntryAllocation(arg.first, arg.second);
 }
 
 RubyCacheBlockTracker::
@@ -162,22 +255,28 @@ DirEntryDeallocationListener::DirEntryDeallocationListener(
 void
 RubyCacheBlockTracker::DirEntryDeallocationListener::notify(const Addr &arg)
 {
-    // TODO
+    owner->processDirEntryDeallocation(arg);
 }
 
 RubyCacheBlockTracker::DataMovementListener::DataMovementListener(
     RubyCacheBlockTracker *_owner, ProbeManager *_probe_manager,
-    const char *_name, const bool _is_cache_fill, const bool _is_cache_evict
+    const char *_name, const bool _is_cache_fill,
+    const bool _is_cache_fill_from_evict, const bool _is_cache_evict
 ) : ProbeListenerArgBase<SimpleCacheAccessProbeArg>(_probe_manager, _name),
     owner(_owner), is_cache_fill(_is_cache_fill),
+    is_cache_fill_from_evict(_is_cache_fill_from_evict),
     is_cache_evict(_is_cache_evict)
 {
+    const bool only_cache_fill =
+        is_cache_fill && !is_cache_fill_from_evict && !is_cache_evict;
+    const bool only_cache_fill_from_evict =
+        !is_cache_fill && is_cache_fill_from_evict && !is_cache_evict;
+    const bool only_cache_evict =
+        !is_cache_fill && !is_cache_fill_from_evict && is_cache_evict;
     panic_if(
-        is_cache_fill && is_cache_evict,
-        "DataMovementListener cannot be both cache fill and cache evict"
-    );
-    panic_if(!is_cache_fill && !is_cache_evict,
-        "DataMovementListener must be either cache fill or cache evict"
+        !(only_cache_fill || only_cache_evict || only_cache_fill_from_evict),
+        "DataMovementListener must be exactly one of the following: "
+        "cache fill, cache eviction, or receiving eviction"
     );
 }
 
@@ -186,7 +285,15 @@ RubyCacheBlockTracker::DataMovementListener::notify(
     const SimpleCacheAccessProbeArg &arg
 )
 {
-    // TODO
+    if (is_cache_fill) {
+        owner->processCacheFill(arg);
+    } else if (is_cache_fill_from_evict) {
+        owner->processCacheFillFromEviction(arg);
+    } else if (is_cache_evict) {
+        owner->processCacheEviction(arg);
+    } else {
+        panic("DataMovementListener must be either cache fill or cache evict");
+    }
 }
 
 }  // namespace ruby

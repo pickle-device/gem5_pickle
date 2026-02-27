@@ -111,5 +111,9 @@ class RubyCacheBlockTracker(ProbeListenerObject):
                 cache_controller.getCCObject(), "DataMovementWriteback"
             )
             self.getCCObject().addEventProbe(
+                cache_controller.getCCObject(),
+                "DataMovementWritebackFromEviction",
+            )
+            self.getCCObject().addEventProbe(
                 cache_controller.getCCObject(), "DataMovementEviction"
             )

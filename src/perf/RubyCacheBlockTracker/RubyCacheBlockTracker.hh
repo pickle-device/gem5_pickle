@@ -61,6 +61,11 @@ class RubyCacheBlockTracker : public ProbeListenerObject
     void addEventProbe(SimObject *obj, const char *event_name);
 
     void processCpuRequest(const RequestPtr &req);
+    void processDirEntryAllocation(const Addr &addr, const RequestPtr &req);
+    void processDirEntryDeallocation(const Addr &addr);
+    void processCacheFill(const SimpleCacheAccessProbeArg &arg);
+    void processCacheFillFromEviction(const SimpleCacheAccessProbeArg &arg);
+    void processCacheEviction(const SimpleCacheAccessProbeArg &arg);
 
   private:
     System* system;
@@ -128,12 +133,13 @@ class RubyCacheBlockTracker : public ProbeListenerObject
       private:
         RubyCacheBlockTracker *owner;
         const bool is_cache_fill;
+        const bool is_cache_fill_from_evict;
         const bool is_cache_evict;
       public:
         DataMovementListener(
           RubyCacheBlockTracker *_owner, ProbeManager *_probe_manager,
           const char *_name, const bool _is_cache_fill,
-          const bool _is_cache_evict
+          const bool _is_cache_fill_from_evict, const bool _is_cache_evict
         );
         void notify(const SimpleCacheAccessProbeArg &arg) override;
     };  // class DataMovementListener
