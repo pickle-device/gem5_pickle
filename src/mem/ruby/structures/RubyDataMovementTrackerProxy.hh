@@ -31,27 +31,31 @@ class RubyDataMovementTrackerProxy : public SimpleCacheAccessor, public Named
   public:
     RubyDataMovementTrackerProxy(AbstractController* cacheController);
 
-    // Notification for cache fill events (writebacks)
+    // Notification for cache fill events (writebacks), including both demand
+    // and prefetch requests.
     void notifyWriteback(
         const RequestPtr& req, const MachineID& requestor_id,
         const MachineID data_sender_id, const bool data_send_id_valid,
         const Tick latency, const DataBlock& data_blk,
         const unsigned cache_state
     );
-    // Notification for cache hit events
+    // Notification for cache hit events for demand requests.
     void notifyHit(
         const RequestPtr& req, const MachineID machine_id, const Addr addr,
         const unsigned cache_state, const DataBlock& data_blk
     );
-    // Notification for hit from memory events
+    // Notification for hit from memory events.
     void notifyHitFromMemory(
         const RequestPtr& req, const MachineID machine_id, const Addr addr
     );
-    // Notification for cache miss events
+    // Notification for cache miss events for demand requests.
     void notifyMiss(
         const RequestPtr& req, const MachineID requestor_id, const Addr addr,
         const unsigned cache_state
     );
+    // Notification for eviction/invalidation events.
+    void notifyEviction(const MachineID machine_id, const Addr addr);
+
     void regProbePoints();
 
   private:
@@ -61,6 +65,7 @@ class RubyDataMovementTrackerProxy : public SimpleCacheAccessor, public Named
     ProbePointArg<SimpleCacheAccessProbeArg> *ppHit;
     ProbePointArg<SimpleCacheAccessProbeArg> *ppHitFromMemory;
     ProbePointArg<SimpleCacheAccessProbeArg> *ppMiss;
+    ProbePointArg<SimpleCacheAccessProbeArg> *ppEviction;
 
     Addr makeLineAddress(Addr addr) const;
     Addr getOffset(Addr addr) const;

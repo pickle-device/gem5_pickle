@@ -3878,6 +3878,9 @@ action(Profile_Eviction, desc="") {
   if (use_prefetcher && is_valid(cache_entry)) {
     pfProxy.notifyPfEvict(address, cache_entry.HWPrefetched, cache_entry.requestor);
   }
+  if (is_valid(cache_entry)) {
+    dmvProxy.notifyEviction(machineID, address);
+  }
 }
 
 action(Profile_OutgoingStart, desc="") {

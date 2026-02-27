@@ -281,6 +281,8 @@ structure(RubyDataMovementTrackerProxy, external = "yes") {
     void notifyHit(RequestPtr, MachineID, Addr, int, DataBlock);
     void notifyHitFromMemory(RequestPtr, MachineID, Addr);
     void notifyMiss(RequestPtr, MachineID, Addr, int);
+    void notifyEviction(MachineID, Addr);
+
     void regProbePoints();
 }
 

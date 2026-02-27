@@ -84,7 +84,7 @@ RubyDirEntryTrackerProxy::notifyDirEntryDeallocation(const Addr paddr)
     ppDirEntryDeallocation->notify(paddr);
     DPRINTF(
         RubyDirEntryTrackerProxyDebug,
-        "Dir Entry Dealloc: paddr: %#x\n", paddr
+        "Dir Entry DEALLOC: paddr: %#x\n", paddr
     );
 }
 

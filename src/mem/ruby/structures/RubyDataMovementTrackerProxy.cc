@@ -98,6 +98,16 @@ RubyDataMovementTrackerProxy::notifyMiss(
 }
 
 void
+RubyDataMovementTrackerProxy::notifyEviction(
+    const MachineID machine_id, const Addr addr
+)
+{
+    ppEviction->notify(SimpleCacheAccessProbeArg(
+        nullptr, *this, machine_id, true, 0, 0, {}
+    ));
+}
+
+void
 RubyDataMovementTrackerProxy::regProbePoints()
 {
     ppWriteback = new ProbePointArg<SimpleCacheAccessProbeArg>(
@@ -111,6 +121,9 @@ RubyDataMovementTrackerProxy::regProbePoints()
     );
     ppMiss = new ProbePointArg<SimpleCacheAccessProbeArg>(
         cacheController->getProbeManager(), "DataMovementMiss"
+    );
+    ppEviction = new ProbePointArg<SimpleCacheAccessProbeArg>(
+        cacheController->getProbeManager(), "DataMovementEviction"
     );
 }
 
