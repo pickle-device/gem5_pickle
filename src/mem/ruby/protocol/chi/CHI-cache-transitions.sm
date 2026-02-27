@@ -765,6 +765,7 @@ transition(SC, AtomicStore, BUSY_BLKD) {
 transition({UD_RSC,SD_RSC,UC_RSC,SC_RSC,RSC,RSD,RUSD,RUSC,UD_RSD,SD_RSD}, Evict, BUSY_BLKD) {
   Initiate_Request;
   Initiate_Evict;
+  //Profile_Writeback_From_Eviction;
   Pop_ReqRdyQueue;
   ProcessNextState;
 }
@@ -782,6 +783,7 @@ transition({UD, UD_RSC, SD_RSC, UC_RSC, SC_RSC, UD_RU, UC_RU, UD_RSD, SD_RSD, RU
 transition({UD_RU, UC_RU, RU, UD_RSD, SD_RSD, RSD, RUSD}, {WriteBackFull, WriteCleanFull}, BUSY_BLKD) {
   Initiate_Request;
   Initiate_CopyBack;
+  Profile_Writeback_From_Eviction;
   Pop_ReqRdyQueue;
   ProcessNextState;
 }
@@ -789,6 +791,7 @@ transition({UD_RU, UC_RU, RU, UD_RSD, SD_RSD, RSD, RUSD}, {WriteBackFull, WriteC
 transition({UD_RU, UC_RU, RU}, WriteEvictFull, BUSY_BLKD) {
   Initiate_Request;
   Initiate_CopyBack;
+  Profile_Writeback_From_Eviction;
   Pop_ReqRdyQueue;
   ProcessNextState;
 }

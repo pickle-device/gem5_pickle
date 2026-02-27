@@ -47,8 +47,14 @@ RubyDataMovementTrackerProxy::notifyWriteback(
     );
     std::vector<uint8_t> cache_fill_data(data, data + data_size);
     ppWriteback->notify(SimpleCacheAccessProbeArg(
-        req_copy, *this, data_sender_id, data_sender_id_valid, latency,
-        cache_state, std::move(cache_fill_data)
+        /*request*/ req_copy,
+        /*eviction_addr*/ 0,
+        /*cache_accessor*/ *this,
+        /*machineID*/ data_sender_id, // where did we get the data from
+        /*machineIDValid*/ data_sender_id_valid,
+        /*latency*/ latency,
+        /*cache_state*/ cache_state,
+        /*cache_fill_data*/ std::move(cache_fill_data)
     ));
 }
 
@@ -67,8 +73,14 @@ RubyDataMovementTrackerProxy::notifyHit(
     );
     std::vector<uint8_t> cache_fill_data(data, data + data_size);
     ppHit->notify(SimpleCacheAccessProbeArg(
-        req_copy, *this, machine_id, true, 0, cache_state,
-        std::move(cache_fill_data)
+        /*request*/ req_copy,
+        /*eviction_addr*/ 0,
+        /*cache_accessor*/ *this,
+        /*machineID*/ machine_id,
+        /*machineIDValid*/ true,
+        /*latency*/ 0,
+        /*cache_state*/ cache_state,
+        /*cache_fill_data*/ std::move(cache_fill_data)
     ));
 }
 
@@ -80,7 +92,14 @@ RubyDataMovementTrackerProxy::notifyHitFromMemory(
     assert(req);
     RequestPtr req_copy(new Request(*req));
     ppHit->notify(SimpleCacheAccessProbeArg(
-        req_copy, *this, machine_id, true, 0, 0, {}
+        /*request*/ req_copy,
+        /*eviction_addr*/ 0,
+        /*cache_accessor*/ *this,
+        /*machineID*/ machine_id,
+        /*machineIDValid*/ true,
+        /*latency*/ 0,
+        /*cache_state*/ 0,
+        /*cache_fill_data*/ {}
     ));
 }
 
@@ -93,7 +112,14 @@ RubyDataMovementTrackerProxy::notifyMiss(
     assert(req);
     RequestPtr req_copy(new Request(*req));
     ppMiss->notify(SimpleCacheAccessProbeArg(
-        req_copy, *this, machine_id, true, 0, cache_state, {}
+        /*request*/ req_copy,
+        /*eviction_addr*/ 0,
+        /*cache_accessor*/ *this,
+        /*machineID*/ machine_id,
+        /*machineIDValid*/ true,
+        /*latency*/ 0,
+        /*cache_state*/ cache_state,
+        /*cache_fill_data*/ {}
     ));
 }
 
@@ -103,7 +129,31 @@ RubyDataMovementTrackerProxy::notifyEviction(
 )
 {
     ppEviction->notify(SimpleCacheAccessProbeArg(
-        nullptr, *this, machine_id, true, 0, 0, {}
+        /*request*/ nullptr,
+        /*eviction_addr*/ addr,
+        /*cache_accessor*/ *this,
+        /*machineID*/ machine_id,
+        /*machineIDValid*/ true,
+        /*latency*/ 0,
+        /*cache_state*/ 0,
+        /*cache_fill_data*/ {}
+    ));
+}
+
+void
+RubyDataMovementTrackerProxy::notifyWritebackFromEviction(
+    const MachineID machine_id, const Addr addr
+)
+{
+    ppWritebackFromEviction->notify(SimpleCacheAccessProbeArg(
+        /*request*/ nullptr,
+        /*eviction_addr*/ addr,
+        /*cache_accessor*/ *this,
+        /*machineID*/ machine_id,
+        /*machineIDValid*/ true,
+        /*latency*/ 0,
+        /*cache_state*/ 0,
+        /*cache_fill_data*/ {}
     ));
 }
 
@@ -124,6 +174,9 @@ RubyDataMovementTrackerProxy::regProbePoints()
     );
     ppEviction = new ProbePointArg<SimpleCacheAccessProbeArg>(
         cacheController->getProbeManager(), "DataMovementEviction"
+    );
+    ppWritebackFromEviction = new ProbePointArg<SimpleCacheAccessProbeArg>(
+        cacheController->getProbeManager(), "DataMovementWritebackFromEviction"
     );
 }
 

@@ -53,8 +53,16 @@ class RubyDataMovementTrackerProxy : public SimpleCacheAccessor, public Named
         const RequestPtr& req, const MachineID requestor_id, const Addr addr,
         const unsigned cache_state
     );
-    // Notification for eviction/invalidation events.
+    // Notification for eviction/invalidation events. This is an event induced
+    // by the upstream cache, which evicts/invalidates a cache line.
     void notifyEviction(const MachineID machine_id, const Addr addr);
+    // Notification for writeback events from eviction. This is an event
+    // from a downstream cache, which receives an eviction from an upstream
+    // cache. This is not induced by a demand/prefetch request, so it won't
+    // appear as a hit/miss/writeback for any demand/prefetch request.
+    void notifyWritebackFromEviction(
+        const MachineID machine_id, const Addr addr
+    );
 
     void regProbePoints();
 
@@ -66,6 +74,7 @@ class RubyDataMovementTrackerProxy : public SimpleCacheAccessor, public Named
     ProbePointArg<SimpleCacheAccessProbeArg> *ppHitFromMemory;
     ProbePointArg<SimpleCacheAccessProbeArg> *ppMiss;
     ProbePointArg<SimpleCacheAccessProbeArg> *ppEviction;
+    ProbePointArg<SimpleCacheAccessProbeArg> *ppWritebackFromEviction;
 
     Addr makeLineAddress(Addr addr) const;
     Addr getOffset(Addr addr) const;

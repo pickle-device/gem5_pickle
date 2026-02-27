@@ -3883,6 +3883,10 @@ action(Profile_Eviction, desc="") {
   }
 }
 
+action(Profile_Writeback_From_Eviction, desc="Writeback due to eviction") {
+  dmvProxy.notifyWritebackFromEviction(machineID, address);
+}
+
 action(Profile_OutgoingStart, desc="") {
   outgoingTransactionStart(address, curTransitionEvent());
 }

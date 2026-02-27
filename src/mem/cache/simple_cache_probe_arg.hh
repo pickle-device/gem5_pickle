@@ -22,6 +22,9 @@ class SimpleCacheAccessProbeArg
 {
   public:
     RequestPtr req;
+    Addr eviction_addr; // upon eviction, there's no request, but we still want
+                        // to know the address being evicted. Only valid for
+                        // eviction probes.
     std::vector<uint8_t> cache_fill_data;
     SimpleCacheAccessor &cache;
     ruby::MachineID machineID;
@@ -29,11 +32,13 @@ class SimpleCacheAccessProbeArg
     Tick latency;
     unsigned cache_state;
     SimpleCacheAccessProbeArg(
-        RequestPtr _req, SimpleCacheAccessor& _cache,
+        RequestPtr _req, Addr _eviction_addr,
+        SimpleCacheAccessor& _cache,
         ruby::MachineID _machineID, bool _machineIDValid,
         Tick _latency, unsigned _cache_state,
         std::vector<uint8_t> _cache_fill_data
-    ) : req(_req), cache_fill_data(std::move(_cache_fill_data)),
+    ) : req(_req), eviction_addr(_eviction_addr),
+        cache_fill_data(std::move(_cache_fill_data)),
         cache(_cache), machineID(_machineID),
         machineIDValid(_machineIDValid), latency(_latency),
         cache_state(_cache_state)
