@@ -75,7 +75,7 @@ RubyCacheBlockTracker::registerDemandRequestor(SimObject *obj)
         getAllRequestorIDs().c_str()
     );
     usefulnessAttributionStats.registerCpuRequestor(id, obj->name());
-    RUBY_CACHE_BLOCK_TRACKER_DEBUG(
+    inform(
         "Added demand requestor with id %d and name %s\n", id,
         obj->name()
     );
@@ -100,7 +100,7 @@ RubyCacheBlockTracker::registerDemandRequestorWithSubrequestor(
     usefulnessAttributionStats.registerCpuRequestor(
         id, full_requestor_name.c_str()
     );
-    RUBY_CACHE_BLOCK_TRACKER_DEBUG(
+    inform(
         "Added demand requestor with id %d and name %s\n", id,
         full_requestor_name.c_str()
     );
@@ -118,7 +118,7 @@ RubyCacheBlockTracker::registerPrefetcherRequestor(SimObject *obj)
         getAllRequestorIDs().c_str()
     );
     usefulnessAttributionStats.registerPrefetcherRequestor(id, obj->name());
-    RUBY_CACHE_BLOCK_TRACKER_DEBUG(
+    inform(
         "Added prefetcher requestor with id %d and name %s\n", id,
         obj->name()
     );
@@ -143,7 +143,7 @@ RubyCacheBlockTracker::registerPrefetcherRequestorWithSubrequestor(
     usefulnessAttributionStats.registerPrefetcherRequestor(
         id, full_requestor_name.c_str()
     );
-    RUBY_CACHE_BLOCK_TRACKER_DEBUG(
+    inform(
         "Added prefetcher requestor with id %d and name %s\n", id,
         full_requestor_name.c_str()
     );
