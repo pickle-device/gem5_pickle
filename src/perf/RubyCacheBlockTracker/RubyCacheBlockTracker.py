@@ -137,17 +137,17 @@ class RubyCacheBlockTracker(ProbeListenerObject):
                     cache_controller.getCCObject(),
                     "Directory entry allocation",
                 )
-                self.getCCObject().registerEventProbe(
-                    cache_controller.getCCObject(),
-                    "Directory entry deallocation",
-                )
-                self.getCCObject().registerEventProbe(
-                    cache_controller.getCCObject(), "DataMovementWriteback"
-                )
-                self.getCCObject().registerEventProbe(
-                    cache_controller.getCCObject(),
-                    "DataMovementWritebackFromEviction",
-                )
+                # self.getCCObject().registerEventProbe(
+                #    cache_controller.getCCObject(),
+                #    "Directory entry deallocation",
+                # )
+                # self.getCCObject().registerEventProbe(
+                #    cache_controller.getCCObject(), "DataMovementWriteback"
+                # )
+                # self.getCCObject().registerEventProbe(
+                #    cache_controller.getCCObject(),
+                #    "DataMovementWritebackFromEviction",
+                # )
                 self.getCCObject().registerEventProbe(
                     cache_controller.getCCObject(), "DataMovementEviction"
                 )
