@@ -66,7 +66,7 @@ RubyCacheBlockTracker::~RubyCacheBlockTracker()
 void
 RubyCacheBlockTracker::registerDemandRequestor(SimObject *obj)
 {
-    RequestorID id = system->lookupRequestorId(obj);
+    RequestorID id = system->lookupRequestorId(obj->name());
     panic_if(
         id == Request::invldRequestorId,
         "Object %s is not registered as a requestor in the system.\n"
@@ -84,7 +84,7 @@ RubyCacheBlockTracker::registerDemandRequestor(SimObject *obj)
 void
 RubyCacheBlockTracker::registerPrefetcherRequestor(SimObject *obj)
 {
-    RequestorID id = system->lookupRequestorId(obj);
+    RequestorID id = system->lookupRequestorId(obj->name());
     panic_if(
         id == Request::invldRequestorId,
         "Object %s is not registered as a requestor in the system.\n"
