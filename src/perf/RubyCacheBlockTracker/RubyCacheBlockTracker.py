@@ -130,26 +130,30 @@ class RubyCacheBlockTracker(ProbeListenerObject):
     # Here we gather the requestor IDs.
     def init(self):
         if hasattr(self, "_demand_requestors"):
-            for sequencer in self._demand_requestors:
-                self.getCCObject().registerDemandRequestorByName(sequencer)
+            for requestor in self._demand_requestors:
+                self.getCCObject().registerDemandRequestor(
+                    requestor.getCCObject()
+                )
         if hasattr(self, "_demand_requestors_with_subrequestors"):
             for (
-                sequencer,
+                requestor,
                 subrequestor,
             ) in self._demand_requestors_with_subrequestors:
-                self.getCCObject().registerDemandRequestorWithSubrequestorByName(
-                    sequencer, subrequestor
+                self.getCCObject().registerDemandRequestorWithSubrequestor(
+                    requestor.getCCObject(), subrequestor
                 )
         if hasattr(self, "_prefetcher_requestors"):
             for requestor in self._prefetcher_requestors:
-                self.getCCObject().registerPrefetcherRequestorByName(requestor)
+                self.getCCObject().registerPrefetcherRequestor(
+                    requestor.getCCObject()
+                )
         if hasattr(self, "_prefetcher_requestors_with_subrequestors"):
             for (
                 requestor,
                 subrequestor,
             ) in self._prefetcher_requestors_with_subrequestors:
-                self.getCCObject().registerPrefetcherRequestorWithSubrequestorByName(
-                    requestor, subrequestor
+                self.getCCObject().registerPrefetcherRequestorWithSubrequestor(
+                    requestor.getCCObject(), subrequestor
                 )
 
     # Here we register probes to the sequencers and the cache controllers.
