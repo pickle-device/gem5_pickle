@@ -37,6 +37,7 @@
 #include "base/stats/group.hh"
 #include "base/types.hh"
 #include "debug/RubyCacheBlockTrackerDebug.hh"
+#include "debug/RubyCacheBlockTrackerObserverDebug.hh"
 #include "mem/cache/simple_cache_probe_arg.hh"
 #include "mem/request.hh"
 #include "params/RubyCacheBlockTracker.hh"
@@ -46,6 +47,11 @@
 
 #define RUBY_CACHE_BLOCK_TRACKER_DEBUG(...) \
     DPRINTF(RubyCacheBlockTrackerDebug, __VA_ARGS__)
+
+// This observer debug is for debugging the observable events probed by the
+// tracker.
+#define RUBY_CACHE_BLOCK_TRACKER_OBSERVER_DEBUG(...) \
+    DPRINTF(RubyCacheBlockTrackerObserverDebug, __VA_ARGS__)
 
 namespace gem5
 {
@@ -77,8 +83,6 @@ class RubyCacheBlockTracker : public ProbeListenerObject
 
   private:
     System* system;
-    std::set<RequestorID> cpuRequestorIDs;
-    std::set<RequestorID> prefetcherRequestorIDs;
 
   public:
     // TODO: make sure that we track all blocks on chip. The LLC directory
@@ -95,11 +99,71 @@ class RubyCacheBlockTracker : public ProbeListenerObject
     // 3) how many block that are brought into the cache system but are never
     //    consumed by any demand request. This can help us understand the
     //    usefulness of the prefetcher.
-    struct UsefulnessAttributionStats : public statistics::Group
+    class UsefulnessAttributionStats : public statistics::Group
     {
-      UsefulnessAttributionStats(statistics::Group *parent);
+      public:
+        UsefulnessAttributionStats(statistics::Group *parent);
+        void regStats() override;
+        void preDumpStats() override;
+
+        void registerCpuRequestor(RequestorID id, const std::string &name);
+        void registerPrefetcherRequestor(
+          RequestorID id, const std::string &name
+        );
+
+        void onBlockBroughtIntoCache(
+          const Addr block_addr, const RequestorID requestor_id
+        );
+        void onBlockEvictedFromCache(const Addr block_addr);
+        void onBlockUsedByDemandRequest(
+          const Addr block_addr, const RequestorID requestor_id
+        );
+      private:
+         void updateUsefulnessStatsForBlock(const Addr block_addr);
+
+      public:
+        /* OVERALL STATS */
+        statistics::Scalar numUsefulBlocksBroughtIntoCacheByCpus;
+        statistics::Scalar numUselessBlocksBroughtIntoCacheByCpus;
+        statistics::Scalar numUsefulBlocksBroughtIntoCacheByPrefetchers;
+        statistics::Scalar numUselessBlocksBroughtIntoCacheByPrefetchers;
+        /* PER PREFETCHER STATS */
+        std::map<RequestorID, statistics::Scalar *>
+          numUsefulBlocksBroughtIntoCachePerPrefetcher;
+        std::map<RequestorID, statistics::Scalar *>
+          numUselessBlocksBroughtIntoCachePerPrefetcher;
+
+      private:
+        /* REQUESTORS */
+        std::map<RequestorID, std::string> cpuRequestorIDs;
+        std::map<RequestorID, std::string> prefetcherRequestorIDs;
+        /* TRACKING BLOCKS */
+        // Mapping the cache block address to the requestor ID of the first
+        // request that brings the block into the cache system.
+        std::unordered_map<Addr, RequestorID> blockToFirstRequestorMap;
+        // The number of times that the block is used by demand requests after
+        // it is brought into the cache system.
+        std::unordered_map<Addr, uint64_t> blockUsageCountMap;
+        /* TRACKING REQUESTORS */
+        // Number of times a requestor brought a block into the cache system
+        // and the block is used by at least one demand request after that.
+        std::unordered_map<RequestorID, uint64_t> requestorUsefulBlocksMap;
+        // Number of times a requestor brought a block into the cache system
+        // and the block is not used by any demand request after that.
+        std::unordered_map<RequestorID, uint64_t> requestorUselessBlocksMap;
     } usefulnessAttributionStats;
 
+    struct TrackerStats : public statistics::Group
+    {
+      TrackerStats(statistics::Group *parent);
+
+      statistics::Scalar numTrackedDemandRequests;
+      statistics::Scalar numTrackedDirectoryEntryAllocations;
+      statistics::Scalar numTrackedDirectoryEntryDeallocations;
+      statistics::Scalar numTrackedCacheFills;
+      statistics::Scalar numTrackedCacheFillFromEviction;
+      statistics::Scalar numTrackedCacheEvictions;
+    } trackerStats;
 
   private:
     // Listeners

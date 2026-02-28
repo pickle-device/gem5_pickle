@@ -33,3 +33,4 @@ SimObject(
 Source('RubyCacheBlockTracker.cc')
 
 DebugFlag('RubyCacheBlockTrackerDebug', tags='perf')
+DebugFlag('RubyCacheBlockTrackerObserverDebug', tags='perf')
