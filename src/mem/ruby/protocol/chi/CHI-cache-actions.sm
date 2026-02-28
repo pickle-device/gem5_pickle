@@ -3436,6 +3436,9 @@ action(Finalize_UpdateDirectoryFromTBE, desc="") {
     assert((tbe.dir_ownerExists == false) && tbe.dir_sharers.isEmpty());
     if(directory.isTagPresent(address)) {
       directory.deallocate(address);
+
+      // Probe point for notifying directory entry deallocation
+      dirEntryTrackerProxy.notifyDirEntryDeallocation(address);
     }
   }
 }
