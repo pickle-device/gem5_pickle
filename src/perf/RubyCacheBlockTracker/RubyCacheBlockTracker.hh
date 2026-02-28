@@ -29,6 +29,8 @@
 #ifndef __PERF_RUBY_CACHE_BLOCK_TRACKER_HH__
 #define __PERF_RUBY_CACHE_BLOCK_TRACKER_HH__
 
+#include <set>
+#include <string>
 #include <utility>
 
 #include "base/statistics.hh"
@@ -57,8 +59,11 @@ class RubyCacheBlockTracker : public ProbeListenerObject
     PARAMS(RubyCacheBlockTracker);
     RubyCacheBlockTracker(const Params &p);
     ~RubyCacheBlockTracker();
-    void init() override;
-    void addEventProbe(SimObject *obj, const char *event_name);
+    // void init() override; // already overriden in Python
+    // void regProbePoints() override; // already overridden in Python
+    void registerEventProbe(SimObject *obj, const char *event_name);
+    void registerDemandRequestor(SimObject *obj);
+    void registerPrefetcherRequestor(SimObject *obj);
 
     void processCpuRequest(const RequestPtr &req);
     void processDirEntryAllocation(const Addr &addr, const RequestPtr &req);
@@ -68,7 +73,12 @@ class RubyCacheBlockTracker : public ProbeListenerObject
     void processCacheEviction(const SimpleCacheAccessProbeArg &arg);
 
   private:
+    std::string getAllRequestorIDs() const;
+
+  private:
     System* system;
+    std::set<RequestorID> cpuRequestorIDs;
+    std::set<RequestorID> prefetcherRequestorIDs;
 
   public:
     // TODO: make sure that we track all blocks on chip. The LLC directory

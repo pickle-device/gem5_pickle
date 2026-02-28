@@ -28,6 +28,9 @@
 
 #include "perf/RubyCacheBlockTracker/RubyCacheBlockTracker.hh"
 
+#include <sstream>
+#include <string>
+
 #include "base/statistics.hh"
 #include "base/stats/group.hh"
 #include "base/types.hh"
@@ -57,24 +60,45 @@ RubyCacheBlockTracker::~RubyCacheBlockTracker()
 }
 
 void
-RubyCacheBlockTracker::init()
+RubyCacheBlockTracker::registerDemandRequestor(SimObject *obj)
 {
-    const uint64_t num_requestors = system->maxRequestors();
-    RUBY_CACHE_BLOCK_TRACKER_DEBUG(
-        "RubyCacheBlockTracker initialized with %d requestors\n",
-        num_requestors
+    RequestorID id = system->lookupRequestorId(obj);
+    panic_if(
+        id == Request::invldRequestorId,
+        "Object %s is not registered as a requestor in the system.\n"
+        "%s\n",
+        obj->name(),
+        getAllRequestorIDs().c_str()
     );
-    for (RequestorID id = 0; id < num_requestors; ++id) {
-        std::string requestor_name = system->getRequestorName(id);
-        RUBY_CACHE_BLOCK_TRACKER_DEBUG(
-            "Registering for requestor id %d with name %s\n",
-            id, requestor_name.c_str()
-        );
-    }
+    cpuRequestorIDs.insert(id);
+    RUBY_CACHE_BLOCK_TRACKER_DEBUG(
+        "Added demand requestor with id %d and name %s\n", id,
+        obj->name()
+    );
 }
 
 void
-RubyCacheBlockTracker::addEventProbe(SimObject *obj, const char *event_name)
+RubyCacheBlockTracker::registerPrefetcherRequestor(SimObject *obj)
+{
+    RequestorID id = system->lookupRequestorId(obj);
+    panic_if(
+        id == Request::invldRequestorId,
+        "Object %s is not registered as a requestor in the system.\n"
+        "%s\n",
+        obj->name(),
+        getAllRequestorIDs().c_str()
+    );
+    prefetcherRequestorIDs.insert(id);
+    RUBY_CACHE_BLOCK_TRACKER_DEBUG(
+        "Added prefetcher requestor with id %d and name %s\n", id,
+        obj->name()
+    );
+}
+
+void
+RubyCacheBlockTracker::registerEventProbe(
+    SimObject *obj, const char *event_name
+)
 {
     ProbeManager *obj_pm = obj->getProbeManager();
     if (strcmp(event_name, "cpu outgoing data request") == 0) {
@@ -204,6 +228,19 @@ RubyCacheBlockTracker::processCacheEviction(
     RUBY_CACHE_BLOCK_TRACKER_DEBUG(
         "Processing cache eviction: addr=0x%lx\n", arg.eviction_addr
     );
+}
+
+std::string
+RubyCacheBlockTracker::getAllRequestorIDs() const
+{
+    std::stringstream strm;
+    const uint64_t num_requestors = system->maxRequestors();
+    for (RequestorID id = 0; id < num_requestors; ++id) {
+        std::string requestor_name = system->getRequestorName(id);
+        strm << "Requestor id " << id << " is registered with name "
+             << requestor_name << "\n";
+    }
+    return strm.str();
 }
 
 RubyCacheBlockTracker::

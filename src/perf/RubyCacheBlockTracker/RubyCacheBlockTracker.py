@@ -66,15 +66,31 @@ class RubyCacheBlockTracker(ProbeListenerObject):
     type = "RubyCacheBlockTracker"
     cxx_class = "gem5::ruby::RubyCacheBlockTracker"
     cxx_header = "perf/RubyCacheBlockTracker/RubyCacheBlockTracker.hh"
-    cxx_exports = [PyBindMethod("addEventProbe")]
+    cxx_exports = [
+        PyBindMethod("registerEventProbe"),
+        PyBindMethod("registerDemandRequestor"),
+        PyBindMethod("registerPrefetcherRequestor"),
+    ]
 
     system = Param.System(Parent.any, "System this is part of")
     ruby_system = Param.RubySystem("RubySystem")
 
+    # For CPU, the requests are issued by the sequencer. However, the sequencer
+    # reuses the requestor ID of the core. Thus, we have separate
+    # `addDemandSequencer` and `addDemandRequestor` functions.
+    # The former is to tell the tracker which sequencer issues the demand
+    # requests so we can register probes to the sequencer for tracking the
+    # demand requests. The latter is to tell the tracker about the cores which
+    # own the requestor IDs.
     def addDemandSequencer(self, sequencer):
         if not hasattr(self, "_demand_sequencers"):
             self._demand_sequencers = []
         self._demand_sequencers.append(sequencer)
+
+    def addDemandRequestor(self, requestor):
+        if not hasattr(self, "_demand_requestors"):
+            self._demand_requestors = []
+        self._demand_requestors.append(requestor)
 
     # Adding the prefetcher requestors. Different prefetchers have different
     # requestors that issue prefetch requests.
@@ -95,25 +111,43 @@ class RubyCacheBlockTracker(ProbeListenerObject):
             self._cache_controllers = []
         self._cache_controllers.append(cache_controller)
 
+    # Here we gather the requestor IDs.
+    def init(self):
+        if hasattr(self, "_demand_requestors"):
+            for sequencer in self._demand_requestors:
+                self.getCCObject().registerDemandRequestor(
+                    sequencer.getCCObject()
+                )
+        if hasattr(self, "_prefetcher_requestors"):
+            for requestor in self._prefetcher_requestors:
+                self.getCCObject().registerPrefetcherRequestor(
+                    requestor.getCCObject()
+                )
+
+    # Here we register probes to the sequencers and the cache controllers.
     def regProbeListeners(self):
-        for sequencer in self._demand_sequencers:
-            self.getCCObject().addEventProbe(
-                sequencer.getCCObject(), "cpu outgoing data request"
-            )
-        for cache_controller in self._cache_controllers:
-            self.getCCObject().addEventProbe(
-                cache_controller.getCCObject(), "Directory entry allocation"
-            )
-            self.getCCObject().addEventProbe(
-                cache_controller.getCCObject(), "Directory entry deallocation"
-            )
-            self.getCCObject().addEventProbe(
-                cache_controller.getCCObject(), "DataMovementWriteback"
-            )
-            self.getCCObject().addEventProbe(
-                cache_controller.getCCObject(),
-                "DataMovementWritebackFromEviction",
-            )
-            self.getCCObject().addEventProbe(
-                cache_controller.getCCObject(), "DataMovementEviction"
-            )
+        if hasattr(self, "_demand_sequencers"):
+            for sequencer in self._demand_sequencers:
+                self.getCCObject().registerEventProbe(
+                    sequencer.getCCObject(), "cpu outgoing data request"
+                )
+        if hasattr(self, "_cache_controllers"):
+            for cache_controller in self._cache_controllers:
+                self.getCCObject().registerEventProbe(
+                    cache_controller.getCCObject(),
+                    "Directory entry allocation",
+                )
+                self.getCCObject().registerEventProbe(
+                    cache_controller.getCCObject(),
+                    "Directory entry deallocation",
+                )
+                self.getCCObject().registerEventProbe(
+                    cache_controller.getCCObject(), "DataMovementWriteback"
+                )
+                self.getCCObject().registerEventProbe(
+                    cache_controller.getCCObject(),
+                    "DataMovementWritebackFromEviction",
+                )
+                self.getCCObject().registerEventProbe(
+                    cache_controller.getCCObject(), "DataMovementEviction"
+                )
