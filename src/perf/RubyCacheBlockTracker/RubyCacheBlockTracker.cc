@@ -82,6 +82,31 @@ RubyCacheBlockTracker::registerDemandRequestor(SimObject *obj)
 }
 
 void
+RubyCacheBlockTracker::registerDemandRequestorWithSubrequestor(
+    SimObject *obj, const std::string &subrequestor_name
+)
+{
+    const std::string full_requestor_name =
+        csprintf("%s.%s", obj->name(), subrequestor_name.c_str());
+    RequestorID id = system->lookupRequestorId(full_requestor_name);
+    panic_if(
+        id == Request::invldRequestorId,
+        "Object %s.%s is not registered as a requestor in the system.\n"
+        "%s\n",
+        obj->name(),
+        subrequestor_name.c_str(),
+        getAllRequestorIDs().c_str()
+    );
+    usefulnessAttributionStats.registerCpuRequestor(
+        id, full_requestor_name.c_str()
+    );
+    RUBY_CACHE_BLOCK_TRACKER_DEBUG(
+        "Added demand requestor with id %d and name %s\n", id,
+        full_requestor_name.c_str()
+    );
+}
+
+void
 RubyCacheBlockTracker::registerPrefetcherRequestor(SimObject *obj)
 {
     RequestorID id = system->lookupRequestorId(obj->name());
@@ -96,6 +121,31 @@ RubyCacheBlockTracker::registerPrefetcherRequestor(SimObject *obj)
     RUBY_CACHE_BLOCK_TRACKER_DEBUG(
         "Added prefetcher requestor with id %d and name %s\n", id,
         obj->name()
+    );
+}
+
+void
+RubyCacheBlockTracker::registerPrefetcherRequestorWithSubrequestor(
+    SimObject *obj, const std::string &subrequestor_name
+)
+{
+    const std::string full_requestor_name =
+        csprintf("%s.%s", obj->name(), subrequestor_name.c_str());
+    RequestorID id = system->lookupRequestorId(full_requestor_name);
+    panic_if(
+        id == Request::invldRequestorId,
+        "Object %s.%s is not registered as a requestor in the system.\n"
+        "%s\n",
+        obj->name(),
+        subrequestor_name.c_str(),
+        getAllRequestorIDs().c_str()
+    );
+    usefulnessAttributionStats.registerPrefetcherRequestor(
+        id, full_requestor_name.c_str()
+    );
+    RUBY_CACHE_BLOCK_TRACKER_DEBUG(
+        "Added prefetcher requestor with id %d and name %s\n", id,
+        full_requestor_name.c_str()
     );
 }
 

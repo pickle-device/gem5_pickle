@@ -69,7 +69,17 @@ class RubyCacheBlockTracker : public ProbeListenerObject
     // void regProbePoints() override; // already overridden in Python
     void registerEventProbe(SimObject *obj, const char *event_name);
     void registerDemandRequestor(SimObject *obj);
+    // This is a special case where the requestor has a subrequestor.
+    // E.g., O3CPU has different requestor IDs for data and inst; however,
+    // "data" and "inst" themselves are not SimObject. They are the names of
+    // the subrequestors of the O3CPU SimObject.
+    void registerDemandRequestorWithSubrequestor(
+      SimObject *obj, const std::string &subrequestor_name
+    );
     void registerPrefetcherRequestor(SimObject *obj);
+    void registerPrefetcherRequestorWithSubrequestor(
+      SimObject *obj, const std::string &subrequestor_name
+    );
 
     void processCpuRequest(const RequestPtr &req);
     void processDirEntryAllocation(const Addr &addr, const RequestPtr &req);

@@ -69,7 +69,9 @@ class RubyCacheBlockTracker(ProbeListenerObject):
     cxx_exports = [
         PyBindMethod("registerEventProbe"),
         PyBindMethod("registerDemandRequestor"),
+        PyBindMethod("registerDemandRequestorWithSubrequestor"),
         PyBindMethod("registerPrefetcherRequestor"),
+        PyBindMethod("registerPrefetcherRequestorWithSubrequestor"),
     ]
 
     system = Param.System(Parent.any, "System this is part of")
@@ -92,6 +94,13 @@ class RubyCacheBlockTracker(ProbeListenerObject):
             self._demand_requestors = []
         self._demand_requestors.append(requestor)
 
+    def addDemandRequestorWithSubrequestor(self, requestor, subrequestor):
+        if not hasattr(self, "_demand_requestors_with_subrequestors"):
+            self._demand_requestors_with_subrequestors = []
+        self._demand_requestors_with_subrequestors.append(
+            (requestor, subrequestor)
+        )
+
     # Adding the prefetcher requestors. Different prefetchers have different
     # requestors that issue prefetch requests.
     # - Pickle prefetcher uses a sequencer to issue prefetch requests. Thus, it
@@ -106,6 +115,13 @@ class RubyCacheBlockTracker(ProbeListenerObject):
             self._prefetcher_requestors = []
         self._prefetcher_requestors.append(requestor)
 
+    def addPrefetcherRequestorWithSubrequestor(self, requestor, subrequestor):
+        if not hasattr(self, "_prefetcher_requestors_with_subrequestors"):
+            self._prefetcher_requestors_with_subrequestors = []
+        self._prefetcher_requestors_with_subrequestors.append(
+            (requestor, subrequestor)
+        )
+
     def addCacheController(self, cache_controller):
         if not hasattr(self, "_cache_controllers"):
             self._cache_controllers = []
@@ -115,13 +131,25 @@ class RubyCacheBlockTracker(ProbeListenerObject):
     def init(self):
         if hasattr(self, "_demand_requestors"):
             for sequencer in self._demand_requestors:
-                self.getCCObject().registerDemandRequestor(
-                    sequencer.getCCObject()
+                self.getCCObject().registerDemandRequestorByName(sequencer)
+        if hasattr(self, "_demand_requestors_with_subrequestors"):
+            for (
+                sequencer,
+                subrequestor,
+            ) in self._demand_requestors_with_subrequestors:
+                self.getCCObject().registerDemandRequestorWithSubrequestorByName(
+                    sequencer, subrequestor
                 )
         if hasattr(self, "_prefetcher_requestors"):
             for requestor in self._prefetcher_requestors:
-                self.getCCObject().registerPrefetcherRequestor(
-                    requestor.getCCObject()
+                self.getCCObject().registerPrefetcherRequestorByName(requestor)
+        if hasattr(self, "_prefetcher_requestors_with_subrequestors"):
+            for (
+                requestor,
+                subrequestor,
+            ) in self._prefetcher_requestors_with_subrequestors:
+                self.getCCObject().registerPrefetcherRequestorWithSubrequestorByName(
+                    requestor, subrequestor
                 )
 
     # Here we register probes to the sequencers and the cache controllers.
