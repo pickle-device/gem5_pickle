@@ -59,6 +59,9 @@ using namespace ArmISA;
 
 MMU::MMU(const ArmMMUParams &p)
   : BaseMMU(p),
+    enable_page_walk_on_prefetch_request_tlb_miss(
+        p.enable_page_walk_on_prefetch_request_tlb_miss
+    ),
     itbStage2(p.stage2_itb), dtbStage2(p.stage2_dtb),
     itbWalker(p.itb_walker), dtbWalker(p.dtb_walker),
     itbStage2Walker(p.stage2_itb_walker),
@@ -1527,7 +1530,9 @@ MMU::getTE(TlbEntry **te, const RequestPtr &req, ThreadContext *tc, Mode mode,
                  false, regime, state.isStage2, mode);
 
     if (!isCompleteTranslation(*te)) {
-        if (req->isPrefetch()) {
+        if (
+            req->isPrefetch() && !enable_page_walk_on_prefetch_request_tlb_miss
+        ) {
             // if the request is a prefetch don't attempt to fill the TLB or go
             // any further with the memory access (here we can safely use the
             // fault status for the short desc. format in all cases)

@@ -72,6 +72,8 @@ class MMU : public BaseMMU
     TLB * getTlb(BaseMMU::Mode mode, bool stage2) const;
     TableWalker * getTableWalker(BaseMMU::Mode mode, bool stage2) const;
 
+    bool enable_page_walk_on_prefetch_request_tlb_miss;
+
   protected:
     TLB *itbStage2;
     TLB *dtbStage2;

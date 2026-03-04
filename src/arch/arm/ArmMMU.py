@@ -71,6 +71,10 @@ class ArmMMU(BaseMMU):
     cxx_class = "gem5::ArmISA::MMU"
     cxx_header = "arch/arm/mmu.hh"
 
+    enable_page_walk_on_prefetch_request_tlb_miss = Param.Bool(
+        False, "Enable page walk on TLB miss of a prefetch request"
+    )
+
     # L2 TLBs
     l2_shared = ArmTLB(
         entry_type="unified", size=1280, assoc=5, partial_levels=["L2"]
