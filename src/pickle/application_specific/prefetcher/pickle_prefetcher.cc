@@ -283,6 +283,11 @@ PicklePrefetcher::configure(std::shared_ptr<PickleJobDescriptor> job)
 {
     num_received_jobs++;
     const uint64_t job_id = num_received_jobs - 1;
+    // The job_id is assigned in the order of job arrival
+    // So, we expect that,
+    //   - Kernel 1 to be sent at address UCPage
+    //   - Kernel 2 to be sent at address UCPage + 8
+    //   and so on, where UCPage is the start address of the uncacheable page.
     for (int core_id = 0; core_id < num_cores; core_id++) {
         prefetcher_work_tracker_collective->addPrefetcherWorkTracker(
             job_id, core_id,
@@ -315,6 +320,9 @@ PicklePrefetcher::enqueueWork(
             packet_status.size()
         );
     }
+    // For BC:
+    //   - Kernel 1: workData = curr_ptr of the queue
+    //   - Kernel 2: workData = curr_ptr of the depth_index[i]
     // For BFS: workData = curr_ptr of the workQueue
     // For PR: workData = node_id + sw_prefetch_distance
     // For SPMV: workData = node_id

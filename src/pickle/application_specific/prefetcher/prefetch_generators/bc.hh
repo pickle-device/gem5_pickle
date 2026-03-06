@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025-2026 The Regents of the University of California
+ * Copyright (c) 2026 The Regents of the University of California
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,15 +29,55 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __ALL_PREFETCH_GENERATORS_HH__
-#define __ALL_PREFETCH_GENERATORS_HH__
+#ifndef __BC_PREFETCH_GENERATOR_HH__
+#define __BC_PREFETCH_GENERATOR_HH__
 
-#include "pickle/application_specific/prefetcher/prefetch_generators/bc.hh"
-#include "pickle/application_specific/prefetcher/prefetch_generators/bfs.hh"
-#include "pickle/application_specific/prefetcher/prefetch_generators/cc.hh"
-#include "pickle/application_specific/prefetcher/prefetch_generators/pr.hh"
+#include <memory>
+#include <string>
+
+#include "base/logging.hh"
+#include "debug/PickleDevicePrefetcherTrace.hh"
+#include "debug/PickleDevicePrefetcherWorkTrackerDebug.hh"
 #include "pickle/application_specific/prefetcher/prefetch_generators/prefetch_generator.hh"
-#include "pickle/application_specific/prefetcher/prefetch_generators/spmv.hh"
-#include "pickle/application_specific/prefetcher/prefetch_generators/tc.hh"
 
-#endif // __ALL_PREFETCH_GENERATORS_HH__
+#define PREFETCHER_TRACE_DEBUG(fmt, args...) \
+  DPRINTF(PickleDevicePrefetcherTrace, "%s: " fmt, name(), ##args)
+#define PREFETCHER_WORK_TRACKER_DEBUG(fmt, args...) \
+  DPRINTF(PickleDevicePrefetcherWorkTrackerDebug, "%s: " fmt, name(), ##args)
+
+namespace gem5
+{
+
+class PrefetcherWorkTracker;
+
+class BCPrefetchKernel1Generator: public PrefetchGenerator
+{
+  public:
+    BCPrefetchKernel1Generator(
+        std::string _name,
+        const uint64_t _software_hint_distance,
+        const uint64_t _prefetch_distance_offset_from_software_hint,
+        PrefetcherWorkTracker* _work_tracker
+    );
+
+    // Function to generate prefetch requests
+    std::shared_ptr<WorkItem> generateWorkItem(Addr work_data) override;
+}; // class BCPrefetchKernel1Generator
+
+class BCPrefetchKernel2Generator: public PrefetchGenerator
+{
+  public:
+    BCPrefetchKernel2Generator(
+        std::string _name,
+        const uint64_t _software_hint_distance,
+        const uint64_t _prefetch_distance_offset_from_software_hint,
+        PrefetcherWorkTracker* _work_tracker
+    );
+
+    // Function to generate prefetch requests
+    std::shared_ptr<WorkItem> generateWorkItem(Addr work_data) override;
+}; // class BCPrefetchKernel2Generator
+
+} // namespace gem5
+
+#endif // __BC_PREFETCH_GENERATOR_HH__

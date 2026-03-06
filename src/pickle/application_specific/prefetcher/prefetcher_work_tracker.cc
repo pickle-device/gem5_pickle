@@ -74,7 +74,21 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
         owner->getSoftwareHintPrefetchDistance() - \
         owner->getPrefetchDistanceOffsetFromSoftwareHint();
 
-    if (job_descriptor->kernel_name == "bfs_kernel") {
+    if (job_descriptor->kernel_name == "bc_kernel_1") {
+        prefetch_generator = std::make_shared<BCPrefetchKernel1Generator>(
+            "BCPrefetchKernel1Generator",
+            owner->getSoftwareHintPrefetchDistance(),
+            owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            this
+        );
+    } else if (job_descriptor->kernel_name == "bc_kernel_2") {
+        prefetch_generator = std::make_shared<BCPrefetchKernel2Generator>(
+            "BCPrefetchKernel2Generator",
+            owner->getSoftwareHintPrefetchDistance(),
+            owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            this
+        );
+    } else if (job_descriptor->kernel_name == "bfs_kernel") {
         prefetch_generator = std::make_shared<BFSPrefetchGenerator>(
             "BFSPrefetchGenerator",
             owner->getSoftwareHintPrefetchDistance(),
@@ -273,7 +287,13 @@ PrefetcherWorkTracker::updateWorkItemQueue()
             const uint64_t job_id = work_item->getJobId();
             const uint64_t work_id = work_item->getWorkId();
             bool too_close = false;
-            if (job_descriptor->kernel_name == "bfs_kernel") {
+            if (job_descriptor->kernel_name == "bc_kernel_1") {
+                too_close = getCoreLatestWorkId() \
+                            + prefetch_dropping_distance * 4 > work_id;
+            } else if (job_descriptor->kernel_name == "bc_kernel_2") {
+                too_close = getCoreLatestWorkId() \
+                            + prefetch_dropping_distance * 4 > work_id;
+            } else if (job_descriptor->kernel_name == "bfs_kernel") {
                 too_close = getCoreLatestWorkId() \
                             + prefetch_dropping_distance * 4 > work_id;
             } else if (job_descriptor->kernel_name == "cc_kernel") {
