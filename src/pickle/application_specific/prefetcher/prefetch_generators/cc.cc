@@ -56,7 +56,7 @@ CCPrefetchGenerator::CCPrefetchGenerator(
 }
 
 std::shared_ptr<WorkItem>
-CCPrefetchGenerator::generateWorkItem(Addr work_data)
+CCPrefetchGenerator::execute_kernel(Addr work_data)
 {
     // work_data is the node that the core is working on
     const Addr node_id = work_data + \

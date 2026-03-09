@@ -42,6 +42,7 @@
 
 #include "mem/packet.hh"
 #include "pickle/application_specific/pickle_job.hh"
+#include "pickle/application_specific/prefetcher/prefetch_context.hh"
 #include "pickle/application_specific/prefetcher/prefetch_request.hh"
 #include "pickle/application_specific/prefetcher/work_item.hh"
 
@@ -93,8 +94,9 @@ class PrefetcherWorkTracker
             std::shared_ptr<PickleJobDescriptor> job_descriptor,
             const uint64_t prefetch_dropping_distance
         );
-        uint64_t getJobId() const { return job_id; }
-        uint64_t getCoreId() const { return core_id; }
+        uint64_t getJobId() const;
+        uint64_t getCoreId() const;
+        void setPrefetchContext(std::shared_ptr<PrefetchContext> context);
         void addWorkItem(Addr work_data);
         bool hasPendingWorkItem();
         std::shared_ptr<WorkItem> peekNextWorkItem() const;
@@ -125,6 +127,7 @@ class PrefetcherWorkTrackerCollective
         // When we drop a prefetch request
         bool enable_dropping_prefetches;
         uint64_t prefetch_dropping_distance;
+        std::shared_ptr<PrefetchContext> prefetch_context;
         // The prefetcher that owns this work tracker
         PicklePrefetcher* owner;
     private:

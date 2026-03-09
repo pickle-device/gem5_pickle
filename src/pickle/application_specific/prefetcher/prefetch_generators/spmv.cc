@@ -56,7 +56,7 @@ SPMVPrefetchGenerator::SPMVPrefetchGenerator(
 }
 
 std::shared_ptr<WorkItem>
-SPMVPrefetchGenerator::generateWorkItem(Addr work_data)
+SPMVPrefetchGenerator::execute_kernel(Addr work_data)
 {
     // work_data is the node_id that the core is working on
     const Addr work_id = work_data + software_hint_distance - \

@@ -29,55 +29,41 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __BC_PREFETCH_GENERATOR_HH__
-#define __BC_PREFETCH_GENERATOR_HH__
+#include <cstdint>
 
-#include <memory>
-#include <string>
-
-#include "base/logging.hh"
-#include "debug/PickleDevicePrefetcherTrace.hh"
-#include "debug/PickleDevicePrefetcherWorkTrackerDebug.hh"
-#include "pickle/application_specific/prefetcher/prefetch_generators/prefetch_generator.hh"
-
-#define PREFETCHER_TRACE_DEBUG(fmt, args...) \
-  DPRINTF(PickleDevicePrefetcherTrace, "%s: " fmt, name(), ##args)
-#define PREFETCHER_WORK_TRACKER_DEBUG(fmt, args...) \
-  DPRINTF(PickleDevicePrefetcherWorkTrackerDebug, "%s: " fmt, name(), ##args)
+#ifndef __PREFETCH_CONTEXT_HH__
+#define __PREFETCH_CONTEXT_HH__
 
 namespace gem5
 {
 
-class PrefetcherWorkTracker;
+class PicklePrefetcher;
 
-class BCPrefetchKernel1Generator: public PrefetchGenerator
+// The context that the prefetcher can use to make prefetching decisions.
+// In hardware, the context can be implemented as a dictionary of key-value
+// pairs, and the prefetcher can query the value of a specific key.
+// However, for the sake of maintainability and readability, we implement the
+// context as a class with specific getter functions for different fields for
+// different workloads. For example, in SSSP, if the prefetcher needs to know
+// the current distance threshold to relax the edges, we can have a
+// getCurrentDistanceThreshold() function in the PrefetchContext class. This
+// way, we can avoid the prefetcher having to know about the specific key names
+// in the dictionary, and we can also have type safety for the values returned
+// by the getter functions.
+
+class PrefetchContext
 {
+  private:
+    PicklePrefetcher* owner;
+    // The current distance threshold to relax the edges in SSSP.
+    uint64_t sssp_current_distance_threshold;
   public:
-    BCPrefetchKernel1Generator(
-        std::string _name,
-        const uint64_t _software_hint_distance,
-        const uint64_t _prefetch_distance_offset_from_software_hint,
-        PrefetcherWorkTracker* _work_tracker
-    );
+    PrefetchContext();
+    void setOwner(PicklePrefetcher* _owner);
+    uint64_t getSSSPCurrentDistanceThreshold() const;
+    void setSSSPCurrentDistanceThreshold(uint64_t threshold);
+};  // class PrefetchContext
 
-    // Function to generate prefetch requests
-    std::shared_ptr<WorkItem> execute_kernel(Addr work_data) override;
-}; // class BCPrefetchKernel1Generator
+}; // namespace gem5
 
-class BCPrefetchKernel2Generator: public PrefetchGenerator
-{
-  public:
-    BCPrefetchKernel2Generator(
-        std::string _name,
-        const uint64_t _software_hint_distance,
-        const uint64_t _prefetch_distance_offset_from_software_hint,
-        PrefetcherWorkTracker* _work_tracker
-    );
-
-    // Function to generate prefetch requests
-    std::shared_ptr<WorkItem> execute_kernel(Addr work_data) override;
-}; // class BCPrefetchKernel2Generator
-
-} // namespace gem5
-
-#endif // __BC_PREFETCH_GENERATOR_HH__
+#endif // __PREFETCH_CONTEXT_HH__

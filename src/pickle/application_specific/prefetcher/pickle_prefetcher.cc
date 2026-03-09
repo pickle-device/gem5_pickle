@@ -512,6 +512,10 @@ PicklePrefetcher::PrefetcherStats::PrefetcherStats(
         "prefetch distance even though the core has not worked on them yet"
     ),
     ADD_STAT(
+        numContextUpdates, statistics::units::Count::get(),
+        "Number of times the prefetch context is updated with new information"
+    ),
+    ADD_STAT(
         numPrefetches, statistics::units::Count::get(),
         "Number of prefetch requests generated"
     ),

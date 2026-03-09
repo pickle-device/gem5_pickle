@@ -56,7 +56,7 @@ BCPrefetchKernel1Generator::BCPrefetchKernel1Generator(
 }
 
 std::shared_ptr<WorkItem>
-BCPrefetchKernel1Generator::generateWorkItem(Addr work_data)
+BCPrefetchKernel1Generator::execute_kernel(Addr work_data)
 {
     // array 0: queue
     // array 1: out_index
@@ -286,7 +286,7 @@ BCPrefetchKernel2Generator::BCPrefetchKernel2Generator(
 }
 
 std::shared_ptr<WorkItem>
-BCPrefetchKernel2Generator::generateWorkItem(Addr work_data)
+BCPrefetchKernel2Generator::execute_kernel(Addr work_data)
 {
     // array 0: depth_index[i]
     // array 1: out_index

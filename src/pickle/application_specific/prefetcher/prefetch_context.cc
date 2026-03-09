@@ -29,55 +29,35 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __BC_PREFETCH_GENERATOR_HH__
-#define __BC_PREFETCH_GENERATOR_HH__
+#include "pickle/application_specific/prefetcher/prefetch_context.hh"
 
-#include <memory>
-#include <string>
-
-#include "base/logging.hh"
-#include "debug/PickleDevicePrefetcherTrace.hh"
-#include "debug/PickleDevicePrefetcherWorkTrackerDebug.hh"
-#include "pickle/application_specific/prefetcher/prefetch_generators/prefetch_generator.hh"
-
-#define PREFETCHER_TRACE_DEBUG(fmt, args...) \
-  DPRINTF(PickleDevicePrefetcherTrace, "%s: " fmt, name(), ##args)
-#define PREFETCHER_WORK_TRACKER_DEBUG(fmt, args...) \
-  DPRINTF(PickleDevicePrefetcherWorkTrackerDebug, "%s: " fmt, name(), ##args)
+#include "pickle/application_specific/prefetcher/pickle_prefetcher.hh"
 
 namespace gem5
 {
 
-class PrefetcherWorkTracker;
-
-class BCPrefetchKernel1Generator: public PrefetchGenerator
+PrefetchContext::PrefetchContext()
+  : sssp_current_distance_threshold(0)
 {
-  public:
-    BCPrefetchKernel1Generator(
-        std::string _name,
-        const uint64_t _software_hint_distance,
-        const uint64_t _prefetch_distance_offset_from_software_hint,
-        PrefetcherWorkTracker* _work_tracker
-    );
+}
 
-    // Function to generate prefetch requests
-    std::shared_ptr<WorkItem> execute_kernel(Addr work_data) override;
-}; // class BCPrefetchKernel1Generator
-
-class BCPrefetchKernel2Generator: public PrefetchGenerator
+void
+PrefetchContext::setOwner(PicklePrefetcher* _owner)
 {
-  public:
-    BCPrefetchKernel2Generator(
-        std::string _name,
-        const uint64_t _software_hint_distance,
-        const uint64_t _prefetch_distance_offset_from_software_hint,
-        PrefetcherWorkTracker* _work_tracker
-    );
+    owner = _owner;
+}
 
-    // Function to generate prefetch requests
-    std::shared_ptr<WorkItem> execute_kernel(Addr work_data) override;
-}; // class BCPrefetchKernel2Generator
+uint64_t
+PrefetchContext::getSSSPCurrentDistanceThreshold() const
+{
+    return sssp_current_distance_threshold;
+}
 
-} // namespace gem5
+void
+PrefetchContext::setSSSPCurrentDistanceThreshold(uint64_t threshold)
+{
+    owner->prefetcherStats.numContextUpdates++;
+    sssp_current_distance_threshold = threshold;
+}
 
-#endif // __BC_PREFETCH_GENERATOR_HH__
+}; // namespace gem5

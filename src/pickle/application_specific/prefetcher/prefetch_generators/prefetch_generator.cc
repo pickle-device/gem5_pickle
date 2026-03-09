@@ -58,6 +58,12 @@ PrefetchGenerator::name() const
 }
 
 void
+PrefetchGenerator::setPrefetchContext(std::shared_ptr<PrefetchContext> context)
+{
+    prefetch_context = context;
+}
+
+void
 PrefetchGenerator::warnIfOutsideRanges(
     const Addr work_id, const Addr pf_vaddr
 ) const

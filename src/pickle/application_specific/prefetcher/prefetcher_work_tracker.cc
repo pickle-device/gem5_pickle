@@ -36,6 +36,7 @@
 #include "debug/PickleDevicePrefetcherWorkTrackerDebug.hh"
 #include "debug/PickleDevicePrefetcherWorkTrackerStatsDebug.hh"
 #include "pickle/application_specific/prefetcher/pickle_prefetcher.hh"
+#include "pickle/application_specific/prefetcher/prefetch_context.hh"
 #include "pickle/device/pickle_device.hh"
 
 namespace gem5
@@ -109,6 +110,27 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             this
         );
+    } else if (job_descriptor->kernel_name == "sssp_kernel_1") {
+        prefetch_generator = std::make_shared<SSSPPrefetchKernel1Generator>(
+            "SSSPPrefetchKernel1Generator",
+            owner->getSoftwareHintPrefetchDistance(),
+            owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            this
+        );
+    } else if (job_descriptor->kernel_name == "sssp_kernel_2") {
+        prefetch_generator = std::make_shared<SSSPPrefetchKernel2Generator>(
+            "SSSPPrefetchKernel2Generator",
+            owner->getSoftwareHintPrefetchDistance(),
+            owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            this
+        );
+    } else if (job_descriptor->kernel_name == "sssp_kernel_3") {
+        prefetch_generator = std::make_shared<SSSPPrefetchKernel3Generator>(
+            "SSSPPrefetchKernel3Generator",
+            owner->getSoftwareHintPrefetchDistance(),
+            owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            this
+        );
     } else if (job_descriptor->kernel_name == "spmv") {
         prefetch_generator = std::make_shared<SPMVPrefetchGenerator>(
             "SPMVPrefetchGenerator",
@@ -131,6 +153,26 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
     }
 }
 
+uint64_t
+PrefetcherWorkTracker::getJobId() const
+{
+    return job_id;
+}
+
+uint64_t
+PrefetcherWorkTracker::getCoreId() const
+{
+    return core_id;
+}
+
+void
+PrefetcherWorkTracker::setPrefetchContext(
+    std::shared_ptr<PrefetchContext> context
+)
+{
+    prefetch_generator->setPrefetchContext(context);
+}
+
 void
 PrefetcherWorkTracker::addWorkItem(Addr work_data)
 {
@@ -140,7 +182,7 @@ PrefetcherWorkTracker::addWorkItem(Addr work_data)
     // work_data is the current node that the core is working on.
     // The prefetcher generator will need to figure out the next node to
     // prefetch.
-    auto work_item = prefetch_generator->generateWorkItem(work_data);
+    auto work_item = prefetch_generator->execute_kernel(work_data);
     if (work_item == nullptr) {
         DPRINTF(
             PickleDevicePrefetcherWorkTrackerDebug,
@@ -305,6 +347,12 @@ PrefetcherWorkTracker::updateWorkItemQueue()
             } else if (job_descriptor->kernel_name == "spmv") {
                 too_close = getCoreLatestWorkId() \
                             + prefetch_dropping_distance > work_id;
+            } else if (job_descriptor->kernel_name == "sssp_kernel_1") {
+                too_close = getCoreLatestWorkId() \
+                            + prefetch_dropping_distance * 4 > work_id;
+            } else if (job_descriptor->kernel_name == "sssp_kernel_2") {
+                too_close = getCoreLatestWorkId() \
+                            + prefetch_dropping_distance * 4 > work_id;
             } else if (job_descriptor->kernel_name == "tc_kernel") {
                 too_close = getCoreLatestWorkId() \
                             + prefetch_dropping_distance > work_id;
@@ -344,6 +392,7 @@ PrefetcherWorkTrackerCollective::PrefetcherWorkTrackerCollective(
     delegate_last_layer_prefetches_to_llc_agents(
         _delegate_last_layer_prefetches_to_llc_agents
     ),
+    prefetch_context(std::make_shared<PrefetchContext>()),
     owner(nullptr)
 {
 }
@@ -367,6 +416,7 @@ PrefetcherWorkTrackerCollective::addPrefetcherWorkTracker(
         core_start_time_map[job_id] = std::unordered_map<uint64_t, Tick>();
     }
     trackers[std::make_pair(job_id, core_id)] = tracker;
+    tracker->setPrefetchContext(prefetch_context);
 }
 
 std::shared_ptr<PrefetcherWorkTracker>

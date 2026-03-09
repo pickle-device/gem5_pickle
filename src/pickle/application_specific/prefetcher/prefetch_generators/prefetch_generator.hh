@@ -35,6 +35,7 @@
 #include <memory>
 #include <string>
 
+#include "pickle/application_specific/prefetcher/prefetch_context.hh"
 #include "pickle/application_specific/prefetcher/work_item.hh"
 
 namespace gem5
@@ -48,6 +49,7 @@ class PrefetchGenerator
     std::string generator_name;
     uint64_t software_hint_distance;
     uint64_t prefetch_distance_offset_from_software_hint;
+    std::shared_ptr<PrefetchContext> prefetch_context;
     PrefetcherWorkTracker* work_tracker;
   public:
     PrefetchGenerator(
@@ -58,9 +60,10 @@ class PrefetchGenerator
     );
 
     std::string name() const;
+    void setPrefetchContext(std::shared_ptr<PrefetchContext> context);
 
     // Function to generate prefetch requests
-    virtual std::shared_ptr<WorkItem> generateWorkItem(Addr work_data) = 0;
+    virtual std::shared_ptr<WorkItem> execute_kernel(Addr work_data) = 0;
 
     void warnIfOutsideRanges(
       const Addr work_id, const Addr pf_vaddr

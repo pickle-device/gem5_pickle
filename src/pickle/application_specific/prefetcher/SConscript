@@ -44,6 +44,7 @@ DebugFlag('PickleDevicePrefetcherWorkTrackerStatsDebug')
 
 Source('llc_prefetch_agent.cc')
 Source('pickle_prefetcher.cc')
+Source('prefetch_context.cc')
 Source('prefetch_request.cc')
 Source('prefetcher_work_tracker.cc')
 Source('work_item.cc')

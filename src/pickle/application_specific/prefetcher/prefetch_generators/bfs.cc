@@ -56,7 +56,7 @@ BFSPrefetchGenerator::BFSPrefetchGenerator(
 }
 
 std::shared_ptr<WorkItem>
-BFSPrefetchGenerator::generateWorkItem(Addr work_data)
+BFSPrefetchGenerator::execute_kernel(Addr work_data)
 {
     // work_data is the address of the node that the core is working on
     Addr work_id = \

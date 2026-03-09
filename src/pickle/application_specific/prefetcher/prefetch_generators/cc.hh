@@ -53,7 +53,7 @@ class CCPrefetchGenerator: public PrefetchGenerator
     );
 
     // Function to generate prefetch requests
-    std::shared_ptr<WorkItem> generateWorkItem(Addr work_data) override;
+    std::shared_ptr<WorkItem> execute_kernel(Addr work_data) override;
 }; // class CCPrefetchGenerator
 
 } // namespace gem5

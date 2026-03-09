@@ -29,8 +29,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __BC_PREFETCH_GENERATOR_HH__
-#define __BC_PREFETCH_GENERATOR_HH__
+#ifndef __SSSP_PREFETCH_GENERATOR_HH__
+#define __SSSP_PREFETCH_GENERATOR_HH__
 
 #include <memory>
 #include <string>
@@ -50,10 +50,10 @@ namespace gem5
 
 class PrefetcherWorkTracker;
 
-class BCPrefetchKernel1Generator: public PrefetchGenerator
+class SSSPPrefetchKernel1Generator: public PrefetchGenerator
 {
   public:
-    BCPrefetchKernel1Generator(
+    SSSPPrefetchKernel1Generator(
         std::string _name,
         const uint64_t _software_hint_distance,
         const uint64_t _prefetch_distance_offset_from_software_hint,
@@ -62,12 +62,12 @@ class BCPrefetchKernel1Generator: public PrefetchGenerator
 
     // Function to generate prefetch requests
     std::shared_ptr<WorkItem> execute_kernel(Addr work_data) override;
-}; // class BCPrefetchKernel1Generator
+}; // class SSSPPrefetchKernel1Generator
 
-class BCPrefetchKernel2Generator: public PrefetchGenerator
+class SSSPPrefetchKernel2Generator: public PrefetchGenerator
 {
   public:
-    BCPrefetchKernel2Generator(
+    SSSPPrefetchKernel2Generator(
         std::string _name,
         const uint64_t _software_hint_distance,
         const uint64_t _prefetch_distance_offset_from_software_hint,
@@ -76,8 +76,22 @@ class BCPrefetchKernel2Generator: public PrefetchGenerator
 
     // Function to generate prefetch requests
     std::shared_ptr<WorkItem> execute_kernel(Addr work_data) override;
-}; // class BCPrefetchKernel2Generator
+}; // class SSSPPrefetchKernel2Generator
+
+class SSSPPrefetchKernel3Generator: public PrefetchGenerator
+{
+  public:
+    SSSPPrefetchKernel3Generator(
+        std::string _name,
+        const uint64_t _software_hint_distance,
+        const uint64_t _prefetch_distance_offset_from_software_hint,
+        PrefetcherWorkTracker* _work_tracker
+    );
+
+    // Function to update the prefetch context
+    std::shared_ptr<WorkItem> execute_kernel(Addr work_data) override;
+}; // class SSSPPrefetchKernel3Generator
 
 } // namespace gem5
 
-#endif // __BC_PREFETCH_GENERATOR_HH__
+#endif // __SSSP_PREFETCH_GENERATOR_HH__

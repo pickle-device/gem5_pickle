@@ -56,7 +56,7 @@ PRPrefetchGenerator::PRPrefetchGenerator(
 }
 
 std::shared_ptr<WorkItem>
-PRPrefetchGenerator::generateWorkItem(Addr work_data)
+PRPrefetchGenerator::execute_kernel(Addr work_data)
 {
     // work_data is the address of the node that the core is working on
 

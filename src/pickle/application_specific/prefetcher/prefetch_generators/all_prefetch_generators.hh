@@ -38,6 +38,7 @@
 #include "pickle/application_specific/prefetcher/prefetch_generators/pr.hh"
 #include "pickle/application_specific/prefetcher/prefetch_generators/prefetch_generator.hh"
 #include "pickle/application_specific/prefetcher/prefetch_generators/spmv.hh"
+#include "pickle/application_specific/prefetcher/prefetch_generators/sssp.hh"
 #include "pickle/application_specific/prefetcher/prefetch_generators/tc.hh"
 
 #endif // __ALL_PREFETCH_GENERATORS_HH__

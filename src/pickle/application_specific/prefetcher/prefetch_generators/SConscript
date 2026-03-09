@@ -38,6 +38,7 @@ Source('bc.cc')
 Source('bfs.cc')
 Source('cc.cc')
 Source('pr.cc')
+Source('sssp.cc')
 Source('tc.cc')
 
 # benchmarks
