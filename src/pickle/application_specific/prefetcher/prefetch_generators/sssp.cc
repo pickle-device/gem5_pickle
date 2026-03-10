@@ -79,7 +79,6 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
     uint64_t lv2_start_ptr_vaddr = 0;
     uint64_t lv2_end_ptr_vaddr = 0;
     std::vector<uint64_t> lv3_edge_indices;
-    bool dist_is_bigger_than_threshold = false;
 
     // level 1: we fetch the node id
     {
@@ -145,14 +144,14 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
             "Work Item = 0x%llx, dist[%lld] = %u\n",
             work_vaddr, lv1_node_id, dist_value
         );
-        // We only prefetch the neighbor list if the distance is within the
-        // threshold
+        // We only prefetch the neighbor list if the distance is bigger than
+        // the threshold
         const uint32_t distance_threshold = \
              prefetch_context->getSSSPCurrentDistanceThreshold(core_id);
-        if (dist_value > distance_threshold) {
-            dist_is_bigger_than_threshold = true;
+        if (dist_value < distance_threshold) {
+            // dist below threshold, skip prefetching neighbors
             PREFETCHER_TRACE_DEBUG(
-                "Distance %u is greater than threshold %u, skip prefetching "
+                "Distance %u is less than threshold %u, skip prefetching "
                 "neighbors for node %lld\n",
                 dist_value,
                 distance_threshold,
