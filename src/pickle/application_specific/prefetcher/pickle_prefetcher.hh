@@ -173,6 +173,7 @@ class PicklePrefetcher: public ClockedObject
             statistics::Histogram prefetchLv1Time;
             statistics::Histogram prefetchLv2Time;
             statistics::Histogram prefetchLv3Time;
+            statistics::Histogram prefetchLv4Time;
             statistics::Histogram totalPrefetchTime;
             statistics::Histogram timelyPrefetchesDistance;
             statistics::Histogram latePrefetchesDistance;

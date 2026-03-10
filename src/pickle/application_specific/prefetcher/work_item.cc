@@ -31,6 +31,8 @@
 
 #include "pickle/application_specific/prefetcher/work_item.hh"
 
+#include "base/logging.hh"
+
 namespace gem5
 {
 
@@ -128,6 +130,14 @@ WorkItem::getWorkActivationTime() const
 Tick
 WorkItem::getPrefetchLvTime(const uint64_t lv) const
 {
+    if (lv >= MAX_INDIRECTION_LEVELS) {
+        panic(
+            "Level %lu exceeds the maximum supported levels of indirection. "
+            "Please modify MAX_INDIRECTION_LEVELS in work_item.hh to increase "
+            "the maximum number of supported levels.\n",
+            lv
+        );
+    }
     if (lv == 0) {
         //return prefetch_received_time[0] - prefetch_sent_time;
         return prefetch_received_time[0] - work_received_time;
@@ -192,6 +202,14 @@ WorkItem::addExpectedPrefetch(Addr pf_vaddr, const uint64_t level)
 {
     if (level + 1 > num_indirection_levels) {
         num_indirection_levels = level + 1;
+    }
+    if (level >= MAX_INDIRECTION_LEVELS) {
+        panic(
+            "Level %lu exceeds the maximum supported levels of indirection. "
+            "Please modify MAX_INDIRECTION_LEVELS in work_item.hh to increase "
+            "the maximum number of supported levels.\n",
+            level
+        );
     }
     expected_prefetches[level].insert(pf_vaddr);
 }

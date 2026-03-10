@@ -576,6 +576,10 @@ PicklePrefetcher::TaskStats::TaskStats(
         "From first prefetch to final prefetch of array 3"
     ),
     ADD_STAT(
+        prefetchLv4Time, statistics::units::Tick::get(),
+        "From first prefetch to final prefetch of array 4"
+    ),
+    ADD_STAT(
         totalPrefetchTime, statistics::units::Tick::get(),
         "From the first prefetch to final prefetch"
     ),
@@ -621,6 +625,9 @@ PicklePrefetcher::TaskStats::TaskStats(
     prefetchLv3Time
       .init(16)
       .flags(statistics::pdf);
+    prefetchLv4Time
+      .init(16)
+      .flags(statistics::pdf);
     totalPrefetchTime
       .init(16)
       .flags(statistics::pdf);
@@ -664,6 +671,7 @@ PicklePrefetcher::profileWork(
     task_stat->prefetchLv1Time.sample(work->getPrefetchLvTime(1));
     task_stat->prefetchLv2Time.sample(work->getPrefetchLvTime(2));
     task_stat->prefetchLv3Time.sample(work->getPrefetchLvTime(3));
+    task_stat->prefetchLv4Time.sample(work->getPrefetchLvTime(4));
     task_stat->totalPrefetchTime.sample(work->getTotalPrefetchTime());
     // late prefetch?
     if (prefetcher_work_tracker_collective->hasCoreWorkedOnThisWork(

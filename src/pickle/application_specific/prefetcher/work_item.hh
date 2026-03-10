@@ -44,10 +44,12 @@ namespace gem5
 class WorkItem
 {
     private:
+        static constexpr uint64_t MAX_INDIRECTION_LEVELS = 16;
         uint64_t job_id; // which prefetch generator generated this work
         uint64_t core_id; // which core is working on this work
         Addr work_id; // used to identify work from the core
-        std::array<std::unordered_set<Addr>, 4> expected_prefetches;
+        std::array<std::unordered_set<Addr>, MAX_INDIRECTION_LEVELS>
+            expected_prefetches;
         uint64_t curr_level;
         bool core_worked_on_this_work;
         uint64_t num_indirection_levels;
@@ -60,7 +62,7 @@ class WorkItem
         // when did the prefetcher send the first prefetch
         Tick prefetch_sent_time;
         // when did the prefetcher receive all prefetches for a certain level
-        std::array<Tick, 4> prefetch_received_time;
+        std::array<Tick, MAX_INDIRECTION_LEVELS> prefetch_received_time;
         // when did the prefetcher finish prefetch all four levels
         Tick work_completed_time;
         // when did the core use this work
