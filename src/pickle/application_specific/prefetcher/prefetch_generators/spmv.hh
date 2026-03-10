@@ -47,6 +47,7 @@ class SPMVPrefetchGenerator: public PrefetchGenerator
   public:
     SPMVPrefetchGenerator(
         std::string _name,
+        const uint64_t _job_id, const uint64_t _core_id,
         const uint64_t _software_hint_distance,
         const uint64_t _prefetch_distance_offset_from_software_hint,
         PrefetcherWorkTracker* _work_tracker

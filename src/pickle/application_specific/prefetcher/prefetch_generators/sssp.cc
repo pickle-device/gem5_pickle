@@ -36,11 +36,13 @@ namespace gem5
 
 SSSPPrefetchKernel1Generator::SSSPPrefetchKernel1Generator(
     std::string _name,
+    const uint64_t _job_id, const uint64_t _core_id,
     const uint64_t _software_hint_distance,
     const uint64_t _prefetch_distance_offset_from_software_hint,
     PrefetcherWorkTracker* _work_tracker
 ) : PrefetchGenerator(
     _name,
+    _job_id, _core_id,
     _software_hint_distance, _prefetch_distance_offset_from_software_hint,
     _work_tracker
     )
@@ -56,11 +58,13 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
 
 SSSPPrefetchKernel2Generator::SSSPPrefetchKernel2Generator(
     std::string _name,
+    const uint64_t _job_id, const uint64_t _core_id,
     const uint64_t _software_hint_distance,
     const uint64_t _prefetch_distance_offset_from_software_hint,
     PrefetcherWorkTracker* _work_tracker
 ) : PrefetchGenerator(
     _name,
+    _job_id, _core_id,
     _software_hint_distance, _prefetch_distance_offset_from_software_hint,
     _work_tracker
     )
@@ -76,11 +80,13 @@ SSSPPrefetchKernel2Generator::execute_kernel(Addr work_data)
 
 SSSPPrefetchKernel3Generator::SSSPPrefetchKernel3Generator(
     std::string _name,
+    const uint64_t _job_id, const uint64_t _core_id,
     const uint64_t _software_hint_distance,
     const uint64_t _prefetch_distance_offset_from_software_hint,
     PrefetcherWorkTracker* _work_tracker
 ) : PrefetchGenerator(
     _name,
+    _job_id, _core_id,
     _software_hint_distance, _prefetch_distance_offset_from_software_hint,
     _work_tracker
     )
@@ -95,7 +101,7 @@ SSSPPrefetchKernel3Generator::execute_kernel(Addr work_data)
     // kernels to determine whether to generate prefetches or not.
 
     // Update the SSSP distance threshold
-    prefetch_context->setSSSPCurrentDistanceThreshold(work_data);
+    prefetch_context->setSSSPCurrentDistanceThreshold(core_id, work_data);
 
     return nullptr;
 }

@@ -47,6 +47,8 @@ class PrefetchGenerator
 {
   protected:
     std::string generator_name;
+    uint64_t job_id;
+    uint64_t core_id;
     uint64_t software_hint_distance;
     uint64_t prefetch_distance_offset_from_software_hint;
     std::shared_ptr<PrefetchContext> prefetch_context;
@@ -54,6 +56,7 @@ class PrefetchGenerator
   public:
     PrefetchGenerator(
         std::string _name,
+        const uint64_t _job_id, const uint64_t _core_id,
         const uint64_t _software_hint_distance,
         const uint64_t _prefetch_distance_offset_from_software_hint,
         PrefetcherWorkTracker* _work_tracker

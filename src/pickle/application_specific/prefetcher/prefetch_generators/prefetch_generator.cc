@@ -39,14 +39,18 @@ namespace gem5
 
 PrefetchGenerator::PrefetchGenerator(
     std::string _name,
+    const uint64_t _job_id, const uint64_t _core_id,
     const uint64_t _software_hint_distance,
     const uint64_t _prefetch_distance_offset_from_software_hint,
     PrefetcherWorkTracker* _work_tracker
 ) : generator_name(_name),
+    job_id(_job_id),
+    core_id(_core_id),
     software_hint_distance(_software_hint_distance),
     prefetch_distance_offset_from_software_hint(
         _prefetch_distance_offset_from_software_hint
     ),
+    prefetch_context(nullptr),
     work_tracker(_work_tracker)
 {
 }

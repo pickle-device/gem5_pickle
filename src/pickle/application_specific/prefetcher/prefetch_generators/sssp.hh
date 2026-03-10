@@ -55,6 +55,7 @@ class SSSPPrefetchKernel1Generator: public PrefetchGenerator
   public:
     SSSPPrefetchKernel1Generator(
         std::string _name,
+        const uint64_t _job_id, const uint64_t _core_id,
         const uint64_t _software_hint_distance,
         const uint64_t _prefetch_distance_offset_from_software_hint,
         PrefetcherWorkTracker* _work_tracker
@@ -69,6 +70,7 @@ class SSSPPrefetchKernel2Generator: public PrefetchGenerator
   public:
     SSSPPrefetchKernel2Generator(
         std::string _name,
+        const uint64_t _job_id, const uint64_t _core_id,
         const uint64_t _software_hint_distance,
         const uint64_t _prefetch_distance_offset_from_software_hint,
         PrefetcherWorkTracker* _work_tracker
@@ -83,6 +85,7 @@ class SSSPPrefetchKernel3Generator: public PrefetchGenerator
   public:
     SSSPPrefetchKernel3Generator(
         std::string _name,
+        const uint64_t _job_id, const uint64_t _core_id,
         const uint64_t _software_hint_distance,
         const uint64_t _prefetch_distance_offset_from_software_hint,
         PrefetcherWorkTracker* _work_tracker

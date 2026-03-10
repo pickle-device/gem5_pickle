@@ -78,6 +78,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
     if (job_descriptor->kernel_name == "bc_kernel_1") {
         prefetch_generator = std::make_shared<BCPrefetchKernel1Generator>(
             "BCPrefetchKernel1Generator",
+            _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             this
@@ -85,6 +86,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
     } else if (job_descriptor->kernel_name == "bc_kernel_2") {
         prefetch_generator = std::make_shared<BCPrefetchKernel2Generator>(
             "BCPrefetchKernel2Generator",
+            _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             this
@@ -92,6 +94,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
     } else if (job_descriptor->kernel_name == "bfs_kernel") {
         prefetch_generator = std::make_shared<BFSPrefetchGenerator>(
             "BFSPrefetchGenerator",
+            _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             this
@@ -99,6 +102,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
     } else if (job_descriptor->kernel_name == "cc_kernel") {
         prefetch_generator = std::make_shared<CCPrefetchGenerator>(
             "CCPrefetchGenerator",
+            _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             this
@@ -106,6 +110,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
     } else if (job_descriptor->kernel_name == "pr_kernel") {
         prefetch_generator = std::make_shared<PRPrefetchGenerator>(
             "PRPrefetchGenerator",
+            _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             this
@@ -113,6 +118,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
     } else if (job_descriptor->kernel_name == "sssp_kernel_1") {
         prefetch_generator = std::make_shared<SSSPPrefetchKernel1Generator>(
             "SSSPPrefetchKernel1Generator",
+            _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             this
@@ -120,6 +126,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
     } else if (job_descriptor->kernel_name == "sssp_kernel_2") {
         prefetch_generator = std::make_shared<SSSPPrefetchKernel2Generator>(
             "SSSPPrefetchKernel2Generator",
+            _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             this
@@ -127,6 +134,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
     } else if (job_descriptor->kernel_name == "sssp_kernel_3") {
         prefetch_generator = std::make_shared<SSSPPrefetchKernel3Generator>(
             "SSSPPrefetchKernel3Generator",
+            _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             this
@@ -134,6 +142,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
     } else if (job_descriptor->kernel_name == "spmv") {
         prefetch_generator = std::make_shared<SPMVPrefetchGenerator>(
             "SPMVPrefetchGenerator",
+            _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             this
@@ -141,6 +150,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
     } else if (job_descriptor->kernel_name == "tc_kernel") {
         prefetch_generator = std::make_shared<TCPrefetchGenerator>(
             "TCPrefetchGenerator",
+            _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             this
