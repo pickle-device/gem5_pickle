@@ -401,6 +401,7 @@ void
 PrefetcherWorkTrackerCollective::setOwner(PicklePrefetcher* owner)
 {
     this->owner = owner;
+    prefetch_context->setOwner(owner);
 }
 
 void
