@@ -292,13 +292,14 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
                 warnIfOutsideRanges(work_vaddr, curr_block_vaddr);
             }
             constexpr Addr item_size = 8;
-            const Addr index_and_weight = \
-                (edge_vaddr - curr_block_vaddr) / item_size;
-            constexpr uint64_t mask_of_32_bits = (1ULL << 32) - 1;
-            const uint64_t edge_index = index_and_weight & mask_of_32_bits;
+            const Addr index_and_weight = data_ptr[
+                (edge_vaddr - curr_block_vaddr) / item_size
+            ];
+            constexpr uint64_t mask_32_bits = (1ULL << 32) - 1;
+            const uint64_t edge_index = index_and_weight & mask_32_bits;
             const uint64_t edge_weight =
-                (index_and_weight >> 32) & mask_of_32_bits;
-            lv3_edge_indices.push_back(data_ptr[edge_index]);
+                (index_and_weight >> 32) & mask_32_bits;
+            lv3_edge_indices.push_back(edge_index);
             PREFETCHER_TRACE_DEBUG(
                 "Work Item = 0x%llx, edge_index = %lld, edge_weight = %lld\n",
                 work_vaddr, lv3_edge_indices.back(), edge_weight
@@ -508,17 +509,18 @@ SSSPPrefetchKernel2Generator::execute_kernel(Addr work_data)
                 curr_block_vaddr = edge_vaddr_block_aligned;
                 data_ptr = pkt->getPtr<uint64_t>();
                 // We add expected prefetches
-                workItem->addExpectedPrefetch(curr_block_vaddr, 2);
+                workItem->addExpectedPrefetch(curr_block_vaddr, 3);
                 warnIfOutsideRanges(work_vaddr, curr_block_vaddr);
             }
             constexpr Addr item_size = 8;
-            const Addr index_and_weight = \
-                (edge_vaddr - curr_block_vaddr) / item_size;
-            constexpr uint64_t mask_of_32_bits = (1ULL << 32) - 1;
-            const uint64_t edge_index = index_and_weight & mask_of_32_bits;
+            const Addr index_and_weight = data_ptr[
+                (edge_vaddr - curr_block_vaddr) / item_size
+            ];
+            constexpr uint64_t mask_32_bits = (1ULL << 32) - 1;
+            const uint64_t edge_index = index_and_weight & mask_32_bits;
             const uint64_t edge_weight =
-                (index_and_weight >> 32) & mask_of_32_bits;
-            lv3_edge_indices.push_back(data_ptr[edge_index]);
+                (index_and_weight >> 32) & mask_32_bits;
+            lv3_edge_indices.push_back(edge_index);
             PREFETCHER_TRACE_DEBUG(
                 "Work Item = 0x%llx, edge_index = %lld, edge_weight = %lld\n",
                 work_vaddr, lv3_edge_indices.back(), edge_weight
