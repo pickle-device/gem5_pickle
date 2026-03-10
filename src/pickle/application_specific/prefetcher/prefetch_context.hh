@@ -30,6 +30,7 @@
  */
 
 #include <cstdint>
+#include <unordered_map>
 
 #ifndef __PREFETCH_CONTEXT_HH__
 #define __PREFETCH_CONTEXT_HH__
@@ -56,12 +57,12 @@ class PrefetchContext
   private:
     PicklePrefetcher* owner;
     // The current distance threshold to relax the edges in SSSP.
-    uint64_t sssp_current_distance_threshold;
+    std::unordered_map<uint64_t, uint64_t> sssp_current_distance_threshold;
   public:
     PrefetchContext();
     void setOwner(PicklePrefetcher* _owner);
-    uint64_t getSSSPCurrentDistanceThreshold() const;
-    void setSSSPCurrentDistanceThreshold(uint64_t threshold);
+    uint64_t getSSSPCurrentDistanceThreshold(uint64_t core_id) const;
+    void setSSSPCurrentDistanceThreshold(uint64_t core_id, uint64_t threshold);
 };  // class PrefetchContext
 
 }; // namespace gem5

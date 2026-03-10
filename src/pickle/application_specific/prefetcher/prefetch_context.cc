@@ -37,8 +37,7 @@ namespace gem5
 {
 
 PrefetchContext::PrefetchContext()
-  : sssp_current_distance_threshold(0)
-{
+  : owner(nullptr) {
 }
 
 void
@@ -48,16 +47,22 @@ PrefetchContext::setOwner(PicklePrefetcher* _owner)
 }
 
 uint64_t
-PrefetchContext::getSSSPCurrentDistanceThreshold() const
+PrefetchContext::getSSSPCurrentDistanceThreshold(uint64_t core_id) const
 {
-    return sssp_current_distance_threshold;
+    auto it = sssp_current_distance_threshold.find(core_id);
+    if (it != sssp_current_distance_threshold.end()) {
+        return it->second;
+    }
+    return 0;
 }
 
 void
-PrefetchContext::setSSSPCurrentDistanceThreshold(uint64_t threshold)
+PrefetchContext::setSSSPCurrentDistanceThreshold(
+    uint64_t core_id, uint64_t threshold
+)
 {
     owner->prefetcherStats.numContextUpdates++;
-    sssp_current_distance_threshold = threshold;
+    sssp_current_distance_threshold[core_id] = threshold;
 }
 
 }; // namespace gem5
