@@ -73,6 +73,9 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
     const Addr work_vaddr = work_id;
 
     std::shared_ptr<WorkItem> workItem(new WorkItem(work_id));
+    PREFETCHER_WORK_TRACKER_DEBUG(
+        "Received work item with vaddr 0x%llx\n", work_vaddr
+    );
 
     constexpr Addr BLOCK_SHIFT = 6;
     uint64_t lv1_node_id = 0;
@@ -112,6 +115,19 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
     // level 1.1: we fetch dist[u] to decide if we want to prefetch the
     // neighbor list of the node or not
     {
+        // safe guard: This is not a problem but we want to make sure that the
+        // prefetch vaddr is within the valid range of the job's memory.
+        const uint64_t dist_array_num_elements =
+            work_tracker->job_descriptor->get_array(3).num_elements();
+        if (lv1_node_id >= dist_array_num_elements) {
+            PREFETCHER_TRACE_DEBUG(
+                "Node id %lld is out of bounds for dist array with %lld "
+                "elements. Work Item = 0x%llx\n",
+                lv1_node_id, dist_array_num_elements, work_vaddr
+            );
+            return nullptr;
+        }
+
         bool success = false;
         const Addr dist_vaddr = \
             work_tracker->job_descriptor->get_array(3).vaddr_start + \
