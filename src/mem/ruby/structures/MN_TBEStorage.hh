@@ -39,6 +39,7 @@
 #define __MEM_RUBY_STRUCTURES_MN_TBESTORAGE_HH__
 
 #include <cassert>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -69,8 +70,9 @@ class MN_TBEStorage
 {
   public:
     MN_TBEStorage(statistics::Group *parent,
-                  std::initializer_list<TBEStorage *> _partitions)
-      : m_stats(parent),
+                  std::initializer_list<TBEStorage *> _partitions,
+                  std::string_view _name)
+      : m_stats(parent, _name),
         partitions(_partitions)
     {}
 
@@ -239,8 +241,8 @@ class MN_TBEStorage
   private:
     struct MN_TBEStorageStats : public statistics::Group
     {
-        MN_TBEStorageStats(statistics::Group *parent)
-          : statistics::Group(parent),
+        MN_TBEStorageStats(statistics::Group *parent, std::string_view name)
+          : statistics::Group(parent, std::string(name).c_str()),
             ADD_STAT(avg_size, "Avg. number of slots allocated"),
             ADD_STAT(avg_util, "Avg. utilization"),
             ADD_STAT(avg_reserved, "Avg. number of slots reserved"),

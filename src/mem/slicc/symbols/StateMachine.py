@@ -871,7 +871,7 @@ $c_ident::init()
                     if "non_obj" not in vtype and not vtype.isEnumeration:
                         args = var.get("constructor", "")
 
-                    code("$expr($args);")
+                    code("$expr(${{args}});")
                     code("assert($vid != NULL);")
 
                     if "default" in var:
