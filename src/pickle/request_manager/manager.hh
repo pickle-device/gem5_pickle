@@ -42,6 +42,7 @@
 #include "pickle/request_manager/helpers.hh"
 #include "sim/eventq.hh"
 #include "sim/sim_object.hh"
+#include "sim/system.hh"
 
 namespace gem5
 {
@@ -114,6 +115,9 @@ class PickleDeviceRequestManager : public SimObject
         BaseMMU* mmu;
         RequestorID requestor_id;
         uint64_t ticks_per_cycle;
+        System *system;
+        bool use_core_mmus_for_address_translation;
+        Tick pickle_to_core_mmus_latency_in_ticks;
         void handleTranslationCompletion(
             std::shared_ptr<RequestBookkeeper> request_bookkeeper
         );

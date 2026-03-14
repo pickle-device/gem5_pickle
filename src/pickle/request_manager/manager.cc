@@ -43,6 +43,13 @@ PickleDeviceRequestManager::PickleDeviceRequestManager(
     owner(nullptr),
     mmu(nullptr),
     ticks_per_cycle(250), // running at the CPU frequency
+    system(params.system),
+    use_core_mmus_for_address_translation(
+        params.use_core_mmus_for_address_translation
+    ),
+    pickle_to_core_mmus_latency_in_ticks(
+        params.pickle_to_core_mmus_latency_in_ticks
+    ),
     retry_handle_translation_completion_event(
         [this]{retryHandleTranslationCompletion();}, name() + ".retry_event"
     ),
@@ -148,12 +155,24 @@ PickleDeviceRequestManager::enqueueRequest(
         )
     );
 
-    mmu->translateTiming(
-        req, owner->getThreadContextPtr(), new PickleDeviceAddressTranslation(
-            outstanding_requests[block_aligned_vaddr].back(), requestor_id
-        ),
-        BaseMMU::Read
-    );
+    if (use_core_mmus_for_address_translation) {
+        BaseMMU* core_mmu = system->threads[context_id]->getMMUPtr();
+        core_mmu->translateTiming(
+            req, owner->getThreadContextPtr(),
+            new PickleDeviceAddressTranslation(
+                outstanding_requests[block_aligned_vaddr].back(), requestor_id
+            ),
+            BaseMMU::Read
+        );
+    } else {
+        mmu->translateTiming(
+            req, owner->getThreadContextPtr(),
+            new PickleDeviceAddressTranslation(
+                outstanding_requests[block_aligned_vaddr].back(), requestor_id
+            ),
+            BaseMMU::Read
+        );
+    }
 
     DPRINTF(PickleDeviceRequestManagerDebug,
         "Started translation for vaddr 0x%llx\n", block_aligned_vaddr
