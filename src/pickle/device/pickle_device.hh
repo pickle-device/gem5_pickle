@@ -166,8 +166,6 @@ class PickleDevice: public ClockedObject
         PickleDeviceRequestManager* request_manager;
     private:
         void doIdle();
-        void doReceivingCommand();
-        void doBusy();
         void changeToState(const PickleDeviceState new_state);
         Port& getPort(const std::string &if_name, PortID idx) override;
         void addWatchRange(AddrRange r);

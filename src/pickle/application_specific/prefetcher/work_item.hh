@@ -47,6 +47,7 @@ class WorkItem
         static constexpr uint64_t MAX_INDIRECTION_LEVELS = 16;
         uint64_t job_id; // which prefetch generator generated this work
         uint64_t core_id; // which core is working on this work
+        ContextID context_id; // which thread is working on this work
         Addr work_id; // used to identify work from the core
         std::array<std::unordered_set<Addr>, MAX_INDIRECTION_LEVELS>
             expected_prefetches;
@@ -79,6 +80,7 @@ class WorkItem
         WorkItem(const Addr _work_id);
         void setJobId(const uint64_t _job_id);
         void setCoreId(const uint64_t _core_id);
+        void setContextId(const ContextID context_id);
         bool isActivated() const;
         void profileWorkActivationTime();
         //Tick getQueueTime() const;
@@ -92,6 +94,7 @@ class WorkItem
         Tick getPrefetchCompleteTime() const;
         uint64_t getJobId() const;
         uint64_t getCoreId() const;
+        ContextID getContextId() const;
         Addr getWorkId() const;
         void addExpectedPrefetch(Addr pf_vaddr, const uint64_t level);
         void removeExpectedPrefetch(Addr pf_vaddr);

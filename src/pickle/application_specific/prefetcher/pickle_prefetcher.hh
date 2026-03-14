@@ -40,6 +40,7 @@
 #include <vector>
 
 #include "base/statistics.hh"
+#include "base/types.hh"
 #include "params/PicklePrefetcher.hh"
 #include "pickle/application_specific/pickle_job.hh"
 #include "pickle/application_specific/prefetcher/llc_prefetch_agent.hh"
@@ -96,6 +97,7 @@ class PicklePrefetcher: public ClockedObject
         // there is a work tracker for each prefetch kernel for each core
         std::shared_ptr<PrefetcherWorkTrackerCollective> \
             prefetcher_work_tracker_collective;
+        std::vector<ContextID> core_id_to_context_id;
         bool prefetcher_initialized;
         uint64_t num_received_jobs;
         void processPrefetcherInQueue();
@@ -120,7 +122,7 @@ class PicklePrefetcher: public ClockedObject
     public: // the interface
         bool enqueueWork(
             const uint64_t workData, const uint64_t prefetchKernelId,
-            const uint64_t cpuId
+            const uint64_t cpuId, const ContextID contextId
         );
         void receivePrefetch(
             const uint64_t vaddr, std::unique_ptr<uint8_t[]> p

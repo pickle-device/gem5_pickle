@@ -67,6 +67,12 @@ WorkItem::setCoreId(const uint64_t _core_id)
     core_id = _core_id;
 }
 
+void
+WorkItem::setContextId(const ContextID _context_id)
+{
+    context_id = _context_id;
+}
+
 bool
 WorkItem::isActivated() const
 {
@@ -195,6 +201,12 @@ uint64_t
 WorkItem::getCoreId() const
 {
     return core_id;
+}
+
+ContextID
+WorkItem::getContextId() const
+{
+    return context_id;
 }
 
 void

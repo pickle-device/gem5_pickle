@@ -70,7 +70,6 @@ class PickleDevice(ClockedObject):
     prefetcher = Param.PicklePrefetcher("Prefetcher")
 
     # design parameters
-    # prefetcher = Param.CerebellumPrefetcher(NULL, "Prefetcher")
     core_to_pickle_latency_in_ticks = Param.Int(
         5000,
         "Latency between the core and the Pickle device",

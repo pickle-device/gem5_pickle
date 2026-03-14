@@ -44,3 +44,16 @@ class PickleDeviceRequestManager(SimObject):
     cxx_exports = [PyBindMethod("switchOn"), PyBindMethod("switchOff")]
 
     system = Param.System(Parent.any, "Sqystem object")
+
+    # [experimential] These are parameters for using
+    use_core_mmus_for_address_translation = Param.Bool(
+        False,
+        "Whether to use the core MMUs for address translation. "
+        "If False, Pickle MMU will be used for address translation. "
+        "If True, the core MMUs will be used for address translation.",
+    )
+    pickle_to_core_mmus_latency_in_ticks = Param.Int(
+        5000,
+        "Latency between the Pickle device and the core MMUs for address "
+        "translation",
+    )

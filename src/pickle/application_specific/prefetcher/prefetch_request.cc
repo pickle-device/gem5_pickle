@@ -44,12 +44,13 @@ PrefetchRequest::PrefetchRequest()
 
 PrefetchRequest
 PrefetchRequest::createWithVAddr(
-    Addr pf_vaddr, Tick pf_req_time, uint64_t pf_id,
+    Addr pf_vaddr, ContextID context_id, Tick pf_req_time, uint64_t pf_id,
     bool is_delegated_to_prefetch_agent
 )
 {
     PrefetchRequest request;
     request.pf_vaddr = pf_vaddr;
+    request.pf_context_id = context_id;
     request.pf_req_time = pf_req_time;
     request.pf_id = pf_id;
     request.has_paddr = false;
@@ -65,6 +66,7 @@ PrefetchRequest::createWithPAddr(
 {
     PrefetchRequest request;
     request.pf_paddr = pf_paddr;
+    request.pf_context_id = InvalidContextID;
     request.pf_vaddr = pf_vaddr;
     request.pf_req_time = pf_req_time;
     request.pf_id = pf_id;
@@ -91,6 +93,12 @@ PrefetchRequest::setPrefetchPAddr(Addr pf_paddr)
 {
     this->pf_paddr = pf_paddr;
     this->has_paddr = true;
+}
+
+ContextID
+PrefetchRequest::getPrefetchContextID() const
+{
+    return pf_context_id;
 }
 
 bool

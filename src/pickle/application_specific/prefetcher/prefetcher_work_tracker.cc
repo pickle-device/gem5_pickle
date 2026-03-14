@@ -32,6 +32,7 @@
 #include "pickle/application_specific/prefetcher/prefetcher_work_tracker.hh"
 
 #include "base/logging.hh"
+#include "base/types.hh"
 #include "debug/PickleDevicePrefetcherTrace.hh"
 #include "debug/PickleDevicePrefetcherWorkTrackerDebug.hh"
 #include "debug/PickleDevicePrefetcherWorkTrackerStatsDebug.hh"
@@ -66,6 +67,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
     is_activated(true),
     enable_dropping_prefetches(_prefetch_dropping_distance > 0),
     prefetch_dropping_distance(_prefetch_dropping_distance),
+    core_thread_context_id(InvalidContextID),
     owner(owner),
     collective(_collective),
     job_descriptor(_job_descriptor)
@@ -184,6 +186,28 @@ PrefetcherWorkTracker::setPrefetchContext(
 }
 
 void
+PrefetcherWorkTracker::trySettingCoreThreadContextId(
+    const ContextID context_id
+)
+{
+    if (core_thread_context_id == InvalidContextID) {
+        core_thread_context_id = context_id;
+        DPRINTF(
+            PickleDevicePrefetcherWorkTrackerDebug,
+            "Set core_thread_context_id to %d for job_id: %lld, "
+            "core_id: %lld\n",
+            context_id, job_id, core_id
+        );
+    } else if (core_thread_context_id != context_id) {
+        panic(
+            "Inconsistent context id for job_id: %lld, core_id: %lld. "
+            "Existing context id: %d, new context id: %d\n",
+            job_id, core_id, core_thread_context_id, context_id
+        );
+    }
+}
+
+void
 PrefetcherWorkTracker::addWorkItem(Addr work_data)
 {
     if (!is_activated) {
@@ -203,11 +227,13 @@ PrefetcherWorkTracker::addWorkItem(Addr work_data)
     }
     work_item->setJobId(job_id);
     work_item->setCoreId(core_id);
+    work_item->setContextId(core_thread_context_id);
     work_id_to_work_items_map[work_item->getWorkId()] = work_item;
     DPRINTF(
         PickleDevicePrefetcherWorkTrackerDebug,
-        "addWorkItem: job_id: %lld, core_id: %lld, work_id 0x%llx\n",
-        job_id, core_id, work_item->getWorkId()
+        "addWorkItem: job_id: %lld, core_id: %lld, context_id: %d, "
+        "work_id 0x%llx\n",
+        job_id, core_id, core_thread_context_id, work_item->getWorkId()
     );
     pending_work_items.push(work_item);
     tryNotifyCoreCurrentWork(work_data);
@@ -560,8 +586,8 @@ PrefetcherWorkTrackerCollective::populateCurrLevelPrefetches(
     for (auto addr: work->getCurrLevelExpectedPrefetches()) {
         outstanding_prefetch_queue.push(
             PrefetchRequest::createWithVAddr(
-                addr, work->getWorkItemReceiveTime(), work->getWorkId(),
-                is_delegated_to_prefetch_agent
+                addr, work->getContextId(), work->getWorkItemReceiveTime(),
+                work->getWorkId(), is_delegated_to_prefetch_agent
             )
         );
         if (

@@ -33,6 +33,7 @@
 
 #include "arch/arm/regs/misc.hh"
 #include "base/trace.hh"
+#include "base/types.hh"
 #include "debug/PickleDeviceAddressTranslation.hh"
 #include "debug/PickleDeviceControl.hh"
 #include "debug/PickleDeviceEvent.hh"
@@ -110,6 +111,12 @@ PickleDevice::~PickleDevice()
 void
 PickleDevice::startup()
 {
+    for (auto core: associated_cores) {
+        DPRINTF(
+            PickleDeviceAddressTranslation,
+            "Core context id: %d\n", core->getContext(0)->contextId()
+        );
+    }
     request_manager->setOwner(this);
     request_manager->setMMU(mmu);
     request_manager->setRequestorID(requestor_id);
@@ -430,8 +437,14 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
                 const Addr paddr = pkt->req->getPaddr();
                 const uint64_t prefetch_generator_kernel_id = \
                     (paddr & 0xFFF) / 8;
+                // Record contextid, useful for identifying which thread the
+                // prefetch request comes from. If the prefetcher uses the
+                // core's MMUs for address translation, the contextid can be
+                // used to find the corresponding core MMU to perform address
+                // translation for the prefetch request.
+                ContextID context_id = pkt->req->contextId();
                 owner->pickle_prefetcher->enqueueWork(
-                    data, prefetch_generator_kernel_id, internal_id
+                    data, prefetch_generator_kernel_id, internal_id, context_id
                 );
                 DPRINTF(
                     PickleDeviceUncacheableForwarding,

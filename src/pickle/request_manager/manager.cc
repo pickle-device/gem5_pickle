@@ -68,31 +68,34 @@ PickleDeviceRequestManager::switchOff()
 
 bool
 PickleDeviceRequestManager::enqueueLoadRequest(
-    const Addr vaddr, bool only_complete_address_translation
+    const Addr vaddr, const ContextID context_id,
+    bool only_complete_address_translation
 )
 {
     // Enqueue a load request to the request manager.
     return enqueueRequest(
-        vaddr, true, nullptr, only_complete_address_translation
+        vaddr, context_id, true, nullptr, only_complete_address_translation
     );
 }
 
 bool
 PickleDeviceRequestManager::enqueueStoreRequest(
-    const Addr vaddr, std::unique_ptr<uint8_t*> data_ptr,
+    const Addr vaddr, const ContextID context_id,
+    std::unique_ptr<uint8_t*> data_ptr,
     bool only_complete_address_translation
 )
 {
     assert(data_ptr != nullptr);
     return enqueueRequest(
-        vaddr, false, std::move(data_ptr), only_complete_address_translation
+        vaddr, context_id, false, std::move(data_ptr),
+        only_complete_address_translation
     );
 }
 
 bool
 PickleDeviceRequestManager::enqueueRequest(
-    const Addr vaddr, bool is_load, std::unique_ptr<uint8_t*> data_ptr,
-    bool only_complete_address_translation
+    const Addr vaddr, const ContextID context_id, bool is_load,
+    std::unique_ptr<uint8_t*> data_ptr, bool only_complete_address_translation
 )
 {
     request_manager_stats.numRequestsReceivedFromOwner++;
@@ -100,9 +103,9 @@ PickleDeviceRequestManager::enqueueRequest(
         outstanding_requests.size()
     );
     DPRINTF(PickleDeviceRequestManagerDebug,
-        "enqueueRequest: vaddr = 0x%llx, isLoad = %d, "
+        "enqueueRequest: vaddr = 0x%llx, context_id = %d, isLoad = %d, "
         "only_complete_address_translation = %d\n",
-        vaddr, is_load, only_complete_address_translation
+        vaddr, context_id, is_load, only_complete_address_translation
     );
     Addr block_aligned_vaddr = (vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
     profileRequest(block_aligned_vaddr);
@@ -124,7 +127,7 @@ PickleDeviceRequestManager::enqueueRequest(
 
     Request::Flags flags = 0;
     RequestPtr req = std::make_shared<Request>(
-        block_aligned_vaddr, BLOCK_SIZE, flags, requestor_id, 0, 0
+        block_aligned_vaddr, BLOCK_SIZE, flags, requestor_id, context_id, 0
     );
 
     static AddressTranslationDoneCallbackType done_callback = std::bind(

@@ -40,6 +40,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "base/types.hh"
 #include "mem/packet.hh"
 #include "pickle/application_specific/pickle_job.hh"
 #include "pickle/application_specific/prefetcher/prefetch_context.hh"
@@ -64,6 +65,7 @@ class PrefetcherWorkTracker
         uint64_t prefetch_dropping_distance;
         // whether we delegate the last layer prefetches to LLC agents
         bool delegate_last_layer_prefetches_to_llc_agents;
+        ContextID core_thread_context_id;
     public:
         PicklePrefetcher* owner;
         std::shared_ptr<PrefetcherWorkTrackerCollective> collective;
@@ -97,6 +99,7 @@ class PrefetcherWorkTracker
         uint64_t getJobId() const;
         uint64_t getCoreId() const;
         void setPrefetchContext(std::shared_ptr<PrefetchContext> context);
+        void trySettingCoreThreadContextId(const ContextID context_id);
         void addWorkItem(Addr work_data);
         bool hasPendingWorkItem();
         std::shared_ptr<WorkItem> peekNextWorkItem() const;

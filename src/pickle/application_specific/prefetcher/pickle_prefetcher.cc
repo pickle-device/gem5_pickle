@@ -31,6 +31,7 @@
 
 #include "pickle/application_specific/prefetcher/pickle_prefetcher.hh"
 
+#include "base/types.hh"
 #include "debug/PickleDevicePrefetcherDebug.hh"
 #include "debug/PickleDevicePrefetcherProgressTracker.hh"
 #include "debug/PickleDevicePrefetcherTrace.hh"
@@ -77,6 +78,7 @@ PicklePrefetcher::PicklePrefetcher(
     delegate_last_layer_prefetches_to_llc_agents(
         params.delegate_last_layer_prefetches_to_llc_agents
     ),
+    core_id_to_context_id(num_cores, InvalidContextID),
     prefetcher_initialized(false),
     num_received_jobs(0),
     owner(nullptr),
@@ -194,6 +196,7 @@ PicklePrefetcher::processOutgoingPrefetchRequestQueue()
         PrefetchRequest prefetch_request = \
             prefetcher_work_tracker_collective->peekNextPrefetchRequest();
         const Addr prefetchVAddr = prefetch_request.getPrefetchVAddr();
+        const ContextID context_id = prefetch_request.getPrefetchContextID();
         // if the prefetch is delegated to an LLC prefetch agent, the main
         // prefetcher only performs address translation and sends the prefetch
         // request to the prefetch agent
@@ -212,9 +215,8 @@ PicklePrefetcher::processOutgoingPrefetchRequestQueue()
         vaddr_to_prefetch_requests_to_be_delegated[prefetchVAddr].push_back(
             prefetch_request
         );
-        bool status = \
-            owner->request_manager->enqueueLoadRequest(
-                prefetchVAddr, is_address_translation_only
+        bool status = owner->request_manager->enqueueLoadRequest(
+                prefetchVAddr, context_id, is_address_translation_only
             );
         if (status) {
             DPRINTF(
@@ -305,7 +307,7 @@ PicklePrefetcher::configure(std::shared_ptr<PickleJobDescriptor> job)
 bool
 PicklePrefetcher::enqueueWork(
     const uint64_t workData, const uint64_t prefetchKernelId,
-    const uint64_t cpuId
+    const uint64_t cpuId, const ContextID contextId
 )
 {
     if (!prefetcher_initialized)
@@ -320,6 +322,12 @@ PicklePrefetcher::enqueueWork(
             packet_status.size()
         );
     }
+    // This is silly but I don't know a better way to map our internal cpuId to
+    // contextId before the prefetcher receives the first prefetch request and
+    // learns the mapping between cpuId and contextId
+    prefetcher_work_tracker_collective->getPrefetcherWorkTracker(
+        prefetchKernelId, cpuId
+    )->trySettingCoreThreadContextId(contextId);
     // For BC:
     //   - Kernel 1: workData = curr_ptr of the queue
     //   - Kernel 2: workData = curr_ptr of the depth_index[i]
@@ -334,7 +342,7 @@ PicklePrefetcher::enqueueWork(
     //scheduleDueToOutstandingPrefetchRequests();
     DPRINTF(
         PickleDevicePrefetcherDebug,
-        "NEW WORK: data = 0x%llx\n", workData
+        "NEW WORK: data = 0x%llx, contextId = %d\n", workData, contextId
     );
     return true;
 }
