@@ -144,7 +144,7 @@ class RequestBookkeeper: public std::enable_shared_from_this<RequestBookkeeper>
 class PickleDeviceAddressTranslation : public BaseMMU::Translation
 {
     private:
-    std::shared_ptr<RequestBookkeeper> bookkeeper;
+        std::shared_ptr<RequestBookkeeper> bookkeeper;
         RequestPtr req;
     public:
         PickleDeviceAddressTranslation(
