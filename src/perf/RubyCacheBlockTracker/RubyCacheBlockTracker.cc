@@ -465,7 +465,7 @@ UsefulnessAttributionStats::updateUsefulnessStatsForBlock(
         // The block is not in the cache system. This should not happen as we
         // should only receive eviction events for blocks that are in the cache
         // system. We print a warning and return.
-        warn(
+        warn_once(
             "Received eviction event for block address 0x%lx that is not in "
             "the cache system. This should not happen.\n", block_addr
         );
