@@ -325,13 +325,6 @@ PickleDeviceRequestManager::setOwner(PickleDevice* owner)
 void
 PickleDeviceRequestManager::setMMU(BaseMMU* mmu)
 {
-    if (use_core_mmus_for_address_translation) {
-        inform(
-            "Using core MMUs for address translation, ignoring the PickleMMU "
-            "set here."
-        );
-        return;
-    }
     this->mmu = mmu;
     DPRINTF(PickleDeviceRequestManagerDebug, "Set MMU to %s\n", mmu->name());
 }

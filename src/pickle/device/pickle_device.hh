@@ -103,6 +103,7 @@ class PickleDevice: public ClockedObject
         System * system;
         //BaseMMU * mmu;
         ArmISA::MMU * mmu;
+        ArmISA::MMU * functional_mmu; // used for functional accesses
         //BaseISA * isa;
         ArmISA::ISA * isa;
         InstDecoder * decoder;
@@ -181,6 +182,8 @@ class PickleDevice: public ClockedObject
         uint64_t uncacheable_response_queue_capacity;
         uint64_t response_queue_progress_per_cycle;
         std::unique_ptr<PickleDeviceThreadContext> device_thread_context;
+        std::unique_ptr<PickleDeviceThreadContext>
+            functional_device_thread_context; // used by functional_mmu
         Addr device_command_address;
         bool coalesce_requests;
         bool coalesce_address_translations;

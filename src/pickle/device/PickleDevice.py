@@ -46,6 +46,7 @@ class PickleDevice(ClockedObject):
     system = Param.System(Parent.any, "system object")
     device_id = Param.Int(-1, "DeviceID")
     mmu = Param.BaseMMU("The engine MMU")
+    functional_mmu = Param.BaseMMU("The MMU used for functional accesses.")
     isa = Param.BaseISA("The ISA")
     decoder = Param.InstDecoder("The ISA decoder")
     request_manager = Param.PickleDeviceRequestManager(

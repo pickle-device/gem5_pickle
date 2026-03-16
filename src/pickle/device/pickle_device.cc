@@ -57,8 +57,9 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
         name() + ".operate_uncacheable_response_queue_event"
     ),
     system(params.system),
-    //mmu(params.mmu),
-    //isa(params.isa),
+    mmu(nullptr),
+    functional_mmu(nullptr),
+    isa(nullptr),
     decoder(params.decoder),
     associated_cores(params.associated_cores),
     num_cores(params.num_cores),
@@ -93,6 +94,7 @@ PickleDevice::PickleDevice(const PickleDeviceParams& params)
         changeToState(PickleDeviceState::SLEEP);
     }
     mmu = dynamic_cast<ArmISA::MMU*>(params.mmu);
+    functional_mmu = dynamic_cast<ArmISA::MMU*>(params.functional_mmu);
     isa = dynamic_cast<ArmISA::ISA*>(params.isa);
 
     requestor_id = system->getRequestorId(this);
@@ -834,11 +836,15 @@ PickleDevice::processJobDescriptor(std::vector<uint8_t>& _job_descriptor)
 void
 PickleDevice::trySetThreadContextFromCore(uint64_t core_id)
 {
-    if (device_thread_context == nullptr) {
+    if (device_thread_context == nullptr && mmu != nullptr) {
         device_thread_context = std::unique_ptr<PickleDeviceThreadContext>(
             new PickleDeviceThreadContext(this)
         );
         isa->setThreadContext(device_thread_context.get());
+        // Note that, here, we copy the threadid (doesn't matter) and the
+        // contextid from the old thread. The contextid is important for
+        // address translation. However, later on, when we call
+        // registerThreadContext, the contextid is set to a new value.
         device_thread_context->copyState(
             associated_cores[core_id]->getContext(0)
         );
@@ -849,14 +855,15 @@ PickleDevice::trySetThreadContextFromCore(uint64_t core_id)
         mmu->s1State = other_mmu->s1State;
         mmu->s2State = other_mmu->s2State;
         mmu->_attr = other_mmu->_attr;
+        // ISA::takeOverFrom
+        isa->takeOverFrom(device_thread_context.get(), nullptr);
+        system->registerThreadContext(device_thread_context.get());
         DPRINTF(
             PickleDeviceAddressTranslation,
             "core thread_id: 0x%llx, device thread_id: 0x%llx\n",
             associated_cores[core_id]->getContext(0)->contextId(),
             device_thread_context->contextId()
         );
-        // ISA::takeOverFrom
-        isa->takeOverFrom(device_thread_context.get(), nullptr);
         DPRINTF(
             PickleDeviceAddressTranslation,
             "Copy the arch regs to device_thread_context from core %lld\n",
@@ -867,6 +874,30 @@ PickleDevice::trySetThreadContextFromCore(uint64_t core_id)
             "TTBR0_EL1: 0x%llx\n",
             device_thread_context->readMiscReg(ArmISA::MISCREG_TTBR0_EL1)
         );
+    }
+    if (functional_device_thread_context == nullptr) {
+        functional_device_thread_context =
+            std::unique_ptr<PickleDeviceThreadContext>(
+                new PickleDeviceThreadContext(this)
+            );
+        isa->setThreadContext(functional_device_thread_context.get());
+        // Note that, here, we copy the threadid (doesn't matter) and the
+        // contextid from the old thread. The contextid is important for
+        // address translation. However, later on, when we call
+        // registerThreadContext, the contextid is set to a new value.
+        functional_device_thread_context->copyState(
+            associated_cores[core_id]->getContext(0)
+        );
+        // MMU::takeOverFrom
+        auto *other_mmu = dynamic_cast<ArmISA::MMU*>(
+            associated_cores[core_id]->getContext(0)->getMMUPtr()
+        );
+        functional_mmu->s1State = other_mmu->s1State;
+        functional_mmu->s2State = other_mmu->s2State;
+        functional_mmu->_attr = other_mmu->_attr;
+        // ISA::takeOverFrom
+        isa->takeOverFrom(functional_device_thread_context.get(), nullptr);
+        system->registerThreadContext(functional_device_thread_context.get());
     }
 }
 
@@ -961,8 +992,8 @@ PickleDevice::zeroCycleLoadWithVAddr(const Addr& vaddr, bool& success)
     RequestPtr req1 = std::shared_ptr<Request>(
         new Request(vaddr, 64, Request::Flags(0), this->requestor_id, -1, 0)
     );
-    Fault f = mmu->translateFunctional(
-        req1, device_thread_context.get(), BaseMMU::Mode::Read
+    Fault f = functional_mmu->translateFunctional(
+        req1, functional_device_thread_context.get(), BaseMMU::Mode::Read
     );
     Addr paddr = req1->getPaddr();
     RequestPtr req = std::make_shared<Request>(
