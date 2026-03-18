@@ -78,6 +78,9 @@ PicklePrefetcher::PicklePrefetcher(
     delegate_last_layer_prefetches_to_llc_agents(
         params.delegate_last_layer_prefetches_to_llc_agents
     ),
+    sssp_threshold_optimization_enabled(
+        params.sssp_threshold_optimization_enabled
+    ),
     core_id_to_context_id(num_cores, InvalidContextID),
     prefetcher_initialized(false),
     num_received_jobs(0),
@@ -268,6 +271,12 @@ uint64_t
 PicklePrefetcher::getBulkPrefetchNumPrefetchesPerHint() const
 {
     return static_cast<uint64_t>(bulk_prefetch_num_prefetches_per_hint);
+}
+
+bool
+PicklePrefetcher::getSSSPThresholdOptimizationEnabled() const
+{
+    return sssp_threshold_optimization_enabled;
 }
 
 void

@@ -104,3 +104,10 @@ class PicklePrefetcher(ClockedObject):
         "LLC agents. Otherwise, the PicklePrefetcher will issue the last layer "
         "prefetches itself.",
     )
+
+    sssp_threshold_optimization_enabled = Param.Bool(
+        True,
+        "Whether the SSSP threshold optimization is enabled. If true, the "
+        "prefetcher will track the `threshold` variable used in SSSP software "
+        "to make prefetch decisions.",
+    )

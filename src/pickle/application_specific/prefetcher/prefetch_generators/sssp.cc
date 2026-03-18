@@ -47,13 +47,15 @@ SSSPPrefetchKernel1Generator::SSSPPrefetchKernel1Generator(
     const uint64_t _job_id, const uint64_t _core_id,
     const uint64_t _software_hint_distance,
     const uint64_t _prefetch_distance_offset_from_software_hint,
+    const bool _sssp_threshold_optimization_enabled,
     PrefetcherWorkTracker* _work_tracker
 ) : PrefetchGenerator(
     _name,
     _job_id, _core_id,
     _software_hint_distance, _prefetch_distance_offset_from_software_hint,
     _work_tracker
-    )
+    ),
+    sssp_threshold_optimization_enabled(_sssp_threshold_optimization_enabled)
 {
 }
 
@@ -83,6 +85,8 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
     uint64_t lv2_end_ptr_vaddr = 0;
     std::vector<uint64_t> lv3_edge_indices;
 
+    uint64_t curr_level = 0;
+
     // level 1: we fetch the node id
     {
         bool success = false;
@@ -106,7 +110,7 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
         lv1_node_id = \
             (uint64_t)(pkt->getConstPtr<uint32_t>()[node_id_offset]);
         // We add expected prefetches
-        workItem->addExpectedPrefetch(block_aligned_vaddr, 0);
+        workItem->addExpectedPrefetch(block_aligned_vaddr, curr_level);
         warnIfOutsideRanges(work_vaddr, block_aligned_vaddr);
         PREFETCHER_TRACE_DEBUG(
             "Work Item = 0x%llx, node_id = %lld\n", work_vaddr, lv1_node_id
@@ -114,7 +118,8 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
     }
     // level 1.1: we fetch dist[u] to decide if we want to prefetch the
     // neighbor list of the node or not
-    {
+    if (sssp_threshold_optimization_enabled) {
+        curr_level += 1;
         // safe guard: This is not a problem but we want to make sure that the
         // prefetch vaddr is within the valid range of the job's memory.
         const uint64_t dist_array_num_elements =
@@ -154,7 +159,7 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
             (dist_vaddr - dist_vaddr_block_aligned) / item_size;
         const uint32_t dist_value = pkt->getConstPtr<uint32_t>()[dist_index];
         // We add expected prefetches
-        workItem->addExpectedPrefetch(dist_vaddr_block_aligned, 1);
+        workItem->addExpectedPrefetch(dist_vaddr_block_aligned, curr_level);
         warnIfOutsideRanges(work_vaddr, dist_vaddr_block_aligned);
         PREFETCHER_TRACE_DEBUG(
             "Work Item = 0x%llx, dist[%lld] = %u\n",
@@ -162,8 +167,8 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
         );
         // We only prefetch the neighbor list if the distance is bigger than
         // the threshold
-        const uint32_t distance_threshold = \
-             prefetch_context->getSSSPCurrentDistanceThreshold(core_id);
+        const uint32_t distance_threshold =
+            prefetch_context->getSSSPCurrentDistanceThreshold(core_id);
         if (dist_value < distance_threshold) {
             // dist below threshold, skip prefetching neighbors
             PREFETCHER_TRACE_DEBUG(
@@ -179,6 +184,7 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
     // level 2: we fetch the start pointer and the end pointer of the neighbor
     // edge list
     {
+        curr_level += 1;
         bool success = false;
         const Addr first_item_index = lv1_node_id;
         const Addr array_vaddr = \
@@ -207,7 +213,9 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
             (first_item_vaddr - first_item_vaddr_block_aligned) / item_size;
         lv2_start_ptr_vaddr = (pkt->getConstPtr<uint64_t>()[start_index]);
         // We add expected prefetches
-        workItem->addExpectedPrefetch(first_item_vaddr_block_aligned, 2);
+        workItem->addExpectedPrefetch(
+            first_item_vaddr_block_aligned, curr_level
+        );
         warnIfOutsideRanges(work_vaddr, first_item_vaddr_block_aligned);
         PREFETCHER_TRACE_DEBUG(
             "Work Item = 0x%llx, edge_start_ptr = 0x%llx\n",
@@ -242,7 +250,9 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
             (second_item_vaddr - second_item_vaddr_block_aligned) / item_size;
         lv2_end_ptr_vaddr = (pkt->getConstPtr<uint64_t>()[end_index]);
         // We add expected prefetches
-        workItem->addExpectedPrefetch(second_item_vaddr_block_aligned, 2);
+        workItem->addExpectedPrefetch(
+            second_item_vaddr_block_aligned, curr_level
+        );
         warnIfOutsideRanges(work_vaddr, second_item_vaddr_block_aligned);
         PREFETCHER_TRACE_DEBUG(
             "Work Item = 0x%llx, edge_end_ptr = 0x%llx\n",
@@ -255,6 +265,7 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
     // first have the edge index (4-byte int), and then we have the edge weight
     // (also 4-byte int).
     {
+        curr_level += 1;
         Addr curr_block_vaddr = 1;
         PacketPtr pkt = nullptr;
         uint64_t* data_ptr = nullptr;
@@ -288,7 +299,7 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
                 curr_block_vaddr = edge_vaddr_block_aligned;
                 data_ptr = pkt->getPtr<uint64_t>();
                 // We add expected prefetches
-                workItem->addExpectedPrefetch(curr_block_vaddr, 3);
+                workItem->addExpectedPrefetch(curr_block_vaddr, curr_level);
                 warnIfOutsideRanges(work_vaddr, curr_block_vaddr);
             }
             constexpr Addr item_size = 8;
@@ -309,6 +320,7 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
 
     // level 4: we fetch the dist array
     {
+        curr_level += 1;
         const Addr dist_array_start_vaddr = \
             work_tracker->job_descriptor->get_array(3).vaddr_start;
         for (auto edge_index : lv3_edge_indices) {
@@ -318,7 +330,9 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
             const Addr dist_vaddr_block_aligned = \
                 (dist_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
             // We add expected prefetches
-            workItem->addExpectedPrefetch(dist_vaddr_block_aligned, 4);
+            workItem->addExpectedPrefetch(
+                dist_vaddr_block_aligned, curr_level
+            );
             warnIfOutsideRanges(work_vaddr, dist_vaddr_block_aligned);
             PREFETCHER_TRACE_DEBUG(
                 "Work Item = 0x%llx, dist = 0x%llx\n",
@@ -368,6 +382,8 @@ SSSPPrefetchKernel2Generator::execute_kernel(Addr work_data)
     uint64_t lv2_end_ptr_vaddr = 0;
     std::vector<uint64_t> lv3_edge_indices;
 
+    uint64_t curr_level = 0;
+
     // level 1: we fetch the node id
     {
         bool success = false;
@@ -391,7 +407,7 @@ SSSPPrefetchKernel2Generator::execute_kernel(Addr work_data)
         lv1_node_id = \
             (uint64_t)(pkt->getConstPtr<uint32_t>()[node_id_offset]);
         // We add expected prefetches
-        workItem->addExpectedPrefetch(block_aligned_vaddr, 0);
+        workItem->addExpectedPrefetch(block_aligned_vaddr, curr_level);
         warnIfOutsideRanges(work_vaddr, block_aligned_vaddr);
         PREFETCHER_TRACE_DEBUG(
             "Work Item = 0x%llx, node_id = %lld\n", work_vaddr, lv1_node_id
@@ -400,6 +416,7 @@ SSSPPrefetchKernel2Generator::execute_kernel(Addr work_data)
     // level 2: we fetch the start pointer and the end pointer of the neighbor
     // edge list
     {
+        curr_level += 1;
         bool success = false;
         const Addr first_item_index = lv1_node_id;
         const Addr array_vaddr = \
@@ -428,7 +445,9 @@ SSSPPrefetchKernel2Generator::execute_kernel(Addr work_data)
             (first_item_vaddr - first_item_vaddr_block_aligned) / item_size;
         lv2_start_ptr_vaddr = (pkt->getConstPtr<uint64_t>()[start_index]);
         // We add expected prefetches
-        workItem->addExpectedPrefetch(first_item_vaddr_block_aligned, 1);
+        workItem->addExpectedPrefetch(
+            first_item_vaddr_block_aligned, curr_level
+        );
         warnIfOutsideRanges(work_vaddr, first_item_vaddr_block_aligned);
         PREFETCHER_TRACE_DEBUG(
             "Work Item = 0x%llx, edge_start_ptr = 0x%llx\n",
@@ -463,7 +482,9 @@ SSSPPrefetchKernel2Generator::execute_kernel(Addr work_data)
             (second_item_vaddr - second_item_vaddr_block_aligned) / item_size;
         lv2_end_ptr_vaddr = (pkt->getConstPtr<uint64_t>()[end_index]);
         // We add expected prefetches
-        workItem->addExpectedPrefetch(second_item_vaddr_block_aligned, 1);
+        workItem->addExpectedPrefetch(
+            second_item_vaddr_block_aligned, curr_level
+        );
         warnIfOutsideRanges(work_vaddr, second_item_vaddr_block_aligned);
         PREFETCHER_TRACE_DEBUG(
             "Work Item = 0x%llx, edge_end_ptr = 0x%llx\n",
@@ -476,6 +497,7 @@ SSSPPrefetchKernel2Generator::execute_kernel(Addr work_data)
     // first have the edge index (4-byte int), and then we have the edge weight
     // (also 4-byte int).
     {
+        curr_level += 1;
         Addr curr_block_vaddr = 1;
         PacketPtr pkt = nullptr;
         uint64_t* data_ptr = nullptr;
@@ -509,7 +531,7 @@ SSSPPrefetchKernel2Generator::execute_kernel(Addr work_data)
                 curr_block_vaddr = edge_vaddr_block_aligned;
                 data_ptr = pkt->getPtr<uint64_t>();
                 // We add expected prefetches
-                workItem->addExpectedPrefetch(curr_block_vaddr, 3);
+                workItem->addExpectedPrefetch(curr_block_vaddr, curr_level);
                 warnIfOutsideRanges(work_vaddr, curr_block_vaddr);
             }
             constexpr Addr item_size = 8;
@@ -530,6 +552,7 @@ SSSPPrefetchKernel2Generator::execute_kernel(Addr work_data)
 
     // level 4: we fetch the dist array
     {
+        curr_level += 1;
         const Addr dist_array_start_vaddr = \
             work_tracker->job_descriptor->get_array(3).vaddr_start;
         for (auto edge_index : lv3_edge_indices) {
@@ -539,7 +562,9 @@ SSSPPrefetchKernel2Generator::execute_kernel(Addr work_data)
             const Addr dist_vaddr_block_aligned = \
                 (dist_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
             // We add expected prefetches
-            workItem->addExpectedPrefetch(dist_vaddr_block_aligned, 3);
+            workItem->addExpectedPrefetch(
+                dist_vaddr_block_aligned, curr_level
+            );
             warnIfOutsideRanges(work_vaddr, dist_vaddr_block_aligned);
             PREFETCHER_TRACE_DEBUG(
                 "Work Item = 0x%llx, dist = 0x%llx\n",

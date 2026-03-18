@@ -58,11 +58,14 @@ class SSSPPrefetchKernel1Generator: public PrefetchGenerator
         const uint64_t _job_id, const uint64_t _core_id,
         const uint64_t _software_hint_distance,
         const uint64_t _prefetch_distance_offset_from_software_hint,
+        const bool _sssp_threshold_optimization_enabled,
         PrefetcherWorkTracker* _work_tracker
     );
 
     // Function to generate prefetch requests
     std::shared_ptr<WorkItem> execute_kernel(Addr work_data) override;
+  private:
+    bool sssp_threshold_optimization_enabled;
 }; // class SSSPPrefetchKernel1Generator
 
 class SSSPPrefetchKernel2Generator: public PrefetchGenerator

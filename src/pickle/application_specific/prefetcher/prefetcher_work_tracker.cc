@@ -123,6 +123,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
             _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            owner->getSSSPThresholdOptimizationEnabled(),
             this
         );
     } else if (job_descriptor->kernel_name == "sssp_kernel_2") {
