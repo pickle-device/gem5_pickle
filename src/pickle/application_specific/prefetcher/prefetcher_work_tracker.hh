@@ -41,6 +41,7 @@
 #include <vector>
 
 #include "base/types.hh"
+#include "enums/PrefetchSchedulingPolicy.hh"
 #include "mem/packet.hh"
 #include "pickle/application_specific/pickle_job.hh"
 #include "pickle/application_specific/prefetcher/prefetch_context.hh"
@@ -128,6 +129,7 @@ class PrefetcherWorkTrackerCollective
         // When we drop a prefetch request
         bool enable_dropping_prefetches;
         uint64_t prefetch_dropping_distance;
+        enums::PrefetchSchedulingPolicy prefetch_scheduling_policy;
         std::shared_ptr<PrefetchContext> prefetch_context;
         // The prefetcher that owns this work tracker
         PicklePrefetcher* owner;
@@ -165,7 +167,8 @@ class PrefetcherWorkTrackerCollective
         PrefetcherWorkTrackerCollective();
         PrefetcherWorkTrackerCollective(
             const uint64_t max_active_work_items,
-            const bool delegate_last_layer_prefetches_to_llc_agents
+            const bool delegate_last_layer_prefetches_to_llc_agents,
+            const enums::PrefetchSchedulingPolicy prefetch_scheduling_policy
         );
         void setOwner(PicklePrefetcher* owner);
         void addPrefetcherWorkTracker(

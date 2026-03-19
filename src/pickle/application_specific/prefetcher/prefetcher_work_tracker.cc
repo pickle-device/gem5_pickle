@@ -36,6 +36,7 @@
 #include "debug/PickleDevicePrefetcherTrace.hh"
 #include "debug/PickleDevicePrefetcherWorkTrackerDebug.hh"
 #include "debug/PickleDevicePrefetcherWorkTrackerStatsDebug.hh"
+#include "enums/PrefetchSchedulingPolicy.hh"
 #include "pickle/application_specific/prefetcher/pickle_prefetcher.hh"
 #include "pickle/application_specific/prefetcher/prefetch_context.hh"
 #include "pickle/device/pickle_device.hh"
@@ -433,11 +434,13 @@ PrefetcherWorkTrackerCollective::PrefetcherWorkTrackerCollective()
 
 PrefetcherWorkTrackerCollective::PrefetcherWorkTrackerCollective(
     const uint64_t _max_active_work_items,
-    const bool _delegate_last_layer_prefetches_to_llc_agents
+    const bool _delegate_last_layer_prefetches_to_llc_agents,
+    const enums::PrefetchSchedulingPolicy _prefetch_scheduling_policy
 ) : max_active_work_items(_max_active_work_items),
     delegate_last_layer_prefetches_to_llc_agents(
         _delegate_last_layer_prefetches_to_llc_agents
     ),
+    prefetch_scheduling_policy(_prefetch_scheduling_policy),
     prefetch_context(std::make_shared<PrefetchContext>()),
     owner(nullptr)
 {
@@ -598,7 +601,19 @@ PrefetcherWorkTrackerCollective::populateCurrLevelPrefetches(
         // be issued, and since we want the prefetch with earlier deadline to
         // be issued earlier, we can use MaxTick-receive_time as the priority
         // score.
-        uint64_t priority_score = MaxTick - work->getWorkItemReceiveTime();
+        uint64_t priority_score = 0;
+        switch (prefetch_scheduling_policy) {
+            case enums::PrefetchSchedulingPolicy\
+                ::EARLIEST_DEADLINE_FIRST_BASED_ON_HINT_ARRIVAL_TIME:
+                priority_score = MaxTick - work->getWorkItemReceiveTime();
+                break;
+            case enums::PrefetchSchedulingPolicy::FIRST_IN_FIRST_OUT:
+                priority_score = MaxTick - curTick();
+                break;
+            default:
+                panic("Unknown prefetch scheduling policy: %d\n",
+                      prefetch_scheduling_policy);
+        }
         outstanding_prefetch_queue.push(
             PrefetchRequest::createWithVAddr(
                 addr, work->getContextId(), work->getWorkItemReceiveTime(),

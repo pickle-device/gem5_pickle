@@ -32,7 +32,11 @@
 Import('*')
 
 SimObject('LLCPrefetchAgent.py', sim_objects=['LLCPrefetchAgent'])
-SimObject('PicklePrefetcher.py', sim_objects=['PicklePrefetcher'])
+SimObject(
+    'PicklePrefetcher.py',
+    sim_objects=['PicklePrefetcher'],
+    enums=['PrefetchSchedulingPolicy']
+)
 
 DebugFlag('LLCPrefetchAgentDebug')
 DebugFlag('PickleDevicePrefetcherDebug')

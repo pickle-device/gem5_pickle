@@ -36,6 +36,13 @@ from m5.SimObject import (
 )
 
 
+class PrefetchSchedulingPolicy(Enum):
+    vals = [
+        "EARLIEST_DEADLINE_FIRST_BASED_ON_HINT_ARRIVAL_TIME",
+        "FIRST_IN_FIRST_OUT",
+    ]
+
+
 class PicklePrefetcher(ClockedObject):
     type = "PicklePrefetcher"
     cxx_header = "pickle/application_specific/prefetcher/pickle_prefetcher.hh"
@@ -74,6 +81,10 @@ class PicklePrefetcher(ClockedObject):
         0,
         "Distance at which prefetches are dropped. "
         "If set to 0, prefetches are never dropped.",
+    )
+    prefetch_scheduling_policy = Param.PrefetchSchedulingPolicy(
+        "EARLIEST_DEADLINE_FIRST_BASED_ON_HINT_ARRIVAL_TIME",
+        "The scheduling policy used when issuing prefetches.",
     )
 
     # Resource parameters

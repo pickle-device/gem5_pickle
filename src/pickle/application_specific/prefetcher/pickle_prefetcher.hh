@@ -41,6 +41,7 @@
 
 #include "base/statistics.hh"
 #include "base/types.hh"
+#include "enums/PrefetchSchedulingPolicy.hh"
 #include "params/PicklePrefetcher.hh"
 #include "pickle/application_specific/pickle_job.hh"
 #include "pickle/application_specific/prefetcher/llc_prefetch_agent.hh"
@@ -81,6 +82,7 @@ class PicklePrefetcher: public ClockedObject
         uint64_t concurrent_work_item_capacity;
         uint64_t expected_number_of_prefetch_generators;
         uint64_t prefetch_dropping_distance;
+        enums::PrefetchSchedulingPolicy prefetch_scheduling_policy;
         PARAMS(PicklePrefetcher);
         EventFunctionWrapper processInQueueEvent;
         EventFunctionWrapper processOutgoingPrefetchRequestQueueEvent;

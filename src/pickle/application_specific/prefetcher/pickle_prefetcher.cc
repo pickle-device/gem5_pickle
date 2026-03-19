@@ -36,6 +36,7 @@
 #include "debug/PickleDevicePrefetcherProgressTracker.hh"
 #include "debug/PickleDevicePrefetcherTrace.hh"
 #include "debug/PickleDevicePrefetcherWorkTrackerDebug.hh"
+#include "enums/PrefetchSchedulingPolicy.hh"
 #include "pickle/device/pickle_device.hh"
 #include "pickle/request_manager/manager.hh"
 
@@ -61,9 +62,8 @@ PicklePrefetcher::PicklePrefetcher(
     expected_number_of_prefetch_generators(
         params.expected_number_of_prefetch_generators
     ),
-    prefetch_dropping_distance(
-        params.prefetch_dropping_distance
-    ),
+    prefetch_dropping_distance(params.prefetch_dropping_distance),
+    prefetch_scheduling_policy(params.prefetch_scheduling_policy),
     processInQueueEvent(
         [this]{processPrefetcherInQueue();},
         name() + ".operate_prefetcher_in_queue_event"
@@ -129,7 +129,8 @@ PicklePrefetcher::PicklePrefetcher(
         std::shared_ptr<PrefetcherWorkTrackerCollective>(
             new PrefetcherWorkTrackerCollective(
                 concurrent_work_item_capacity,
-                delegate_last_layer_prefetches_to_llc_agents
+                delegate_last_layer_prefetches_to_llc_agents,
+                prefetch_scheduling_policy
             )
         );
     prefetcher_work_tracker_collective->setOwner(this);
