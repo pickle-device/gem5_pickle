@@ -38,14 +38,14 @@ namespace gem5
 
 PrefetchRequest::PrefetchRequest()
     : pf_vaddr(-1ULL), pf_req_time(-1ULL), pf_id(-1ULL), has_paddr(false),
-      is_delegated_to_prefetch_agent(false)
+      is_delegated_to_prefetch_agent(false), priority_score(0)
 {
 }
 
 PrefetchRequest
 PrefetchRequest::createWithVAddr(
     Addr pf_vaddr, ContextID context_id, Tick pf_req_time, uint64_t pf_id,
-    bool is_delegated_to_prefetch_agent
+    bool is_delegated_to_prefetch_agent, uint64_t priority_score
 )
 {
     PrefetchRequest request;
@@ -55,13 +55,14 @@ PrefetchRequest::createWithVAddr(
     request.pf_id = pf_id;
     request.has_paddr = false;
     request.is_delegated_to_prefetch_agent = is_delegated_to_prefetch_agent;
+    request.priority_score = priority_score;
     return request;
 }
 
 PrefetchRequest
 PrefetchRequest::createWithPAddr(
     Addr pf_paddr, Addr pf_vaddr, Tick pf_req_time, uint64_t pf_id,
-    bool is_delegated_to_prefetch_agent
+    bool is_delegated_to_prefetch_agent, uint64_t priority_score
 )
 {
     PrefetchRequest request;
@@ -72,6 +73,7 @@ PrefetchRequest::createWithPAddr(
     request.pf_id = pf_id;
     request.has_paddr = true;
     request.is_delegated_to_prefetch_agent = is_delegated_to_prefetch_agent;
+    request.priority_score = priority_score;
     return request;
 }
 
@@ -111,6 +113,12 @@ Tick
 PrefetchRequest::getPrefetchReqTime() const
 {
     return pf_req_time;
+}
+
+uint64_t
+PrefetchRequest::getPrefetchPriorityScore() const
+{
+    return priority_score;
 }
 
 uint64_t

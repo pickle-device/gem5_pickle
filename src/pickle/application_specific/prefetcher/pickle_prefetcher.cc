@@ -387,22 +387,32 @@ PicklePrefetcher::receiveAddressTranslationOnlyResponse(
         // this should never happen
         warn("No prefetch request is found for vaddr 0x%llx\n", vaddr);
     }
-    // we pick the request with the highest priority (i.e., the earliest
-    // request time)
-    Tick earliest_req_time = -1ULL;
+    // we pick the request with the highest priority
+    //Tick earliest_req_time = -1ULL;
+    //uint64_t pf_id = 0;
+    //for (auto &req: vaddr_to_prefetch_requests_to_be_delegated[vaddr]) {
+    //    if (req.getPrefetchReqTime() < earliest_req_time) {
+    //        earliest_req_time = req.getPrefetchReqTime();
+    //        pf_id = req.getPrefetchId();
+    //    }
+    //}
+    uint64_t highest_priority_score = 0;
     uint64_t pf_id = 0;
+    Tick req_time = -1ULL;
     for (auto &req: vaddr_to_prefetch_requests_to_be_delegated[vaddr]) {
-        if (req.getPrefetchReqTime() < earliest_req_time) {
-            earliest_req_time = req.getPrefetchReqTime();
+        if (req.getPrefetchPriorityScore() > highest_priority_score) {
+            highest_priority_score = req.getPrefetchPriorityScore();
             pf_id = req.getPrefetchId();
+            req_time = req.getPrefetchReqTime();
         }
     }
     PrefetchRequest pf_request = PrefetchRequest::createWithPAddr(
         paddr, //paddr
         vaddr, // vaddr,
-        earliest_req_time, // req_time
+        req_time, // req_time
         pf_id, // unused
-        true // is_delegated_to_prefetch_agent
+        true, // is_delegated_to_prefetch_agent
+        highest_priority_score // priority_score
     );
     vaddr_to_prefetch_requests_to_be_delegated.erase(vaddr);
     // send the prefetch request to a prefetch agent that monitors the address

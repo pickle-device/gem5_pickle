@@ -47,20 +47,27 @@ class PrefetchRequest
         uint64_t pf_id;
         bool has_paddr;
         bool is_delegated_to_prefetch_agent;
+        uint64_t priority_score;
     public:
         PrefetchRequest();
         static PrefetchRequest createWithVAddr(
             Addr pf_vaddr, ContextID context_id, Tick pf_req_time,
-            uint64_t pf_id, bool is_delegated_to_prefetch_agent);
+            uint64_t pf_id, bool is_delegated_to_prefetch_agent,
+            uint64_t priority_score
+        );
         static PrefetchRequest createWithPAddr(
             Addr pf_paddr, Addr pf_vaddr, Tick pf_req_time,
-            uint64_t pf_id, bool is_delegated_to_prefetch_agent);
+            uint64_t pf_id, bool is_delegated_to_prefetch_agent,
+            uint64_t priority_score
+        );
         Addr getPrefetchVAddr() const;
         Addr getPrefetchPAddr() const;
         void setPrefetchPAddr(Addr pf_paddr);
         ContextID getPrefetchContextID() const;
         bool hasPAddr() const;
         Tick getPrefetchReqTime() const;
+        // the higher the priority, the earlier the request is issued
+        uint64_t getPrefetchPriorityScore() const;
         uint64_t getPrefetchId() const;
         bool isDelegatedToPrefetchAgent() const;
 };
@@ -70,7 +77,11 @@ struct PrefetchRequestOrder
 {
     bool operator()(PrefetchRequest const& a, PrefetchRequest const& b) const
     {
-        return a.getPrefetchReqTime() > b.getPrefetchReqTime();
+        // We are using this with std::priority_queue, which puts the largest
+        // element on top. We want the request with the highest priority score
+        // to be issued first, so we return true if a's priority score is less
+        // than b's priority score.
+        return a.getPrefetchPriorityScore() < b.getPrefetchPriorityScore();
     }
 };
 

@@ -585,10 +585,16 @@ PrefetcherWorkTrackerCollective::populateCurrLevelPrefetches(
     const bool is_delegated_to_prefetch_agent = \
         delegate_last_layer_prefetches_to_llc_agents && work->isLastLevel();
     for (auto addr: work->getCurrLevelExpectedPrefetches()) {
+        // Since the higher the priority score, the earlier the prefetch will
+        // be issued, and since we want the prefetch with earlier deadline to
+        // be issued earlier, we can use MaxTick-receive_time as the priority
+        // score.
+        uint64_t priority_score = MaxTick - work->getWorkItemReceiveTime();
         outstanding_prefetch_queue.push(
             PrefetchRequest::createWithVAddr(
                 addr, work->getContextId(), work->getWorkItemReceiveTime(),
-                work->getWorkId(), is_delegated_to_prefetch_agent
+                work->getWorkId(), is_delegated_to_prefetch_agent,
+                priority_score
             )
         );
         if (

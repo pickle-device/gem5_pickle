@@ -217,7 +217,8 @@ void LLCPrefetchAgent::triggerTests()
     for (const auto& paddr : test_paddrs) {
         if (isAddressInMonitoredRanges(paddr)) {
             PrefetchRequest pf_request = PrefetchRequest::createWithPAddr(
-                paddr, 0x0, curTick(), (paddr - 0x110000000) / 64, true
+                paddr, 0x0, curTick(), (paddr - 0x110000000) / 64, true,
+                MaxTick - curTick() // priority_score
             );
             enqueueRequestWithPAddr(std::move(pf_request));
             DPRINTF(LLCPrefetchAgentDebug,
