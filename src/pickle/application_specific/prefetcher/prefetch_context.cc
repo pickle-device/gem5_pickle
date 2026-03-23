@@ -65,4 +65,21 @@ PrefetchContext::setSSSPCurrentDistanceThreshold(
     sssp_current_distance_threshold[core_id] = threshold;
 }
 
+uint64_t
+PrefetchContext::getBCCurrentDepth(uint64_t core_id) const
+{
+    auto it = bc_current_depth.find(core_id);
+    if (it != bc_current_depth.end()) {
+        return it->second;
+    }
+    return 0;
+}
+
+void
+PrefetchContext::setBCCurrentDepth(uint64_t core_id, uint64_t depth)
+{
+    owner->prefetcherStats.numContextUpdates++;
+    bc_current_depth[core_id] = depth;
+}
+
 }; // namespace gem5

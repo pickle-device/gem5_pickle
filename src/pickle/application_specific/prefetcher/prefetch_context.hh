@@ -58,11 +58,15 @@ class PrefetchContext
     PicklePrefetcher* owner;
     // The current distance threshold to relax the edges in SSSP.
     std::unordered_map<uint64_t, uint64_t> sssp_current_distance_threshold;
+    // The current depth in BC.
+    std::unordered_map<uint64_t, uint64_t> bc_current_depth;
   public:
     PrefetchContext();
     void setOwner(PicklePrefetcher* _owner);
     uint64_t getSSSPCurrentDistanceThreshold(uint64_t core_id) const;
     void setSSSPCurrentDistanceThreshold(uint64_t core_id, uint64_t threshold);
+    uint64_t getBCCurrentDepth(uint64_t core_id) const;
+    void setBCCurrentDepth(uint64_t core_id, uint64_t depth);
 };  // class PrefetchContext
 
 }; // namespace gem5

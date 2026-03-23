@@ -47,13 +47,15 @@ BCPrefetchKernel1Generator::BCPrefetchKernel1Generator(
     const uint64_t _job_id, const uint64_t _core_id,
     const uint64_t _software_hint_distance,
     const uint64_t _prefetch_distance_offset_from_software_hint,
+    bool _bc_depth_optimization_enabled,
     PrefetcherWorkTracker* _work_tracker
 ) : PrefetchGenerator(
-    _name,
-    _job_id, _core_id,
-    _software_hint_distance, _prefetch_distance_offset_from_software_hint,
-    _work_tracker
-    )
+        _name,
+        _job_id, _core_id,
+        _software_hint_distance, _prefetch_distance_offset_from_software_hint,
+        _work_tracker
+    ),
+    bc_depth_optimization_enabled(_bc_depth_optimization_enabled)
 {
 }
 
@@ -80,6 +82,7 @@ BCPrefetchKernel1Generator::execute_kernel(Addr work_data)
     uint64_t lv2_start_ptr_vaddr = 0;
     uint64_t lv2_end_ptr_vaddr = 0;
     std::vector<uint64_t> lv3_edge_indices;
+    std::vector<uint32_t> lv4_depths;
 
     // level 1: we fetch the node id
     {
@@ -232,10 +235,14 @@ BCPrefetchKernel1Generator::execute_kernel(Addr work_data)
         }
     }
 
-    // level 4: we fetch the depths and path_counts arrays
+    // level 4: we fetch the depths and path_counts of the neighbor nodes.
+    // Note that, in BC, the core will access the depths and path_counts of all
+    // the neighbors, but it will only access the path_counts of the neighbors
+    // whose depth is equal to the current depth.
     // Note that, the element size of depths is 4 bytes, and the element size
     // of path_counts is 8 bytes.
     {
+        // working on the depths
         const Addr depths_array_start_vaddr = \
             work_tracker->job_descriptor->get_array(3).vaddr_start;
         for (auto edge_index : lv3_edge_indices) {
@@ -244,6 +251,34 @@ BCPrefetchKernel1Generator::execute_kernel(Addr work_data)
                 depths_array_start_vaddr + edge_index * 4;
             const Addr depths_vaddr_block_aligned = \
                 (depths_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+            uint32_t depth = 0;
+            if (bc_depth_optimization_enabled) {
+                bool success = false;
+                PREFETCHER_WORK_TRACKER_DEBUG(
+                    "Fetching depths vaddr 0x%llx\n",
+                    depths_vaddr_block_aligned
+                );
+                PacketPtr pkt = work_tracker->owner->zeroCycleLoadWithVAddr(
+                    depths_vaddr_block_aligned, success
+                );
+                if (!success) {
+                    PREFETCHER_TRACE_DEBUG(
+                        "Failed to fetch depths, Work Item = 0x%llx, "
+                        "vaddr = 0x%llx\n",
+                        work_vaddr, depths_vaddr_block_aligned
+                    );
+                    return nullptr;
+                }
+                constexpr Addr item_size = 4;
+                const Addr depth_index = \
+                    (depths_vaddr - depths_vaddr_block_aligned) / item_size;
+                depth = pkt->getConstPtr<uint32_t>()[depth_index];
+                lv4_depths.push_back(depth);
+                PREFETCHER_TRACE_DEBUG(
+                    "Work Item = 0x%llx, depth = %u\n",
+                    work_vaddr, depth
+                );
+            }
             // We add expected prefetches
             workItem->addExpectedPrefetch(depths_vaddr_block_aligned, 3);
             warnIfOutsideRanges(work_vaddr, depths_vaddr_block_aligned);
@@ -252,22 +287,65 @@ BCPrefetchKernel1Generator::execute_kernel(Addr work_data)
                 work_vaddr, depths_vaddr_block_aligned
             );
         }
-
-        const Addr path_counts_array_start_vaddr = \
-            work_tracker->job_descriptor->get_array(4).vaddr_start;
-        for (auto edge_index : lv3_edge_indices) {
-            // path_counts array
-            const Addr path_counts_vaddr =
-                path_counts_array_start_vaddr + edge_index * 8;
-            const Addr path_counts_vaddr_block_aligned = \
-                (path_counts_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
-            // We add expected prefetches
-            workItem->addExpectedPrefetch(path_counts_vaddr_block_aligned, 3);
-            warnIfOutsideRanges(work_vaddr, path_counts_vaddr_block_aligned);
-            PREFETCHER_TRACE_DEBUG(
-                "Work Item = 0x%llx, path_counts = 0x%llx\n",
-                work_vaddr, path_counts_vaddr_block_aligned
-            );
+        // if depth optimization is not enabled, we prefetch the path_counts of
+        // all the neighbors
+        if (!bc_depth_optimization_enabled) {
+            const Addr path_counts_array_start_vaddr = \
+                work_tracker->job_descriptor->get_array(4).vaddr_start;
+            for (auto edge_index : lv3_edge_indices) {
+                // path_counts array
+                const Addr path_counts_vaddr =
+                    path_counts_array_start_vaddr + edge_index * 8;
+                const Addr path_counts_vaddr_block_aligned = \
+                    (path_counts_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+                // We add expected prefetches
+                workItem->addExpectedPrefetch(
+                    path_counts_vaddr_block_aligned, 3
+                );
+                warnIfOutsideRanges(
+                    work_vaddr, path_counts_vaddr_block_aligned
+                );
+                PREFETCHER_TRACE_DEBUG(
+                    "Work Item = 0x%llx, path_counts = 0x%llx\n",
+                    work_vaddr, path_counts_vaddr_block_aligned
+                );
+            }
+        } else {
+            // if depth optimization is enabled, we only prefetch the
+            // path_counts of the neighbors whose depth is equal to the current
+            // depth
+            const Addr path_counts_array_start_vaddr = \
+                work_tracker->job_descriptor->get_array(4).vaddr_start;
+            for (uint64_t i = 0; i < lv3_edge_indices.size(); i++) {
+                // depths array
+                const uint32_t neighbor_depth = lv4_depths[i];
+                // current depth
+                const uint32_t current_depth =
+                    (uint32_t)(prefetch_context->getBCCurrentDepth(core_id));
+                // We only prefetch path_counts if the neighbor depth is equal
+                // to the current depth. This is because, in BC, the core will
+                // only access the path_counts of the neighbors whose depth is
+                // equal to the current depth.
+                if (neighbor_depth != current_depth) {
+                    continue;
+                }
+                // path_counts array
+                const Addr path_counts_vaddr =
+                    path_counts_array_start_vaddr + lv3_edge_indices[i] * 8;
+                const Addr path_counts_vaddr_block_aligned = \
+                    (path_counts_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+                // We add expected prefetches
+                workItem->addExpectedPrefetch(
+                    path_counts_vaddr_block_aligned, 3
+                );
+                warnIfOutsideRanges(
+                    work_vaddr, path_counts_vaddr_block_aligned
+                );
+                PREFETCHER_TRACE_DEBUG(
+                    "Work Item = 0x%llx, path_counts = 0x%llx\n",
+                    work_vaddr, path_counts_vaddr_block_aligned
+                );
+            }
         }
     }
 
@@ -551,6 +629,31 @@ BCPrefetchKernel2Generator::execute_kernel(Addr work_data)
     }
 
     return workItem;
+}
+
+BCPrefetchKernel3Generator::BCPrefetchKernel3Generator(
+    std::string _name,
+    const uint64_t _job_id, const uint64_t _core_id,
+    const uint64_t _software_hint_distance,
+    const uint64_t _prefetch_distance_offset_from_software_hint,
+    PrefetcherWorkTracker* _work_tracker
+) : PrefetchGenerator(
+    _name,
+    _job_id, _core_id,
+    _software_hint_distance, _prefetch_distance_offset_from_software_hint,
+    _work_tracker
+    )
+{
+}
+
+std::shared_ptr<WorkItem>
+BCPrefetchKernel3Generator::execute_kernel(Addr work_data)
+{
+    // This kernel only updates the depth of the node that the core is working
+    // on.
+    prefetch_context->setBCCurrentDepth(core_id, work_data);
+
+    return nullptr;
 }
 
 } // namespace gem5

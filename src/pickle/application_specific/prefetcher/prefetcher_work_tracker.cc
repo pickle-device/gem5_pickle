@@ -83,11 +83,20 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
             _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            owner->getBCDepthOptimizationEnabled(),
             this
         );
     } else if (job_descriptor->kernel_name == "bc_kernel_2") {
         prefetch_generator = std::make_shared<BCPrefetchKernel2Generator>(
             "BCPrefetchKernel2Generator",
+            _job_id, _core_id,
+            owner->getSoftwareHintPrefetchDistance(),
+            owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            this
+        );
+    } else if (job_descriptor->kernel_name == "bc_kernel_3") {
+        prefetch_generator = std::make_shared<BCPrefetchKernel3Generator>(
+            "BCPrefetchKernel3Generator",
             _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),

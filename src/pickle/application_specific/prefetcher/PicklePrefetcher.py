@@ -111,3 +111,10 @@ class PicklePrefetcher(ClockedObject):
         "prefetcher will track the `threshold` variable used in SSSP software "
         "to make prefetch decisions.",
     )
+
+    bc_depth_optimization_enabled = Param.Bool(
+        False,
+        "Whether the BC depth optimization is enabled. If true, the "
+        "prefetcher will track the current depth of the BFS traversal in BC "
+        "to make prefetch decisions.",
+    )

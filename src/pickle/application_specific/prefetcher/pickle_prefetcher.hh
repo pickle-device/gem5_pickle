@@ -89,6 +89,7 @@ class PicklePrefetcher: public ClockedObject
         std::vector<LLCPrefetchAgent*> llc_prefetch_agents;
         bool delegate_last_layer_prefetches_to_llc_agents;
         bool sssp_threshold_optimization_enabled;
+        bool bc_depth_optimization_enabled;
     private:
         std::unordered_map<Addr, std::unique_ptr<uint8_t[]>> packet_data;
         std::unordered_map<Addr, PacketStatus> packet_status;
@@ -121,6 +122,7 @@ class PicklePrefetcher: public ClockedObject
         uint64_t getBulkPrefetchChunkSize() const;
         uint64_t getBulkPrefetchNumPrefetchesPerHint() const;
         bool getSSSPThresholdOptimizationEnabled() const;
+        bool getBCDepthOptimizationEnabled() const;
     public: // the interface
         bool enqueueWork(
             const uint64_t workData, const uint64_t prefetchKernelId,

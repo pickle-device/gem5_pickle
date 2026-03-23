@@ -81,6 +81,9 @@ PicklePrefetcher::PicklePrefetcher(
     sssp_threshold_optimization_enabled(
         params.sssp_threshold_optimization_enabled
     ),
+    bc_depth_optimization_enabled(
+        params.bc_depth_optimization_enabled
+    ),
     core_id_to_context_id(num_cores, InvalidContextID),
     prefetcher_initialized(false),
     num_received_jobs(0),
@@ -277,6 +280,12 @@ bool
 PicklePrefetcher::getSSSPThresholdOptimizationEnabled() const
 {
     return sssp_threshold_optimization_enabled;
+}
+
+bool
+PicklePrefetcher::getBCDepthOptimizationEnabled() const
+{
+    return bc_depth_optimization_enabled;
 }
 
 void

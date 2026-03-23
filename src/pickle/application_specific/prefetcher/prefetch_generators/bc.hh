@@ -58,11 +58,15 @@ class BCPrefetchKernel1Generator: public PrefetchGenerator
         const uint64_t _job_id, const uint64_t _core_id,
         const uint64_t _software_hint_distance,
         const uint64_t _prefetch_distance_offset_from_software_hint,
+        bool _bc_depth_optimization_enabled,
         PrefetcherWorkTracker* _work_tracker
     );
 
     // Function to generate prefetch requests
     std::shared_ptr<WorkItem> execute_kernel(Addr work_data) override;
+
+  private:
+    bool bc_depth_optimization_enabled;
 }; // class BCPrefetchKernel1Generator
 
 class BCPrefetchKernel2Generator: public PrefetchGenerator
@@ -79,6 +83,21 @@ class BCPrefetchKernel2Generator: public PrefetchGenerator
     // Function to generate prefetch requests
     std::shared_ptr<WorkItem> execute_kernel(Addr work_data) override;
 }; // class BCPrefetchKernel2Generator
+
+class BCPrefetchKernel3Generator: public PrefetchGenerator
+{
+  public:
+    BCPrefetchKernel3Generator(
+        std::string _name,
+        const uint64_t _job_id, const uint64_t _core_id,
+        const uint64_t _software_hint_distance,
+        const uint64_t _prefetch_distance_offset_from_software_hint,
+        PrefetcherWorkTracker* _work_tracker
+    );
+
+    // Function to generate prefetch requests
+    std::shared_ptr<WorkItem> execute_kernel(Addr work_data) override;
+}; // class BCPrefetchKernel3Generator
 
 } // namespace gem5
 
