@@ -251,7 +251,12 @@ WorkItem::getCurrLevelExpectedPrefetches() const
 void
 WorkItem::moveToNextLevel()
 {
-    curr_level += 1;
+    while (
+        curr_level < num_indirection_levels
+        && expected_prefetches[curr_level].empty()
+    ) {
+        curr_level += 1;
+    }
 }
 
 bool
