@@ -67,6 +67,9 @@ class BCPrefetchKernel1Generator: public PrefetchGenerator
 
   private:
     bool bc_depth_optimization_enabled;
+    // When the depth is not assigned to a node, the program sets it to -1.
+    static constexpr uint32_t UNKNOWN_DEPTH = \
+      std::numeric_limits<uint32_t>::max();
 }; // class BCPrefetchKernel1Generator
 
 class BCPrefetchKernel2Generator: public PrefetchGenerator

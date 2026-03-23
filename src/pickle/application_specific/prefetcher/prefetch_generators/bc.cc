@@ -251,8 +251,15 @@ BCPrefetchKernel1Generator::execute_kernel(Addr work_data)
                 depths_array_start_vaddr + edge_index * 4;
             const Addr depths_vaddr_block_aligned = \
                 (depths_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
-            uint32_t depth = 0;
+            // We add expected prefetches
+            workItem->addExpectedPrefetch(depths_vaddr_block_aligned, 3);
+            warnIfOutsideRanges(work_vaddr, depths_vaddr_block_aligned);
+            PREFETCHER_TRACE_DEBUG(
+                "Work Item = 0x%llx, depths = 0x%llx\n",
+                work_vaddr, depths_vaddr_block_aligned
+            );
             if (bc_depth_optimization_enabled) {
+                uint32_t depth = 0;
                 bool success = false;
                 PREFETCHER_WORK_TRACKER_DEBUG(
                     "Fetching depths vaddr 0x%llx\n",
@@ -273,19 +280,19 @@ BCPrefetchKernel1Generator::execute_kernel(Addr work_data)
                 const Addr depth_index = \
                     (depths_vaddr - depths_vaddr_block_aligned) / item_size;
                 depth = pkt->getConstPtr<uint32_t>()[depth_index];
+                // if the depth has not been assigned, we set it to the current
+                // depth of the core as it is **very** likely that the neighbor
+                // node will have the same depth as the core's current depth
+                // (the current depth means the current depth of child nodes)
+                if (depth == UNKNOWN_DEPTH) {
+                    depth = prefetch_context->getBCCurrentDepth(core_id);
+                }
                 lv4_depths.push_back(depth);
                 PREFETCHER_TRACE_DEBUG(
                     "Work Item = 0x%llx, depth = %u\n",
                     work_vaddr, depth
                 );
             }
-            // We add expected prefetches
-            workItem->addExpectedPrefetch(depths_vaddr_block_aligned, 3);
-            warnIfOutsideRanges(work_vaddr, depths_vaddr_block_aligned);
-            PREFETCHER_TRACE_DEBUG(
-                "Work Item = 0x%llx, depths = 0x%llx\n",
-                work_vaddr, depths_vaddr_block_aligned
-            );
         }
         // if depth optimization is not enabled, we prefetch the path_counts of
         // all the neighbors
@@ -655,6 +662,10 @@ BCPrefetchKernel3Generator::execute_kernel(Addr work_data)
     // This kernel only updates the depth of the node that the core is working
     // on.
     prefetch_context->setBCCurrentDepth(core_id, work_data);
+    PREFETCHER_TRACE_DEBUG(
+        "Updating current depth, core_id = 0x%llx, depth = %u\n",
+        core_id, (uint32_t)work_data
+    );
 
     return nullptr;
 }
