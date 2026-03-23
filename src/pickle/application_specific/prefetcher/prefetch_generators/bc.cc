@@ -316,12 +316,12 @@ BCPrefetchKernel1Generator::execute_kernel(Addr work_data)
             // depth
             const Addr path_counts_array_start_vaddr = \
                 work_tracker->job_descriptor->get_array(4).vaddr_start;
+            // current depth
+            const uint32_t current_depth =
+                (uint32_t)(prefetch_context->getBCCurrentDepth(core_id));
             for (uint64_t i = 0; i < lv3_edge_indices.size(); i++) {
                 // depths array
                 const uint32_t neighbor_depth = lv4_depths[i];
-                // current depth
-                const uint32_t current_depth =
-                    (uint32_t)(prefetch_context->getBCCurrentDepth(core_id));
                 // We only prefetch path_counts if the neighbor depth is equal
                 // to the current depth. This is because, in BC, the core will
                 // only access the path_counts of the neighbors whose depth is
@@ -334,9 +334,12 @@ BCPrefetchKernel1Generator::execute_kernel(Addr work_data)
                     path_counts_array_start_vaddr + lv3_edge_indices[i] * 8;
                 const Addr path_counts_vaddr_block_aligned = \
                     (path_counts_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
-                // We add expected prefetches
+                // We add expected prefetches.
+                // We only know the depth after fetching the depths, so we
+                // cannot issue prefetches for path_counts until the depths are
+                // fetched, thus we use level 4 here for path_counts.
                 workItem->addExpectedPrefetch(
-                    path_counts_vaddr_block_aligned, 3
+                    path_counts_vaddr_block_aligned, 4
                 );
                 warnIfOutsideRanges(
                     work_vaddr, path_counts_vaddr_block_aligned
