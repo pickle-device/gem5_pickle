@@ -33,7 +33,7 @@
 #define __PREFETCHER_WORK_ITEM_HH__
 
 #include <array>
-#include <unordered_set>
+#include <set>
 
 #include "base/types.hh"
 #include "sim/cur_tick.hh"
@@ -49,7 +49,7 @@ class WorkItem
         uint64_t core_id; // which core is working on this work
         ContextID context_id; // which thread is working on this work
         Addr work_id; // used to identify work from the core
-        std::array<std::unordered_set<Addr>, MAX_INDIRECTION_LEVELS>
+        std::array<std::set<Addr>, MAX_INDIRECTION_LEVELS>
             expected_prefetches;
         uint64_t curr_level;
         bool core_worked_on_this_work;
@@ -98,7 +98,7 @@ class WorkItem
         Addr getWorkId() const;
         void addExpectedPrefetch(Addr pf_vaddr, const uint64_t level);
         void removeExpectedPrefetch(Addr pf_vaddr);
-        const std::unordered_set<Addr>& getCurrLevelExpectedPrefetches() const;
+        const std::set<Addr>& getCurrLevelExpectedPrefetches() const;
         void moveToNextLevel();
         bool isDoneWithCurrLevel() const;
         bool isLastLevel() const;

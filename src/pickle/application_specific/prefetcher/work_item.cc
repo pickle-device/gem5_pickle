@@ -229,7 +229,7 @@ WorkItem::addExpectedPrefetch(Addr pf_vaddr, const uint64_t level)
 void
 WorkItem::removeExpectedPrefetch(Addr pf_vaddr)
 {
-    std::unordered_set<Addr>& curr_set = expected_prefetches[curr_level];
+    std::set<Addr>& curr_set = expected_prefetches[curr_level];
     auto it = curr_set.find(pf_vaddr);
     if (it != curr_set.end()) {
         curr_set.erase(it);
@@ -242,7 +242,7 @@ WorkItem::removeExpectedPrefetch(Addr pf_vaddr)
     }
 }
 
-const std::unordered_set<Addr>&
+const std::set<Addr>&
 WorkItem::getCurrLevelExpectedPrefetches() const
 {
     return expected_prefetches[curr_level];
