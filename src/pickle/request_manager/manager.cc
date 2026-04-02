@@ -166,15 +166,11 @@ PickleDeviceRequestManager::enqueueRequest(
             BaseMMU::Read
         );
     } else if (use_functional_mmu) {
-        functional_mmu->translateFunctional(
+        Fault fault = functional_mmu->translateFunctional(
             req, owner->getThreadContextPtr(), BaseMMU::Read
         );
-        // After the functional translation is done, we directly call the
-        // translation completion callback to send the request to the cache
-        // hierarchy, without waiting for the latency of translating with the
-        // core MMUs.
-        handleTranslationCompletion(
-            outstanding_requests[block_aligned_vaddr].back()
+        outstanding_requests[block_aligned_vaddr].back()->setTranslationResult(
+            fault, req
         );
     } else {
         mmu->translateTiming(
@@ -221,7 +217,7 @@ PickleDeviceRequestManager::handleTranslationCompletion(
     );
     if (success) {
         request_bookkeeper->translationSent();
-        request_manager_stats.numRequestInitiatedAfterTranslation++;;
+        request_manager_stats.numRequestInitiatedAfterTranslation++;
         DPRINTF(PickleDeviceRequestManagerDebug,
             "Done translation for vaddr 0x%llx\n",
             request_bookkeeper->getReq()->getVaddr()
