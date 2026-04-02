@@ -56,6 +56,7 @@ PrefetchRequest::createWithVAddr(
     request.has_paddr = false;
     request.is_delegated_to_prefetch_agent = is_delegated_to_prefetch_agent;
     request.priority_score = priority_score;
+    request.timeout = MaxTick; // initialize timeout to a very large value
     return request;
 }
 
@@ -74,6 +75,7 @@ PrefetchRequest::createWithPAddr(
     request.has_paddr = true;
     request.is_delegated_to_prefetch_agent = is_delegated_to_prefetch_agent;
     request.priority_score = priority_score;
+    request.timeout = MaxTick; // initialize timeout to a very large value
     return request;
 }
 
@@ -113,6 +115,18 @@ Tick
 PrefetchRequest::getPrefetchReqTime() const
 {
     return pf_req_time;
+}
+
+void
+PrefetchRequest::setTimeout(const Tick timeout)
+{
+    this->timeout = timeout;
+}
+
+bool
+PrefetchRequest::isTimedOut(const Tick current_tick) const
+{
+    return current_tick >= timeout;
 }
 
 uint64_t

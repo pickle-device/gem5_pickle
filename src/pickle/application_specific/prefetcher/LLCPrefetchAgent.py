@@ -46,6 +46,11 @@ class LLCPrefetchAgent(ClockedObject):
     llc_controller = Param.CHI_Cache_Controller(
         "The LLC controller that this prefetch agent is associated with",
     )
+    timeout_cycles = Param.Cycles(
+        0,
+        "The number of cycles after which a pending prefetch request will be "
+        "considered timed out and will be retried. 0 means no timeout.",
+    )
     addr_ranges = VectorParam.AddrRange(
         [],
         "The address range that this prefetch agent is responsible for. If empty, "

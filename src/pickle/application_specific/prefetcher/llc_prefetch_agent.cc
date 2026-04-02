@@ -47,6 +47,7 @@ LLCPrefetchAgent::LLCPrefetchAgent(const LLCPrefetchAgentParams &params)
       system(params.system),
       prefetcher(nullptr),
       llc_controller(params.llc_controller),
+      timeout_threshold(params.timeout_cycles),
       addr_ranges(params.addr_ranges),
       requestor_id(system->getRequestorId(this)),
       ticks_per_cycle(250), // running at the LLC frequency
@@ -77,7 +78,7 @@ void LLCPrefetchAgent::setPicklePrefetcher(PicklePrefetcher* prefetcher)
 }
 
 void
-LLCPrefetchAgent::enqueueRequestWithPAddr(const PrefetchRequest& pf_request)
+LLCPrefetchAgent::enqueueRequestWithPAddr(PrefetchRequest& pf_request)
 {
     assert(pf_request.hasPAddr());
     agent_stats.prefetch_request_count++;
@@ -85,6 +86,14 @@ LLCPrefetchAgent::enqueueRequestWithPAddr(const PrefetchRequest& pf_request)
     agent_stats.prefetch_request_queue_length.sample(
         prefetch_request_queue.size()
     );
+    if (timeout_threshold == Cycles(0)) {
+        // No timeout, set timeout to MaxTick
+        pf_request.setTimeout(MaxTick);
+    } else {
+        pf_request.setTimeout(
+            curTick() + cyclesToTicks(timeout_threshold)
+        );
+    }
     // Add to the map of outstanding requests
     pf_paddr_to_outstanding_requests[
         pf_request.getPrefetchPAddr()
@@ -142,12 +151,28 @@ LLCPrefetchAgent::processOutgoingRequestQueue()
         // Peek at the front request
         const PrefetchRequest& pf_request = prefetch_request_queue.top();
         const Addr paddr = pf_request.getPrefetchPAddr();
+        if (pf_request.isTimedOut(curTick())) {
+            // Request has timed out, we drop it.
+            agent_stats.prefetch_request_dropped_due_to_timedout++;
+            prefetch_request_queue.pop();
+            agent_stats.prefetch_request_queue_length.sample(
+                prefetch_request_queue.size()
+            );
+            DPRINTF(LLCPrefetchAgentDebug,
+                "Dropped prefetch request for paddr 0x%llx due to timeout\n",
+                paddr
+            );
+            continue;
+        }
         // Check if the cache line is already present in the cache by
         // consulting the LLC directory and its own cache.
         // Note that the LLC directory does not keep track of cache lines only
         // present in LLC.
         if (llc_controller->getDirEntry(paddr) != nullptr
             || llc_controller->getCacheEntry(paddr) != nullptr) {
+            //llc_controller->m_cache_ptr->setMRU(
+            //    llc_controller->getCacheEntry(paddr)
+            //);
             // Cache line is already present, drop the request
             agent_stats.prefetch_request_dropped_due_to_cache_line_presence++;
             prefetch_request_queue.pop();
@@ -220,7 +245,7 @@ void LLCPrefetchAgent::triggerTests()
                 paddr, 0x0, curTick(), (paddr - 0x110000000) / 64, true,
                 MaxTick - curTick() // priority_score
             );
-            enqueueRequestWithPAddr(std::move(pf_request));
+            enqueueRequestWithPAddr(pf_request);
             DPRINTF(LLCPrefetchAgentDebug,
                 "Triggered test prefetch request for paddr 0x%llx\n", paddr
             );
@@ -300,13 +325,17 @@ LLCPrefetchAgent::LLCPrefetchAgentStats::LLCPrefetchAgentStats(
                statistics::units::Count::get(),
                "Number of prefetch requests dropped due to the cache line "
                "already being present in the cache"),
+      ADD_STAT(prefetch_request_dropped_due_to_timedout,
+               statistics::units::Count::get(),
+               "Number of prefetch requests dropped due to timeout"),
       ADD_STAT(prefetch_request_sent, statistics::units::Count::get(),
                "Number of prefetch requests sent to the memory system"),
       ADD_STAT(prefetch_request_not_sent, statistics::units::Count::get(),
                "Number of prefetch requests not sent to the memory system "
                "due to our errors. Should be 0.",
                prefetch_request_count - prefetch_request_sent - \
-                prefetch_request_dropped_due_to_cache_line_presence),
+                prefetch_request_dropped_due_to_cache_line_presence - \
+                prefetch_request_dropped_due_to_timedout),
       ADD_STAT(prefetch_request_queue_length, statistics::units::Count::get(),
                 "Histogram of the prefetch request queue length over time")
 {

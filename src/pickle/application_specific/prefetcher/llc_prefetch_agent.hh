@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "base/addr_range.hh"
+#include "base/types.hh"
 #include "mem/ruby/protocol/CHI/Cache_Controller.hh"
 #include "params/LLCPrefetchAgent.hh"
 #include "pickle/application_specific/prefetcher/pickle_prefetcher.hh"
@@ -57,6 +58,7 @@ class LLCPrefetchAgent: public ClockedObject
         System * system;
         PicklePrefetcher* prefetcher;
         ruby::CHI::Cache_Controller* llc_controller;
+        Cycles timeout_threshold;
         std::vector<AddrRange> addr_ranges;
         RequestorID requestor_id;
         std::priority_queue<
@@ -73,7 +75,7 @@ class LLCPrefetchAgent: public ClockedObject
         // Enqueue a prefetch request with a physical address.
         // We do not allow enqueuing a request with a virtual address, because
         // the LLC prefetch agent should only work with physical addresses.
-        void enqueueRequestWithPAddr(const PrefetchRequest& request);
+        void enqueueRequestWithPAddr(PrefetchRequest& request);
         // Notify the prefetch agent that a request has been completed
         void completeRequest(Addr paddr);
         // Check if an address is in the address ranges this agent monitors
@@ -108,6 +110,8 @@ class LLCPrefetchAgent: public ClockedObject
             statistics::Scalar prefetch_request_count;
             statistics::Scalar \
                 prefetch_request_dropped_due_to_cache_line_presence;
+            statistics::Scalar \
+                prefetch_request_dropped_due_to_timedout;
             statistics::Scalar prefetch_request_sent;
             statistics::Formula prefetch_request_not_sent;
             statistics::Histogram prefetch_request_queue_length;

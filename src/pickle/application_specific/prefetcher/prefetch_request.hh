@@ -48,6 +48,12 @@ class PrefetchRequest
         bool has_paddr;
         bool is_delegated_to_prefetch_agent;
         uint64_t priority_score;
+        // When the prefetch request is enqueued to the prefetch agent, we
+        // record the current tick as the start time. If the request is still
+        // not completed after some timeout threshold, the prefetch agent can
+        // retry the request. This field is used to record the start time for
+        // timeout calculation.
+        Tick timeout;
     public:
         PrefetchRequest();
         static PrefetchRequest createWithVAddr(
@@ -66,6 +72,8 @@ class PrefetchRequest
         ContextID getPrefetchContextID() const;
         bool hasPAddr() const;
         Tick getPrefetchReqTime() const;
+        void setTimeout(const Tick timeout);
+        bool isTimedOut(const Tick current_tick) const;
         // the higher the priority, the earlier the request is issued
         uint64_t getPrefetchPriorityScore() const;
         uint64_t getPrefetchId() const;

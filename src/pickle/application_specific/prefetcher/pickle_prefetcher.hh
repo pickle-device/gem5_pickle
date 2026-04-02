@@ -141,7 +141,7 @@ class PicklePrefetcher: public ClockedObject
         // Send the prefetch request to a prefetch agent that monitors the
         // address range of the physical address. Return true if the request is
         // sent to an agent, false otherwise.
-        bool delegatePrefetchToLLCAgent(const PrefetchRequest& pf_request);
+        bool delegatePrefetchToLLCAgent(PrefetchRequest& pf_request);
         // Notify the prefetcher that a prefetch request has been completed by
         // an LLC prefetch agent.
         void agentCompletePrefetchRequest(const PrefetchRequest& pf_request);

@@ -448,7 +448,7 @@ PicklePrefetcher::receivePrefetch(
 }
 
 bool
-PicklePrefetcher::delegatePrefetchToLLCAgent(const PrefetchRequest& pf_request)
+PicklePrefetcher::delegatePrefetchToLLCAgent(PrefetchRequest& pf_request)
 {
     const Addr pf_paddr = pf_request.getPrefetchPAddr();
     for (auto &agent: llc_prefetch_agents) {
