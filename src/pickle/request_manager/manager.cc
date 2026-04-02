@@ -47,6 +47,7 @@ PickleDeviceRequestManager::PickleDeviceRequestManager(
     use_core_mmus_for_address_translation(
         params.use_core_mmus_for_address_translation
     ),
+    use_functional_mmu(params.use_functional_mmu),
     pickle_to_core_mmus_latency_in_ticks(
         params.pickle_to_core_mmus_latency_in_ticks
     ),
@@ -163,6 +164,17 @@ PickleDeviceRequestManager::enqueueRequest(
                 outstanding_requests[block_aligned_vaddr].back(), requestor_id
             ),
             BaseMMU::Read
+        );
+    } else if (use_functional_mmu) {
+        functional_mmu->translateFunctional(
+            req, owner->getThreadContextPtr(), BaseMMU::Read
+        );
+        // After the functional translation is done, we directly call the
+        // translation completion callback to send the request to the cache
+        // hierarchy, without waiting for the latency of translating with the
+        // core MMUs.
+        handleTranslationCompletion(
+            outstanding_requests[block_aligned_vaddr].back()
         );
     } else {
         mmu->translateTiming(
@@ -327,6 +339,15 @@ PickleDeviceRequestManager::setMMU(BaseMMU* mmu)
 {
     this->mmu = mmu;
     DPRINTF(PickleDeviceRequestManagerDebug, "Set MMU to %s\n", mmu->name());
+}
+
+void
+PickleDeviceRequestManager::setFunctionalMMU(BaseMMU* functional_mmu)
+{
+    this->functional_mmu = functional_mmu;
+    DPRINTF(PickleDeviceRequestManagerDebug,
+        "Set functional MMU to %s\n", functional_mmu->name()
+    );
 }
 
 void

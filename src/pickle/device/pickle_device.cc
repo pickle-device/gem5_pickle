@@ -121,6 +121,7 @@ PickleDevice::startup()
     }
     request_manager->setOwner(this);
     request_manager->setMMU(mmu);
+    request_manager->setFunctionalMMU(functional_mmu);
     request_manager->setRequestorID(requestor_id);
     pickle_prefetcher->setOwner(this);
 }

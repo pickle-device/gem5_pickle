@@ -107,16 +107,19 @@ class PickleDeviceRequestManager : public SimObject
         );
         void setRequestorID(const RequestorID requestor_id);
         void setMMU(BaseMMU* mmu);
+        void setFunctionalMMU(BaseMMU* functional_mmu);
         void setOwner(PickleDevice* owner);
         void handleRequestCompletion(PacketPtr pkt);
     private:
         bool is_activated;
         PickleDevice* owner;
         BaseMMU* mmu;
+        BaseMMU* functional_mmu;
         RequestorID requestor_id;
         uint64_t ticks_per_cycle;
         System *system;
         bool use_core_mmus_for_address_translation;
+        bool use_functional_mmu;
         Tick pickle_to_core_mmus_latency_in_ticks;
         void handleTranslationCompletion(
             std::shared_ptr<RequestBookkeeper> request_bookkeeper

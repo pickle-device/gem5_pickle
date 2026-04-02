@@ -52,6 +52,13 @@ class PickleDeviceRequestManager(SimObject):
         "If False, Pickle MMU will be used for address translation. "
         "If True, the core MMUs will be used for address translation.",
     )
+    use_functional_mmu = Param.Bool(
+        False,
+        "Whether to use the functional MMU for address translation. If false, "
+        "the prefetcher will use functional accesses for address translation, "
+        "which does not perform page walks. Should not use for reporting "
+        "prefetcher performance statistics.",
+    )
     pickle_to_core_mmus_latency_in_ticks = Param.Int(
         5000,
         "Latency between the Pickle device and the core MMUs for address "
