@@ -47,11 +47,13 @@ SPMVPrefetchGenerator::SPMVPrefetchGenerator(
     const uint64_t _job_id, const uint64_t _core_id,
     const uint64_t _software_hint_distance,
     const uint64_t _prefetch_distance_offset_from_software_hint,
+    const uint64_t _max_requests_per_level,
     PrefetcherWorkTracker* _work_tracker
 ) : PrefetchGenerator(
     _name,
     _job_id, _core_id,
     _software_hint_distance, _prefetch_distance_offset_from_software_hint,
+    _max_requests_per_level,
     _work_tracker
     )
 {
@@ -251,6 +253,9 @@ SPMVPrefetchGenerator::execute_kernel(Addr work_data)
                 "Work Item = 0x%llx, col_index = %lld\n",
                 work_id, col_indices.back()
             );
+            if (col_indices.size() >= max_requests_per_level) {
+                break;
+            }
         }
     }
 

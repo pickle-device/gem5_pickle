@@ -62,12 +62,14 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
     std::shared_ptr<PrefetcherWorkTrackerCollective> _collective,
     const uint64_t _job_id, const uint64_t _core_id,
     std::shared_ptr<PickleJobDescriptor> _job_descriptor,
-    const uint64_t _prefetch_dropping_distance
+    const uint64_t _prefetch_dropping_distance,
+    const uint64_t _max_requests_per_level
 ) : job_id(_job_id),
     core_id(_core_id),
     is_activated(true),
     enable_dropping_prefetches(_prefetch_dropping_distance > 0),
     prefetch_dropping_distance(_prefetch_dropping_distance),
+    max_requests_per_level(_max_requests_per_level),
     core_thread_context_id(InvalidContextID),
     owner(owner),
     collective(_collective),
@@ -85,6 +87,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             owner->getBCDepthOptimizationEnabled(),
+            max_requests_per_level,
             this
         );
     } else if (job_descriptor->kernel_name == "bc_kernel_2") {
@@ -93,6 +96,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
             _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            max_requests_per_level,
             this
         );
     } else if (job_descriptor->kernel_name == "bc_kernel_3") {
@@ -101,6 +105,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
             _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            max_requests_per_level,
             this
         );
     } else if (job_descriptor->kernel_name == "bfs_kernel") {
@@ -109,6 +114,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
             _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            max_requests_per_level,
             this
         );
     } else if (job_descriptor->kernel_name == "cc_kernel") {
@@ -117,6 +123,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
             _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            max_requests_per_level,
             this
         );
     } else if (job_descriptor->kernel_name == "pr_kernel") {
@@ -125,6 +132,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
             _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            max_requests_per_level,
             this
         );
     } else if (job_descriptor->kernel_name == "sssp_kernel_1") {
@@ -134,6 +142,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             owner->getSSSPThresholdOptimizationEnabled(),
+            max_requests_per_level,
             this
         );
     } else if (job_descriptor->kernel_name == "sssp_kernel_2") {
@@ -142,6 +151,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
             _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            max_requests_per_level,
             this
         );
     } else if (job_descriptor->kernel_name == "sssp_kernel_3") {
@@ -150,6 +160,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
             _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            max_requests_per_level,
             this
         );
     } else if (job_descriptor->kernel_name == "spmv") {
@@ -158,6 +169,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
             _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            max_requests_per_level,
             this
         );
     } else if (job_descriptor->kernel_name == "tc_kernel") {
@@ -166,6 +178,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
             _job_id, _core_id,
             owner->getSoftwareHintPrefetchDistance(),
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            max_requests_per_level,
             this
         );
     } else {
@@ -435,13 +448,19 @@ PrefetcherWorkTrackerCollective::PrefetcherWorkTrackerCollective()
 PrefetcherWorkTrackerCollective::PrefetcherWorkTrackerCollective(
     const uint64_t _max_active_work_items,
     const bool _delegate_last_layer_prefetches_to_llc_agents,
-    const enums::PrefetchSchedulingPolicy _prefetch_scheduling_policy
+    const enums::PrefetchSchedulingPolicy _prefetch_scheduling_policy,
+    const uint64_t _prefetch_dropping_distance,
+    const uint64_t _max_requests_per_level,
+    const bool _drop_inflight_prefetches
 ) : max_active_work_items(_max_active_work_items),
     delegate_last_layer_prefetches_to_llc_agents(
         _delegate_last_layer_prefetches_to_llc_agents
     ),
     prefetch_scheduling_policy(_prefetch_scheduling_policy),
     prefetch_context(std::make_shared<PrefetchContext>()),
+    prefetch_dropping_distance(_prefetch_dropping_distance),
+    max_requests_per_level(_max_requests_per_level),
+    drop_inflight_prefetches(_drop_inflight_prefetches),
     owner(nullptr)
 {
 }
@@ -589,13 +608,14 @@ PrefetcherWorkTrackerCollective::processIncomingPrefetch(const Addr pf_vaddr)
     }
 }
 
-void
+bool
 PrefetcherWorkTrackerCollective::populateCurrLevelPrefetches(
     std::shared_ptr<WorkItem> work
 )
 {
     const bool is_delegated_to_prefetch_agent = \
         delegate_last_layer_prefetches_to_llc_agents && work->isLastLevel();
+    uint64_t new_request_count = 0;
     for (auto addr: work->getCurrLevelExpectedPrefetches()) {
         // Since the higher the priority score, the earlier the prefetch will
         // be issued, and since we want the prefetch with earlier deadline to
@@ -628,8 +648,13 @@ PrefetcherWorkTrackerCollective::populateCurrLevelPrefetches(
             pf_vaddr_to_work_items_map[addr] = \
                 std::vector<std::shared_ptr<WorkItem>>();
             pf_vaddr_to_work_items_map[addr].reserve(2);
+            new_request_count++;
         }
         pf_vaddr_to_work_items_map[addr].push_back(work);
+        if (max_requests_per_level > 0
+                && new_request_count >= max_requests_per_level) {
+            //break;
+        }
         DPRINTF(
             PickleDevicePrefetcherWorkTrackerDebug,
             "Adding pf_vaddr 0x%llx from WorkItem = 0x%llx, level = %d, "
@@ -638,7 +663,11 @@ PrefetcherWorkTrackerCollective::populateCurrLevelPrefetches(
             is_delegated_to_prefetch_agent
         );
     }
+    if (new_request_count == 0) {
+        //return false;
+    }
     owner->scheduleDueToOutstandingPrefetchRequests();
+    return true;
 }
 
 void

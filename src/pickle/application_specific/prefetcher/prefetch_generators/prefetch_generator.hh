@@ -51,6 +51,7 @@ class PrefetchGenerator
     uint64_t core_id;
     uint64_t software_hint_distance;
     uint64_t prefetch_distance_offset_from_software_hint;
+    uint64_t max_requests_per_level;
     std::shared_ptr<PrefetchContext> prefetch_context;
     PrefetcherWorkTracker* work_tracker;
   public:
@@ -59,6 +60,7 @@ class PrefetchGenerator
         const uint64_t _job_id, const uint64_t _core_id,
         const uint64_t _software_hint_distance,
         const uint64_t _prefetch_distance_offset_from_software_hint,
+        const uint64_t _max_requests_per_level,
         PrefetcherWorkTracker* _work_tracker
     );
 

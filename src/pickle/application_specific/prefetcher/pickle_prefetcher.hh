@@ -83,6 +83,8 @@ class PicklePrefetcher: public ClockedObject
         uint64_t expected_number_of_prefetch_generators;
         uint64_t prefetch_dropping_distance;
         enums::PrefetchSchedulingPolicy prefetch_scheduling_policy;
+        uint64_t max_requests_per_level;
+        bool drop_inflight_prefetches;
         PARAMS(PicklePrefetcher);
         EventFunctionWrapper processInQueueEvent;
         EventFunctionWrapper processOutgoingPrefetchRequestQueueEvent;

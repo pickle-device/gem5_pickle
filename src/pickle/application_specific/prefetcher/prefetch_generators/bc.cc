@@ -48,11 +48,13 @@ BCPrefetchKernel1Generator::BCPrefetchKernel1Generator(
     const uint64_t _software_hint_distance,
     const uint64_t _prefetch_distance_offset_from_software_hint,
     bool _bc_depth_optimization_enabled,
+    uint64_t _max_requests_per_level,
     PrefetcherWorkTracker* _work_tracker
 ) : PrefetchGenerator(
         _name,
         _job_id, _core_id,
         _software_hint_distance, _prefetch_distance_offset_from_software_hint,
+        _max_requests_per_level,
         _work_tracker
     ),
     bc_depth_optimization_enabled(_bc_depth_optimization_enabled)
@@ -232,6 +234,9 @@ BCPrefetchKernel1Generator::execute_kernel(Addr work_data)
                 "Work Item = 0x%llx, edge_index = %lld\n",
                 work_vaddr, lv3_edge_indices.back()
             );
+            if (lv3_edge_indices.size() >= max_requests_per_level) {
+                break;
+            }
         }
     }
 
@@ -367,11 +372,13 @@ BCPrefetchKernel2Generator::BCPrefetchKernel2Generator(
     const uint64_t _job_id, const uint64_t _core_id,
     const uint64_t _software_hint_distance,
     const uint64_t _prefetch_distance_offset_from_software_hint,
+    uint64_t _max_requests_per_level,
     PrefetcherWorkTracker* _work_tracker
 ) : PrefetchGenerator(
     _name,
     _job_id, _core_id,
     _software_hint_distance, _prefetch_distance_offset_from_software_hint,
+    _max_requests_per_level,
     _work_tracker
     )
 {
@@ -596,6 +603,9 @@ BCPrefetchKernel2Generator::execute_kernel(Addr work_data)
                 "Work Item = 0x%llx, edge_index = %lld\n",
                 work_vaddr, lv3_edge_indices.back()
             );
+            if (lv3_edge_indices.size() >= max_requests_per_level) {
+                break;
+            }
         }
     }
 
@@ -646,11 +656,13 @@ BCPrefetchKernel3Generator::BCPrefetchKernel3Generator(
     const uint64_t _job_id, const uint64_t _core_id,
     const uint64_t _software_hint_distance,
     const uint64_t _prefetch_distance_offset_from_software_hint,
+    uint64_t _max_requests_per_level,
     PrefetcherWorkTracker* _work_tracker
 ) : PrefetchGenerator(
     _name,
     _job_id, _core_id,
     _software_hint_distance, _prefetch_distance_offset_from_software_hint,
+    _max_requests_per_level,
     _work_tracker
     )
 {

@@ -86,6 +86,18 @@ class PicklePrefetcher(ClockedObject):
         "EARLIEST_DEADLINE_FIRST_BASED_ON_HINT_ARRIVAL_TIME",
         "The scheduling policy used when issuing prefetches.",
     )
+    max_requests_per_level = Param.Int(
+        0,
+        "The maximum number of prefetch requests that can be in-flight per "
+        "indirection level. If set to 0, there is no limit.",
+    )
+    drop_inflight_prefetches = Param.Bool(
+        False,
+        "Whether to check and drop request at the time of prefetch issue. If "
+        "true, the prefetcher will check if the core is too close at the time "
+        "of prefetch issue, and drop the prefetch if the core is within the "
+        "dropping distance.",
+    )
 
     # Resource parameters
     concurrent_work_item_capacity = Param.Int(

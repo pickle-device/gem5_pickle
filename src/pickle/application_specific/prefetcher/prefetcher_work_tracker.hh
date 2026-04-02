@@ -64,6 +64,7 @@ class PrefetcherWorkTracker
         // When we drop a prefetch request
         bool enable_dropping_prefetches;
         uint64_t prefetch_dropping_distance;
+        uint64_t max_requests_per_level;
         ContextID core_thread_context_id;
     public:
         PicklePrefetcher* owner;
@@ -93,7 +94,8 @@ class PrefetcherWorkTracker
             std::shared_ptr<PrefetcherWorkTrackerCollective> collective,
             const uint64_t job_id, const uint64_t core_id,
             std::shared_ptr<PickleJobDescriptor> job_descriptor,
-            const uint64_t prefetch_dropping_distance
+            const uint64_t prefetch_dropping_distance,
+            const uint64_t max_requests_per_level
         );
         uint64_t getJobId() const;
         uint64_t getCoreId() const;
@@ -131,6 +133,10 @@ class PrefetcherWorkTrackerCollective
         uint64_t prefetch_dropping_distance;
         enums::PrefetchSchedulingPolicy prefetch_scheduling_policy;
         std::shared_ptr<PrefetchContext> prefetch_context;
+        // The maximum number of requests per level
+        uint64_t max_requests_per_level;
+        // Whether to drop prefetches at the time of issuing prefetch request
+        bool drop_inflight_prefetches;
         // The prefetcher that owns this work tracker
         PicklePrefetcher* owner;
     private:
@@ -168,7 +174,10 @@ class PrefetcherWorkTrackerCollective
         PrefetcherWorkTrackerCollective(
             const uint64_t max_active_work_items,
             const bool delegate_last_layer_prefetches_to_llc_agents,
-            const enums::PrefetchSchedulingPolicy prefetch_scheduling_policy
+            const enums::PrefetchSchedulingPolicy prefetch_scheduling_policy,
+            const uint64_t prefetch_dropping_distance,
+            const uint64_t max_requests_per_level,
+            const bool drop_inflight_prefetches
         );
         void setOwner(PicklePrefetcher* owner);
         void addPrefetcherWorkTracker(
@@ -183,7 +192,8 @@ class PrefetcherWorkTrackerCollective
         PrefetchRequest peekNextPrefetchRequest() const;
         void popPrefetchRequest();
         void processIncomingPrefetch(const Addr pf_vaddr);
-        void populateCurrLevelPrefetches(std::shared_ptr<WorkItem> work);
+        // return true if we have at least 1 prefetch, false otherwise
+        bool populateCurrLevelPrefetches(std::shared_ptr<WorkItem> work);
         void replaceActiveWorkItemsUponCompletion();
         void profilePrefetchCompleteTime(
             const uint64_t job_id, const Addr work_id,

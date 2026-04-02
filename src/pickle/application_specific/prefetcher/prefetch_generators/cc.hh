@@ -50,6 +50,7 @@ class CCPrefetchGenerator: public PrefetchGenerator
         const uint64_t _job_id, const uint64_t _core_id,
         const uint64_t _software_hint_distance,
         const uint64_t _prefetch_distance_offset_from_software_hint,
+        const uint64_t _max_requests_per_level,
         PrefetcherWorkTracker* _work_tracker
     );
 

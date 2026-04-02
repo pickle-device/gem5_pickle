@@ -64,6 +64,11 @@ PicklePrefetcher::PicklePrefetcher(
     ),
     prefetch_dropping_distance(params.prefetch_dropping_distance),
     prefetch_scheduling_policy(params.prefetch_scheduling_policy),
+    max_requests_per_level(
+        params.max_requests_per_level == 0 ? UINT64_MAX
+                                           : params.max_requests_per_level
+    ),
+    drop_inflight_prefetches(params.drop_inflight_prefetches),
     processInQueueEvent(
         [this]{processPrefetcherInQueue();},
         name() + ".operate_prefetcher_in_queue_event"
@@ -130,7 +135,10 @@ PicklePrefetcher::PicklePrefetcher(
             new PrefetcherWorkTrackerCollective(
                 concurrent_work_item_capacity,
                 delegate_last_layer_prefetches_to_llc_agents,
-                prefetch_scheduling_policy
+                prefetch_scheduling_policy,
+                prefetch_dropping_distance,
+                max_requests_per_level,
+                drop_inflight_prefetches
             )
         );
     prefetcher_work_tracker_collective->setOwner(this);
@@ -315,7 +323,8 @@ PicklePrefetcher::configure(std::shared_ptr<PickleJobDescriptor> job)
             std::shared_ptr<PrefetcherWorkTracker>(
                 new PrefetcherWorkTracker(
                     this, prefetcher_work_tracker_collective,
-                    job_id, core_id, job, prefetch_dropping_distance
+                    job_id, core_id, job, prefetch_dropping_distance,
+                    max_requests_per_level
                 )
             )
         );

@@ -47,11 +47,13 @@ BFSPrefetchGenerator::BFSPrefetchGenerator(
     const uint64_t _job_id, const uint64_t _core_id,
     const uint64_t _software_hint_distance,
     const uint64_t _prefetch_distance_offset_from_software_hint,
+    const uint64_t _max_requests_per_level,
     PrefetcherWorkTracker* _work_tracker
 ) : PrefetchGenerator(
     _name,
     _job_id, _core_id,
     _software_hint_distance, _prefetch_distance_offset_from_software_hint,
+    _max_requests_per_level,
     _work_tracker
     )
 {
@@ -241,6 +243,9 @@ BFSPrefetchGenerator::execute_kernel(Addr work_data)
                 "Work Item = 0x%llx, edge_index = %lld\n",
                 work_vaddr, lv3_edge_indices.back()
             );
+            if (lv3_edge_indices.size() >= max_requests_per_level) {
+                break;
+            }
         }
     }
 
