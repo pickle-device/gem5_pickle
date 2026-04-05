@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025-2026 The Regents of the University of California
+ * Copyright (c) 2026 The Regents of the University of California
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,18 +29,34 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __ALL_PREFETCH_GENERATORS_HH__
-#define __ALL_PREFETCH_GENERATORS_HH__
+#ifndef __IS_RANKING_PREFETCH_GENERATOR_HH__
+#define __IS_RANKING_PREFETCH_GENERATOR_HH__
 
-#include "pickle/application_specific/prefetcher/prefetch_generators/bc.hh"
-#include "pickle/application_specific/prefetcher/prefetch_generators/bfs.hh"
-#include "pickle/application_specific/prefetcher/prefetch_generators/cc.hh"
-#include "pickle/application_specific/prefetcher/prefetch_generators/cg.hh"
-#include "pickle/application_specific/prefetcher/prefetch_generators/is.hh"
-#include "pickle/application_specific/prefetcher/prefetch_generators/pr.hh"
+#include <memory>
+#include <string>
+
 #include "pickle/application_specific/prefetcher/prefetch_generators/prefetch_generator.hh"
-#include "pickle/application_specific/prefetcher/prefetch_generators/spmv.hh"
-#include "pickle/application_specific/prefetcher/prefetch_generators/sssp.hh"
-#include "pickle/application_specific/prefetcher/prefetch_generators/tc.hh"
 
-#endif // __ALL_PREFETCH_GENERATORS_HH__
+namespace gem5
+{
+
+class PrefetcherWorkTracker;
+
+class ISRankingPrefetchGenerator: public PrefetchGenerator
+{
+  public:
+    ISRankingPrefetchGenerator(
+        std::string _name,
+        const uint64_t _job_id, const uint64_t _core_id,
+        const uint64_t _software_hint_distance,
+        const uint64_t _prefetch_distance_offset_from_software_hint,
+        PrefetcherWorkTracker* _work_tracker
+    );
+
+    // Function to generate prefetch requests
+    std::shared_ptr<WorkItem> execute_kernel(Addr work_data) override;
+}; // class ISRankingPrefetchGenerator
+
+} // namespace gem5
+
+#endif // __IS_RANKING_PREFETCH_GENERATOR_HH__

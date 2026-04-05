@@ -119,6 +119,27 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             this
         );
+    } else if (
+        job_descriptor->kernel_name == "cg_spmv_kernel_1"
+        || job_descriptor->kernel_name == "cg_spmv_kernel_2"
+    ) {
+        prefetch_generator = std::make_shared<CGSpMVPrefetchGenerator>(
+            "CGSpMVPrefetchGenerator",
+            _job_id, _core_id,
+            owner->getSoftwareHintPrefetchDistance(),
+            owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            this
+        );
+    } else if (
+        job_descriptor->kernel_name == "is_ranking_kernel"
+    ) {
+        prefetch_generator = std::make_shared<ISRankingPrefetchGenerator>(
+            "ISRankingPrefetchGenerator",
+            _job_id, _core_id,
+            owner->getSoftwareHintPrefetchDistance(),
+            owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+            this
+        );
     } else if (job_descriptor->kernel_name == "pr_kernel") {
         prefetch_generator = std::make_shared<PRPrefetchGenerator>(
             "PRPrefetchGenerator",
@@ -388,6 +409,17 @@ PrefetcherWorkTracker::updateWorkItemQueue()
             } else if (job_descriptor->kernel_name == "cc_kernel") {
                 too_close = getCoreLatestWorkId() \
                             + prefetch_dropping_distance > work_id;
+            } else if (
+                job_descriptor->kernel_name == "cg_spmv_kernel_1"
+                || job_descriptor->kernel_name == "cg_spmv_kernel_2"
+            ) {
+                // CG sends index, not addresses
+                too_close = getCoreLatestWorkId() \
+                            + prefetch_dropping_distance > work_id;
+            } else if (job_descriptor->kernel_name == "is_ranking_kernel") {
+                // be careful here, size=4 only applies to class S-C.
+                too_close = getCoreLatestWorkId() \
+                            + prefetch_dropping_distance * 4 > work_id;
             } else if (job_descriptor->kernel_name == "pr_kernel") {
                 too_close = getCoreLatestWorkId() \
                             + prefetch_dropping_distance > work_id;

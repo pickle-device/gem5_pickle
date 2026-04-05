@@ -41,5 +41,9 @@ Source('pr.cc')
 Source('sssp.cc')
 Source('tc.cc')
 
+# npb
+Source('cg.cc')
+Source('is.cc')
+
 # benchmarks
 Source('spmv.cc')
