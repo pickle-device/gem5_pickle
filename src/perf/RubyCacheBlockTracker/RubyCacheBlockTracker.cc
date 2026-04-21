@@ -51,12 +51,26 @@ namespace gem5
 namespace ruby
 {
 
+constexpr uint64_t log2(uint64_t n) {
+    return (n < 2) ? 0 : 1 + log2(n / 2);
+}
+
+constexpr Addr getBlockAlignedAddr(const Addr addr, const Addr offset_bits) {
+    return (addr >> offset_bits) << offset_bits;
+}
+
+constexpr bool isBlockAligned(const Addr addr, const Addr offset_bits) {
+    return getBlockAlignedAddr(addr, offset_bits) == addr;
+}
+
 RubyCacheBlockTracker::RubyCacheBlockTracker(const Params &p)
   : ProbeListenerObject(p),
     system(p.system),
-    usefulnessAttributionStats(this),
+    cache_line_offset(log2(p.system->cacheLineSize())),
+    usefulnessAttributionStats(this, p.system->cacheLineSize()),
     trackerStats(this)
 {
+    inform("Cache line offset %d\n", cache_line_offset);
 }
 
 RubyCacheBlockTracker::~RubyCacheBlockTracker()
@@ -221,14 +235,20 @@ RubyCacheBlockTracker::processCpuRequest(const RequestPtr &req)
         return;
     }
     trackerStats.numTrackedDemandRequests++;
-    usefulnessAttributionStats.onBlockUsedByDemandRequest(
-        req->getPaddr(), req->requestorId()
+    const Addr paddr = req->getPaddr();
+    const Addr block_aligned_paddr = getBlockAlignedAddr(
+        paddr, cache_line_offset
     );
     RUBY_CACHE_BLOCK_TRACKER_OBSERVER_DEBUG(
-        "Processing CPU request: addr=0x%lx, size=%d, requestor_id=%d\n",
+        "Processing CPU request: addr=0x%lx (block=0x%lx), size=%d, "
+        "requestor_id=%d\n",
         req->getPaddr(),
+        block_aligned_paddr,
         req->getSize(),
         req->requestorId()
+    );
+    usefulnessAttributionStats.onBlockUsedByDemandRequest(
+        block_aligned_paddr, req->requestorId()
     );
 }
 
@@ -238,15 +258,19 @@ RubyCacheBlockTracker::processDirEntryAllocation(
 )
 {
     trackerStats.numTrackedDirectoryEntryAllocations++;
-    usefulnessAttributionStats.onBlockBroughtIntoCache(
-        addr, req->requestorId()
+    const Addr block_aligned_addr = getBlockAlignedAddr(
+        addr, cache_line_offset
     );
     RUBY_CACHE_BLOCK_TRACKER_OBSERVER_DEBUG(
-        "Processing directory entry allocation: addr=0x%lx, size=%d, "
-        "requestor_id=%d\n",
+        "Processing directory entry allocation: addr=0x%lx (block=0x%lx), "
+        "size=%d, requestor_id=%d\n",
         addr,
+        block_aligned_addr,
         req->hasSize() ? req->getSize() : 0,
         req->requestorId()
+    );
+    usefulnessAttributionStats.onBlockBroughtIntoCache(
+        block_aligned_addr, req->requestorId()
     );
 }
 
@@ -254,8 +278,13 @@ void
 RubyCacheBlockTracker::processDirEntryDeallocation(const Addr &addr)
 {
     trackerStats.numTrackedDirectoryEntryDeallocations++;
+    const Addr block_aligned_addr = getBlockAlignedAddr(
+        addr, cache_line_offset
+    );
     RUBY_CACHE_BLOCK_TRACKER_OBSERVER_DEBUG(
-        "Processing directory entry deallocation: addr=0x%lx\n", addr
+        "Processing directory entry deallocation: addr=0x%lx (block=0x%lx)\n",
+        addr,
+        block_aligned_addr
     );
 }
 
@@ -263,9 +292,15 @@ void
 RubyCacheBlockTracker::processCacheFill(const SimpleCacheAccessProbeArg &arg)
 {
     trackerStats.numTrackedCacheFills++;
+    const Addr paddr = arg.req->getPaddr();
+    const Addr block_aligned_paddr = getBlockAlignedAddr(
+        paddr, cache_line_offset
+    );
     RUBY_CACHE_BLOCK_TRACKER_OBSERVER_DEBUG(
-        "Processing cache fill: addr=0x%lx, size=%d, requestor_id=%d\n",
-        arg.req->getPaddr(),
+        "Processing cache fill: addr=0x%lx (block=0x%lx), size=%d, "
+        "requestor_id=%d\n",
+        paddr,
+        block_aligned_paddr,
         arg.req->getSize(),
         arg.req->requestorId()
     );
@@ -277,8 +312,14 @@ RubyCacheBlockTracker::processCacheFillFromEviction(
 )
 {
     trackerStats.numTrackedCacheFillFromEviction++;
+    const Addr addr = arg.eviction_addr;
+    const Addr block_aligned_addr = getBlockAlignedAddr(
+        addr, cache_line_offset
+    );
     RUBY_CACHE_BLOCK_TRACKER_OBSERVER_DEBUG(
-        "Processing cache fill from eviction: addr=0x%lx\n", arg.eviction_addr
+        "Processing cache fill from eviction: addr=0x%lx (block=0x%lx)\n",
+        addr,
+        block_aligned_addr
     );
 }
 
@@ -288,10 +329,16 @@ RubyCacheBlockTracker::processCacheEviction(
 )
 {
     trackerStats.numTrackedCacheEvictions++;
-    usefulnessAttributionStats.onBlockEvictedFromCache(arg.eviction_addr);
-    RUBY_CACHE_BLOCK_TRACKER_OBSERVER_DEBUG(
-        "Processing cache eviction: addr=0x%lx\n", arg.eviction_addr
+    const Addr addr = arg.eviction_addr;
+    const Addr block_aligned_addr = getBlockAlignedAddr(
+        addr, cache_line_offset
     );
+    RUBY_CACHE_BLOCK_TRACKER_OBSERVER_DEBUG(
+        "Processing cache eviction: addr=0x%lx (block=0x%lx)\n",
+        addr,
+        block_aligned_addr
+    );
+    usefulnessAttributionStats.onBlockEvictedFromCache(block_aligned_addr);
 }
 
 std::string
@@ -308,7 +355,8 @@ RubyCacheBlockTracker::getAllRequestorIDs() const
 }
 
 RubyCacheBlockTracker::UsefulnessAttributionStats::UsefulnessAttributionStats(
-    statistics::Group *parent
+    statistics::Group *parent,
+    const Addr _cache_line_size
 ) : statistics::Group(parent),
     ADD_STAT(
         numUsefulBlocksBroughtIntoCacheByCpus, statistics::units::Count::get(),
@@ -328,8 +376,15 @@ RubyCacheBlockTracker::UsefulnessAttributionStats::UsefulnessAttributionStats(
         numUselessBlocksBroughtIntoCacheByPrefetchers,
         statistics::units::Count::get(),
         "Number of useless blocks that are brought into cache by prefetchers"
-    )
+    ),
+    ADD_STAT(
+        numUntrackedEvictions,
+        statistics::units::Count::get(),
+        "Number of eviction events that we don't know who brought the block in"
+    ),
+    cache_line_offset(log2(_cache_line_size))
 {
+    inform("Cache line offset %d\n", cache_line_offset);
 }
 
 void
@@ -407,6 +462,7 @@ RubyCacheBlockTracker::UsefulnessAttributionStats::onBlockBroughtIntoCache(
     const Addr block_addr, const RequestorID requestor_id
 )
 {
+    assert(isBlockAligned(block_addr, cache_line_offset));
     // We need to check if the block is already in the cache system.
     auto it = blockToFirstRequestorMap.find(block_addr);
     if (it == blockToFirstRequestorMap.end()) {
@@ -424,6 +480,7 @@ RubyCacheBlockTracker::UsefulnessAttributionStats::onBlockEvictedFromCache(
     const Addr block_addr
 )
 {
+    assert(isBlockAligned(block_addr, cache_line_offset));
     // First, we update the usefulness attribution stats.
     updateUsefulnessStatsForBlock(block_addr);
     // Finally, we remove the block from the tracking maps.
@@ -436,6 +493,7 @@ RubyCacheBlockTracker::UsefulnessAttributionStats::onBlockUsedByDemandRequest(
     const Addr block_addr, const RequestorID requestor_id
 )
 {
+    assert(isBlockAligned(block_addr, cache_line_offset));
     // If the block is already in the cache system, we increment the usage
     // count for the block.
     auto it = blockUsageCountMap.find(block_addr);
@@ -460,6 +518,7 @@ UsefulnessAttributionStats::updateUsefulnessStatsForBlock(
     const Addr block_addr
 )
 {
+    assert(isBlockAligned(block_addr, cache_line_offset));
     auto it = blockToFirstRequestorMap.find(block_addr);
     if (it == blockToFirstRequestorMap.end()) {
         // The block is not in the cache system. This should not happen as we
@@ -469,6 +528,7 @@ UsefulnessAttributionStats::updateUsefulnessStatsForBlock(
             "Received eviction event for block address 0x%lx that is not in "
             "the cache system. This should not happen.\n", block_addr
         );
+        numUntrackedEvictions++;
         assert(
             blockUsageCountMap.find(block_addr) == blockUsageCountMap.end()
         );

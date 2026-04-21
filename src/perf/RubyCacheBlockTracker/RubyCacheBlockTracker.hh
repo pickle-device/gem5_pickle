@@ -93,6 +93,8 @@ class RubyCacheBlockTracker : public ProbeListenerObject
 
   private:
     System* system;
+    /* SYSTEM*/
+    const Addr cache_line_offset;
 
   public:
     // TODO: make sure that we track all blocks on chip. The LLC directory
@@ -112,7 +114,9 @@ class RubyCacheBlockTracker : public ProbeListenerObject
     class UsefulnessAttributionStats : public statistics::Group
     {
       public:
-        UsefulnessAttributionStats(statistics::Group *parent);
+        UsefulnessAttributionStats(
+          statistics::Group *parent, const Addr _cache_line_size
+        );
         void regStats() override;
         void preDumpStats() override;
 
@@ -137,6 +141,7 @@ class RubyCacheBlockTracker : public ProbeListenerObject
         statistics::Scalar numUselessBlocksBroughtIntoCacheByCpus;
         statistics::Scalar numUsefulBlocksBroughtIntoCacheByPrefetchers;
         statistics::Scalar numUselessBlocksBroughtIntoCacheByPrefetchers;
+        statistics::Scalar numUntrackedEvictions;
         /* PER PREFETCHER STATS */
         std::map<RequestorID, statistics::Scalar *>
           numUsefulBlocksBroughtIntoCachePerPrefetcher;
@@ -144,6 +149,8 @@ class RubyCacheBlockTracker : public ProbeListenerObject
           numUselessBlocksBroughtIntoCachePerPrefetcher;
 
       private:
+        /* SYSTEM*/
+        const Addr cache_line_offset;
         /* REQUESTORS */
         std::map<RequestorID, std::string> cpuRequestorIDs;
         std::map<RequestorID, std::string> prefetcherRequestorIDs;
