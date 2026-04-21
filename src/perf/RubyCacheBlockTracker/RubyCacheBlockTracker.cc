@@ -431,8 +431,8 @@ RubyCacheBlockTracker::UsefulnessAttributionStats::preDumpStats()
 {
     statistics::Group::preDumpStats();
     // We can't emulate evicting cache blocks here as we might continue to run
-    // the simulation after dumping stats, so we just print out the stats for
-    // the blocks that are still in the cache system.
+    // the simulation after dumping stats, so we just update the stats
+    // internally for the blocks that are still in the cache system.
     for (auto it = blockToFirstRequestorMap.begin();
          it != blockToFirstRequestorMap.end(); ++it) {
         Addr block_addr = it->first;
