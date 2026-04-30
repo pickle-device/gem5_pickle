@@ -419,7 +419,7 @@ PrefetcherWorkTracker::updateWorkItemQueue()
             } else if (job_descriptor->kernel_name == "is_ranking_kernel") {
                 // be careful here, size=4 only applies to class S-C.
                 too_close = getCoreLatestWorkId() \
-                            + prefetch_dropping_distance * 4 > work_id;
+                            + prefetch_dropping_distance > work_id;
             } else if (job_descriptor->kernel_name == "pr_kernel") {
                 too_close = getCoreLatestWorkId() \
                             + prefetch_dropping_distance > work_id;
