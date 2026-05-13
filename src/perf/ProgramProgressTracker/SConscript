@@ -27,7 +27,8 @@
 Import('*')
 
 SimObject(
-    'ProgramProgressTracker.py', sim_objects=['ProgramProgressTracker']
+    'ProgramProgressTracker.py', enums=['TrackingAction'],
+    sim_objects=['ProgramProgressTracker']
 )
 SimObject(
     'ProgramProgressTrackerAgent.py',

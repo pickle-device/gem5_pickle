@@ -44,12 +44,15 @@ class ProgramProgressTrackerAgent : public ProbeListenerObject
   private:
     ProgramProgressTracker *owner;
     o3::CPU* associated_core;
+    uint64_t agent_id;
+
   public:
     typedef ProgramProgressTrackerAgentParams Params;
     ProgramProgressTrackerAgent(const ProgramProgressTrackerAgentParams &p);
     ~ProgramProgressTrackerAgent() = default;
 
     void setOwner(ProgramProgressTracker *owner);
+    void setID(uint64_t id);
 
     void observeInstructionCommit(const o3::DynInstPtr &dyn_inst);
     void regProbeListeners() override;

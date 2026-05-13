@@ -31,9 +31,13 @@
 #include <chrono>
 #include <cstdio>
 
+#include "base/statistics.hh"
+#include "base/stats/group.hh"
 #include "base/types.hh"
+#include "enums/TrackingAction.hh"
 #include "params/ProgramProgressTracker.hh"
 #include "sim/cur_tick.hh"
+#include "sim/sim_exit.hh"
 #include "sim/sim_object.hh"
 
 namespace gem5
@@ -45,20 +49,43 @@ ProgramProgressTracker::ProgramProgressTracker(
     agents(p.tracker_agents),
     tracking_pc(p.tracking_pc),
     tracking_interval(p.tracking_interval),
-    pc_encounter_count(0)
+    action_when_threshold_reached(
+        p.action_when_threshold_reached),
+    action_threshold(p.action_threshold),
+    pc_encounter_count(0),
+    stats(this, tracking_pc, agents.size())
 {
+    uint64_t i = 0;
     for (auto *agent : agents) {
         agent->setOwner(this);
+        agent->setID(i);
+        i++;
     }
 }
 
 void
-ProgramProgressTracker::recordPC(const Addr pc)
+ProgramProgressTracker::recordPC(const uint64_t agent_id, const Addr pc)
 {
     if (pc == tracking_pc) {
         pc_encounter_count++;
+        stats.total_pc_count++;
+        (*stats.pc_count_per_core[agent_id])++;
         if (pc_encounter_count % tracking_interval == 0) {
             printProgress();
+        }
+        if (action_threshold != 0 &&
+            pc_encounter_count % action_threshold == 0) {
+            if (action_when_threshold_reached == enums::TrackingAction::NONE) {
+                return;
+            } else if (
+                action_when_threshold_reached
+                    == enums::TrackingAction::EXIT_SIM
+            ) {
+                exitSimLoop("ProgramProgressTracker: PC 0x%lx is committed "
+                    "%lu times", tracking_pc, pc_encounter_count);
+            } else {
+                panic("Unknown action");
+            }
         }
     }
 }
@@ -75,6 +102,35 @@ ProgramProgressTracker::printProgress() const
         "times\n",
         time_str, curTick(), tracking_pc, pc_encounter_count
     );
+}
+
+ProgramProgressTracker::
+ProgramProgressTrackerStats::ProgramProgressTrackerStats(
+    statistics::Group *parent, const Addr tracking_pc,
+    const uint64_t num_agents
+) : statistics::Group(parent),
+    ADD_STAT(
+        total_pc_count,
+        statistics::units::Count::get(),
+        csprintf(
+            "Total number of times the tracking PC (0x%llx) is committed",
+            tracking_pc
+        ).c_str()
+    )
+{
+    for (uint64_t i = 0; i < num_agents; i++) {
+        pc_count_per_core.push_back(
+            new statistics::Scalar(
+                this,
+                csprintf("tracker_%llu_pc_count", i).c_str(),
+                statistics::units::Count::get(),
+                csprintf(
+                    "Number of times the tracking PC (0x%llx) is committed "
+                    "by tracker %llu", tracking_pc, i
+                ).c_str()
+            )
+        );
+    }
 }
 
 };  // namespace gem5

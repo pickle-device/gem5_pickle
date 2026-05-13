@@ -30,6 +30,13 @@ from m5.proxy import *
 from m5.SimObject import SimObject
 
 
+class TrackingAction(Enum):
+    vals = [
+        "NONE",
+        "EXIT_SIM",
+    ]
+
+
 class ProgramProgressTracker(SimObject):
     type = "ProgramProgressTracker"
     cxx_class = "gem5::ProgramProgressTracker"
@@ -45,4 +52,14 @@ class ProgramProgressTracker(SimObject):
     )
     tracking_interval = Param.UInt64(
         "The number of instructions between progress updates", default=100000
+    )
+    action_when_threshold_reached = Param.TrackingAction(
+        "The action to take when the tracking pc commit count threshold is "
+        "reached.",
+        default=TrackingAction("NONE"),
+    )
+    action_threshold = Param.UInt64(
+        "The number of times the tracking pc must be committed before the "
+        "action takes place. If this value is 0, the action is never taken.",
+        default=0,
     )

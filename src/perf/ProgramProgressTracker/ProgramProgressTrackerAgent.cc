@@ -52,11 +52,17 @@ ProgramProgressTrackerAgent::setOwner(ProgramProgressTracker *owner)
 }
 
 void
+ProgramProgressTrackerAgent::setID(uint64_t id)
+{
+    this->agent_id = id;
+}
+
+void
 ProgramProgressTrackerAgent::observeInstructionCommit(
   const o3::DynInstPtr &dyn_inst
 )
 {
-    owner->recordPC(dyn_inst->pcState().instAddr());
+    owner->recordPC(agent_id, dyn_inst->pcState().instAddr());
 }
 
 void

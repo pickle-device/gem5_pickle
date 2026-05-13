@@ -31,7 +31,10 @@
 
 #include <vector>
 
+#include "base/statistics.hh"
+#include "base/stats/group.hh"
 #include "base/types.hh"
+#include "enums/TrackingAction.hh"
 #include "params/ProgramProgressTracker.hh"
 #include "perf/ProgramProgressTracker/ProgramProgressTrackerAgent.hh"
 #include "sim/probe/probe.hh"
@@ -45,6 +48,8 @@ class ProgramProgressTracker : public SimObject
     std::vector<ProgramProgressTrackerAgent*> agents;
     Addr tracking_pc;
     uint64_t tracking_interval;
+    enums::TrackingAction action_when_threshold_reached;
+    uint64_t action_threshold;
 
     uint64_t pc_encounter_count;
 
@@ -53,8 +58,18 @@ class ProgramProgressTracker : public SimObject
     ProgramProgressTracker(const ProgramProgressTrackerParams &p);
     ~ProgramProgressTracker() = default;
 
-    void recordPC(const Addr pc);
+    void recordPC(uint64_t agent_id, const Addr pc);
     void printProgress() const;
+
+    struct ProgramProgressTrackerStats : public statistics::Group
+    {
+        ProgramProgressTrackerStats(
+          statistics::Group *parent, const Addr tracking_pc,
+          const uint64_t num_agents
+        );
+        statistics::Scalar total_pc_count;
+        std::vector<statistics::Scalar *> pc_count_per_core;
+    } stats;
 };
 
 }  // namespace gem5
