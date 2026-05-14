@@ -49,6 +49,10 @@ class MemoryMode(Enum):
     vals = ["invalid", "atomic", "timing", "atomic_noncaching"]
 
 
+class CompressionType(Enum):
+    vals = ["RAW", "GZIP", "ZSTD"]
+
+
 class System(SimObject):
     type = "System"
     cxx_header = "sim/system.hh"
@@ -153,4 +157,12 @@ class System(SimObject):
         0,
         "Base of the 64KiB PA range used for "
         "memory-mapped m5ops. Set to 0 to disable.",
+    )
+
+    compression_type = Param.CompressionType(
+        CompressionType("GZIP"), "Compression type for physical memory"
+    )
+    checkpoint_mem_checksum = Param.Bool(
+        False,
+        "Whether to compute checksum of memory when creating checkpoint",
     )

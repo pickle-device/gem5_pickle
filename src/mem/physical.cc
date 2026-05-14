@@ -47,6 +47,7 @@
 #include <cerrno>
 #include <climits>
 #include <cstdio>
+#include <cstring>
 #include <iostream>
 #include <string>
 
@@ -80,10 +81,14 @@ PhysicalMemory::PhysicalMemory(const std::string& _name,
                                const std::vector<AbstractMemory*>& _memories,
                                bool mmap_using_noreserve,
                                const std::string& shared_backstore,
-                               bool auto_unlink_shared_backstore) :
+                               bool auto_unlink_shared_backstore,
+                               enums::CompressionType _compression_type,
+                               bool _checkpoint_mem_checksum) :
     _name(_name), size(0), mmapUsingNoReserve(mmap_using_noreserve),
     sharedBackstore(shared_backstore), sharedBackstoreSize(0),
-    pageSize(sysconf(_SC_PAGE_SIZE))
+    pageSize(sysconf(_SC_PAGE_SIZE)),
+    compressionType(_compression_type),
+    checkpointMemChecksum(_checkpoint_mem_checksum)
 {
     // Register cleanup callback if requested.
     if (auto_unlink_shared_backstore && !sharedBackstore.empty()) {
@@ -350,18 +355,20 @@ PhysicalMemory::serialize(CheckpointOut &cp) const
     // serialize the backing stores
     unsigned int nbr_of_stores = backingStore.size();
     SERIALIZE_SCALAR(nbr_of_stores);
+    SERIALIZE_ENUM(compressionType);
 
     unsigned int store_id = 0;
     // store each backing store memory segment in a file
     for (auto& s : backingStore) {
         ScopedCheckpointSection sec(cp, csprintf("store%d", store_id));
-        serializeStore(cp, store_id++, s.range, s.pmem);
+        serializeStore(cp, store_id++, s.range, s.pmem, compressionType);
     }
 }
 
 void
 PhysicalMemory::serializeStore(CheckpointOut &cp, unsigned int store_id,
-                               AddrRange range, uint8_t* pmem) const
+                               AddrRange range, uint8_t* pmem,
+                               enums::CompressionType compression_type) const
 {
     // we cannot use the address range for the name as the
     // memories that are not part of the address map can overlap
@@ -378,32 +385,61 @@ PhysicalMemory::serializeStore(CheckpointOut &cp, unsigned int store_id,
 
     // write memory file
     std::string filepath = CheckpointIn::dir() + "/" + filename.c_str();
-    gzFile compressed_mem = gzopen(filepath.c_str(), "wb");
-    if (compressed_mem == NULL)
-        fatal("Can't open physical memory checkpoint file '%s'\n",
-              filename);
+    if (compression_type == enums::CompressionType::RAW) {
+        int fd = ::open(filepath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd < 0)
+            fatal("Can't open physical memory checkpoint file '%s': %s\n",
+                filename, std::strerror(errno));
 
-    uint64_t pass_size = 0;
+        posix_fadvise(fd, 0, 0, POSIX_FADV_SEQUENTIAL);
 
-    // gzwrite fails if (int)len < 0 (gzwrite returns int)
-    for (uint64_t written = 0; written < range.size();
-         written += pass_size) {
-        pass_size = (uint64_t)INT_MAX < (range.size() - written) ?
-            (uint64_t)INT_MAX : (range.size() - written);
-
-        if (gzwrite(compressed_mem, pmem + written,
-                    (unsigned int) pass_size) != (int) pass_size) {
-            fatal("Write failed on physical memory checkpoint file '%s'\n",
-                  filename);
+        const size_t chunk_max = 1UL << 30;  // 1 GiB per write()
+        uint64_t written = 0;
+        while (written < range.size()) {
+            size_t to_write = std::min(chunk_max, range.size() - written);
+            ssize_t n = ::write(fd, pmem + written, to_write);
+            if (n < 0)
+                fatal("Write failed on '%s': %s\n",
+                    filename, std::strerror(errno));
+            written += n;
         }
+
+        if (::close(fd))
+            fatal("Close failed on '%s': %s\n",
+                filename, std::strerror(errno));
+    } else {
+        gzFile compressed_mem = gzopen(filepath.c_str(), "wb");
+        if (compressed_mem == NULL)
+            fatal("Can't open physical memory checkpoint file '%s'\n",
+                filename);
+
+        uint64_t pass_size = 0;
+
+        // gzwrite fails if (int)len < 0 (gzwrite returns int)
+        for (uint64_t written = 0; written < range.size();
+            written += pass_size) {
+            pass_size = (uint64_t)INT_MAX < (range.size() - written) ?
+                (uint64_t)INT_MAX : (range.size() - written);
+
+            if (gzwrite(compressed_mem, pmem + written,
+                        (unsigned int) pass_size) != (int) pass_size) {
+                fatal("Write failed on physical memory checkpoint file '%s'\n",
+                    filename);
+            }
+        }
+
+        // close the compressed stream and check that the exit status
+        // is zero
+        if (gzclose(compressed_mem))
+            fatal("Close failed on physical memory checkpoint file '%s'\n",
+                filename);
     }
 
-    // close the compressed stream and check that the exit status
-    // is zero
-    if (gzclose(compressed_mem))
-        fatal("Close failed on physical memory checkpoint file '%s'\n",
-              filename);
-
+    if (checkpointMemChecksum) {
+        inform(
+            "PhysicalMemory::serializeStore: store:%d, size:%llu, crc32: %x\n",
+            store_id, range.size(), pmemCRC32(pmem, range.size()));
+    }
 }
 
 void
@@ -415,6 +451,8 @@ PhysicalMemory::unserialize(CheckpointIn &cp)
     std::vector<ContextID> lal_cid;
     UNSERIALIZE_CONTAINER(lal_addr);
     UNSERIALIZE_CONTAINER(lal_cid);
+    UNSERIALIZE_ENUM(compressionType);
+
     for (size_t i = 0; i < lal_addr.size(); ++i) {
         const auto& m = addrMap.contains(lal_addr[i]);
         m->second->addLockedAddr(LockedAddr(lal_addr[i], lal_cid[i]));
@@ -426,13 +464,15 @@ PhysicalMemory::unserialize(CheckpointIn &cp)
 
     for (unsigned int i = 0; i < nbr_of_stores; ++i) {
         ScopedCheckpointSection sec(cp, csprintf("store%d", i));
-        unserializeStore(cp);
+        unserializeStore(cp, compressionType);
     }
 
 }
 
 void
-PhysicalMemory::unserializeStore(CheckpointIn &cp)
+PhysicalMemory::unserializeStore(
+    CheckpointIn &cp, enums::CompressionType compression_type
+)
 {
     const uint32_t chunk_size = 16384;
 
@@ -442,11 +482,6 @@ PhysicalMemory::unserializeStore(CheckpointIn &cp)
     std::string filename;
     UNSERIALIZE_SCALAR(filename);
     std::string filepath = cp.getCptDir() + "/" + filename;
-
-    // mmap memoryfile
-    gzFile compressed_mem = gzopen(filepath.c_str(), "rb");
-    if (compressed_mem == NULL)
-        fatal("Can't open physical memory checkpoint file '%s'", filename);
 
     // we've already got the actual backing store mapped
     uint8_t* pmem = backingStore[store_id].pmem;
@@ -462,19 +497,64 @@ PhysicalMemory::unserializeStore(CheckpointIn &cp)
         fatal("Memory range size has changed! Saw %lld, expected %lld\n",
               range_size, range.size());
 
-    uint64_t curr_size = 0;
-    uint32_t bytes_read;
-    while (curr_size < range.size()) {
-        bytes_read = gzread(compressed_mem, pmem, chunk_size);
-        if (bytes_read == 0)
-            break;
-        curr_size += bytes_read;
-        pmem += bytes_read;
-    }
+    if (compression_type == enums::CompressionType::RAW) {
+        int fd = ::open(filepath.c_str(), O_RDONLY);
+        if (fd < 0)
+            fatal("Can't open physical memory checkpoint file '%s': %s\n",
+                  filename, std::strerror(errno));
+        const size_t chunk_size = 1UL << 30;  // 1 GiB
+        uint64_t curr = 0;
+        while (curr < range.size()) {
+            size_t to_read = std::min(chunk_size, range.size() - curr);
+            ssize_t n = ::read(fd, pmem, to_read);
+            if (n < 0)
+                fatal("Read failed on '%s': %s\n",
+                    filename, std::strerror(errno));
+            if (n == 0)
+                fatal("Unexpected EOF on '%s' at offset %llu\n",
+                    filename, (unsigned long long)curr);
+            pmem += n;
+            curr += n;
+        }
+        ::close(fd);
+    } else {
+        uint64_t curr_size = 0;
+        uint32_t bytes_read;
+        // mmap memoryfile
+        gzFile compressed_mem = gzopen(filepath.c_str(), "rb");
+        if (compressed_mem == NULL)
+            fatal("Can't open physical memory checkpoint file '%s'", filename);
+        while (curr_size < range.size()) {
+            bytes_read = gzread(compressed_mem, pmem, chunk_size);
+            if (bytes_read == 0)
+                break;
+            curr_size += bytes_read;
+            pmem += bytes_read;
+        }
 
-    if (gzclose(compressed_mem))
-        fatal("Close failed on physical memory checkpoint file '%s'\n",
-              filename);
+        if (gzclose(compressed_mem))
+            fatal("Close failed on physical memory checkpoint file '%s'\n",
+                filename);
+    }
+    if (checkpointMemChecksum) {
+        inform(
+            "PhysicalMemory::serializeStore: store:%d, size:%llu, crc32: %x\n",
+            store_id, range.size(), pmemCRC32(pmem, range.size()));
+    }
+}
+
+uint32_t
+PhysicalMemory::pmemCRC32(const uint8_t* pmem, uint64_t size)
+{
+    inform("calculating crc32 for %llu bytes\n", size);
+    uint32_t crc = crc32(0L, Z_NULL, 0);  // init
+    const uint64_t chunk = 1UL << 28;     // 256 MiB at a time
+    for (uint64_t off = 0; off < size; off += chunk) {
+        uint64_t this_chunk = std::min(chunk, size - off);
+        inform("offset: %llu, size: %llu\n", off, this_chunk);
+        crc = crc32(crc, pmem + off, (uInt)this_chunk);
+    }
+    return crc;
 }
 
 } // namespace memory

@@ -44,6 +44,7 @@
 
 #include "base/addr_range.hh"
 #include "base/addr_range_map.hh"
+#include "enums/CompressionType.hh"
 #include "mem/packet.hh"
 #include "sim/serialize.hh"
 
@@ -158,6 +159,9 @@ class PhysicalMemory : public Serializable
 
     long pageSize;
 
+    enums::CompressionType compressionType;
+    bool checkpointMemChecksum;
+
     // The physical memory used to provide the memory in the simulated
     // system
     std::vector<BackingStoreEntry> backingStore;
@@ -191,7 +195,9 @@ class PhysicalMemory : public Serializable
                    const std::vector<AbstractMemory*>& _memories,
                    bool mmap_using_noreserve,
                    const std::string& shared_backstore,
-                   bool auto_unlink_shared_backstore);
+                   bool auto_unlink_shared_backstore,
+                   enums::CompressionType compression_type,
+                   bool checkpoint_mem_checksum);
 
     /**
      * Unmap all the backing store we have used.
@@ -280,9 +286,11 @@ class PhysicalMemory : public Serializable
      * @param store_id Unique identifier of this backing store
      * @param range The address range of this backing store
      * @param pmem The host pointer to this backing store
+     * @param compression_type Compression type for physical memory
      */
     void serializeStore(CheckpointOut &cp, unsigned int store_id,
-                        AddrRange range, uint8_t* pmem) const;
+                        AddrRange range, uint8_t* pmem,
+                        enums::CompressionType compression_type) const;
 
     /**
      * Unserialize the memories in the system. As with the
@@ -294,7 +302,11 @@ class PhysicalMemory : public Serializable
     /**
      * Unserialize a specific backing store, identified by a section.
      */
-    void unserializeStore(CheckpointIn &cp);
+    void unserializeStore(
+      CheckpointIn &cp, enums::CompressionType compression_type
+    );
+
+    static uint32_t pmemCRC32(const uint8_t* pmem, uint64_t size);
 
 };
 
