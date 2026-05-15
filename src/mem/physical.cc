@@ -43,6 +43,7 @@
 #include <sys/user.h>
 #include <unistd.h>
 #include <zlib.h>
+#include <zstd.h>
 
 #include <cerrno>
 #include <climits>
@@ -407,7 +408,62 @@ PhysicalMemory::serializeStore(CheckpointOut &cp, unsigned int store_id,
         if (::close(fd))
             fatal("Close failed on '%s': %s\n",
                 filename, std::strerror(errno));
-    } else {
+    } else if (compression_type == enums::CompressionType::ZSTD) {
+        // ZSTD compression
+        int fd = ::open(filepath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd < 0)
+            fatal("Can't open '%s': %s\n", filename, std::strerror(errno));
+        posix_fadvise(fd, 0, 0, POSIX_FADV_SEQUENTIAL);
+
+        ZSTD_CCtx* cctx = ZSTD_createCCtx();
+        if (!cctx) fatal("Can't create ZSTD compression context\n");
+
+        // Compression level 1: see docs for details. We want the balance of
+        // good compression ratio and speed.
+        ZSTD_CCtx_setParameter(cctx, ZSTD_c_compressionLevel, 1);
+        // Multi-threaded compression
+        //ZSTD_CCtx_setParameter(cctx, ZSTD_c_nbWorkers,
+        //                    std::thread::hardware_concurrency());
+
+        const size_t out_cap = ZSTD_CStreamOutSize();
+        std::vector<uint8_t> out_buf(out_cap);
+
+        ZSTD_inBuffer input = { pmem, range.size(), 0 };
+        size_t remaining;
+        do {
+            ZSTD_outBuffer output = { out_buf.data(), out_cap, 0 };
+            remaining = ZSTD_compressStream2(
+                cctx, &output, &input, ZSTD_e_end
+            );
+            if (ZSTD_isError(remaining)) {
+                ZSTD_freeCCtx(cctx);
+                ::close(fd);
+                fatal("ZSTD_compressStream2 failed: %s\n",
+                    ZSTD_getErrorName(remaining));
+            }
+
+            size_t written = 0;
+            while (written < output.pos) {
+                ssize_t n = ::write(fd, out_buf.data() + written,
+                                    output.pos - written);
+                if (n < 0) {
+                    ZSTD_freeCCtx(cctx);
+                    ::close(fd);
+                    fatal("Write failed on '%s': %s\n",
+                        filename, std::strerror(errno));
+                }
+                written += n;
+            }
+        } while (remaining != 0);
+
+        ZSTD_freeCCtx(cctx);
+        if (::close(fd)) {
+            fatal(
+                "Close failed on '%s': %s\n",
+                filename, std::strerror(errno)
+            );
+        }
+    } else if (compression_type == enums::CompressionType::GZIP) {
         gzFile compressed_mem = gzopen(filepath.c_str(), "wb");
         if (compressed_mem == NULL)
             fatal("Can't open physical memory checkpoint file '%s'\n",
@@ -433,6 +489,8 @@ PhysicalMemory::serializeStore(CheckpointOut &cp, unsigned int store_id,
         if (gzclose(compressed_mem))
             fatal("Close failed on physical memory checkpoint file '%s'\n",
                 filename);
+    } else {
+        panic("Unsupported compression type");
     }
 
     if (checkpointMemChecksum) {
@@ -517,7 +575,59 @@ PhysicalMemory::unserializeStore(
             curr += n;
         }
         ::close(fd);
-    } else {
+    } else if (compression_type == enums::CompressionType::ZSTD) {
+        // ZSTD decompression
+        int fd = ::open(filepath.c_str(), O_RDONLY);
+        if (fd < 0)
+            fatal("Can't open '%s': %s\n", filename, std::strerror(errno));
+        posix_fadvise(fd, 0, 0, POSIX_FADV_SEQUENTIAL);
+
+        ZSTD_DCtx* dctx = ZSTD_createDCtx();
+        if (!dctx) fatal("Can't create ZSTD decompression context\n");
+
+        const size_t in_cap = ZSTD_DStreamInSize();
+        std::vector<uint8_t> in_buf(in_cap);
+
+        ZSTD_outBuffer output = { pmem, range.size(), 0 };
+        size_t last_ret = 0;
+        bool eof = false;
+
+        while (!eof) {
+            ssize_t n = ::read(fd, in_buf.data(), in_cap);
+            if (n < 0) {
+                ZSTD_freeDCtx(dctx);
+                ::close(fd);
+                fatal("Read failed on '%s': %s\n",
+                    filename, std::strerror(errno));
+            }
+            if (n == 0) { eof = true; break; }
+
+            ZSTD_inBuffer input = { in_buf.data(), (size_t)n, 0 };
+            while (input.pos < input.size) {
+                last_ret = ZSTD_decompressStream(dctx, &output, &input);
+                if (ZSTD_isError(last_ret)) {
+                    ZSTD_freeDCtx(dctx);
+                    ::close(fd);
+                    fatal("ZSTD_decompressStream failed: %s\n",
+                        ZSTD_getErrorName(last_ret));
+                }
+                if (last_ret == 0) break;  // frame complete
+            }
+        }
+
+        ZSTD_freeDCtx(dctx);
+        ::close(fd);
+
+        if (last_ret != 0) {
+            fatal("ZSTD decompression: truncated frame on '%s'\n", filename);
+        }
+        if (output.pos != range.size()) {
+            fatal("ZSTD decompressed size mismatch on '%s': "
+                "got %llu, expected %llu\n",
+                filename, (unsigned long long)output.pos,
+                (unsigned long long)range.size());
+        }
+    } else if (compression_type == enums::CompressionType::GZIP) {
         uint64_t curr_size = 0;
         uint32_t bytes_read;
         // mmap memoryfile
@@ -535,6 +645,8 @@ PhysicalMemory::unserializeStore(
         if (gzclose(compressed_mem))
             fatal("Close failed on physical memory checkpoint file '%s'\n",
                 filename);
+    } else {
+        panic("Unsupported compression type");
     }
     if (checkpointMemChecksum) {
         inform(
