@@ -539,19 +539,18 @@ PhysicalMemory::unserializeStore(
     if (checkpointMemChecksum) {
         inform(
             "PhysicalMemory::serializeStore: store:%d, size:%llu, crc32: %x\n",
-            store_id, range.size(), pmemCRC32(pmem, range.size()));
+            store_id, range.size(),
+            pmemCRC32(backingStore[store_id].pmem, range.size()));
     }
 }
 
 uint32_t
 PhysicalMemory::pmemCRC32(const uint8_t* pmem, uint64_t size)
 {
-    inform("calculating crc32 for %llu bytes\n", size);
     uint32_t crc = crc32(0L, Z_NULL, 0);  // init
     const uint64_t chunk = 1UL << 28;     // 256 MiB at a time
     for (uint64_t off = 0; off < size; off += chunk) {
         uint64_t this_chunk = std::min(chunk, size - off);
-        inform("offset: %llu, size: %llu\n", off, this_chunk);
         crc = crc32(crc, pmem + off, (uInt)this_chunk);
     }
     return crc;
