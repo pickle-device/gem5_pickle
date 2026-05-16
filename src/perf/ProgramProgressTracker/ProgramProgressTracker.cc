@@ -68,7 +68,7 @@ ProgramProgressTracker::recordPC(const uint64_t agent_id, const Addr pc)
 {
     if (pc == tracking_pc) {
         pc_encounter_count++;
-        stats.total_pc_count++;
+        stats.pc_count_total++;
         (*stats.pc_count_per_core[agent_id])++;
         if (pc_encounter_count % tracking_interval == 0) {
             printProgress();
@@ -81,8 +81,10 @@ ProgramProgressTracker::recordPC(const uint64_t agent_id, const Addr pc)
                 action_when_threshold_reached
                     == enums::TrackingAction::EXIT_SIM
             ) {
-                exitSimLoop("ProgramProgressTracker: PC 0x%lx is committed "
-                    "%lu times", tracking_pc, pc_encounter_count);
+                exitSimLoop(
+                    "ProgramProgressTracker: PC 0x%lx is committed "
+                    "%lu times", tracking_pc, pc_encounter_count
+                );
             } else {
                 panic("Unknown action");
             }
@@ -109,8 +111,10 @@ ProgramProgressTrackerStats::ProgramProgressTrackerStats(
     statistics::Group *parent, const Addr tracking_pc,
     const uint64_t num_agents
 ) : statistics::Group(parent),
+    _tracking_pc(tracking_pc),
+    _num_agents(num_agents),
     ADD_STAT(
-        total_pc_count,
+        pc_count_total,
         statistics::units::Count::get(),
         csprintf(
             "Total number of times the tracking PC (0x%llx) is committed",
@@ -118,15 +122,21 @@ ProgramProgressTrackerStats::ProgramProgressTrackerStats(
         ).c_str()
     )
 {
-    for (uint64_t i = 0; i < num_agents; i++) {
+}
+
+void
+ProgramProgressTracker::ProgramProgressTrackerStats::regStats()
+{
+    statistics::Group::regStats();
+    for (uint64_t i = 0; i < _num_agents; i++) {
         pc_count_per_core.push_back(
             new statistics::Scalar(
                 this,
-                csprintf("tracker_%llu_pc_count", i).c_str(),
+                csprintf("pc_count_tracker_%llu", i).c_str(),
                 statistics::units::Count::get(),
                 csprintf(
                     "Number of times the tracking PC (0x%llx) is committed "
-                    "by tracker %llu", tracking_pc, i
+                    "by tracker %llu", _tracking_pc, i
                 ).c_str()
             )
         );

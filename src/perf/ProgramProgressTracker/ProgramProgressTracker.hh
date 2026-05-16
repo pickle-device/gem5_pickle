@@ -63,11 +63,14 @@ class ProgramProgressTracker : public SimObject
 
     struct ProgramProgressTrackerStats : public statistics::Group
     {
+        Addr _tracking_pc;
+        uint64_t _num_agents;
         ProgramProgressTrackerStats(
           statistics::Group *parent, const Addr tracking_pc,
           const uint64_t num_agents
         );
-        statistics::Scalar total_pc_count;
+        void regStats() override;
+        statistics::Scalar pc_count_total;
         std::vector<statistics::Scalar *> pc_count_per_core;
     } stats;
 };
