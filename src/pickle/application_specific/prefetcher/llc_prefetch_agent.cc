@@ -168,13 +168,21 @@ LLCPrefetchAgent::processOutgoingRequestQueue()
         // consulting the LLC directory and its own cache.
         // Note that the LLC directory does not keep track of cache lines only
         // present in LLC.
-        if (llc_controller->getDirEntry(paddr) != nullptr
-            || llc_controller->getCacheEntry(paddr) != nullptr) {
-            //llc_controller->m_cache_ptr->setMRU(
-            //    llc_controller->getCacheEntry(paddr)
-            //);
-            // Cache line is already present, drop the request
+        const bool entry_already_in_cache =
+            llc_controller->getCacheEntry(paddr) != nullptr;
+        const bool entry_already_in_directory =
+            llc_controller->getDirEntry(paddr) != nullptr;
+        if (entry_already_in_cache) {
             agent_stats.prefetch_request_dropped_due_to_cache_line_presence++;
+            llc_controller->m_cache_ptr->setMRU(
+                llc_controller->getCacheEntry(paddr)
+            );
+        }
+        if (entry_already_in_directory) {
+            agent_stats.prefetch_request_dropped_due_to_dir_entry_presence++;
+        }
+        if (entry_already_in_cache || entry_already_in_directory) {
+            // Cache line is already present, drop the request
             prefetch_request_queue.pop();
             agent_stats.prefetch_request_queue_length.sample(
                 prefetch_request_queue.size()
@@ -325,6 +333,10 @@ LLCPrefetchAgent::LLCPrefetchAgentStats::LLCPrefetchAgentStats(
                statistics::units::Count::get(),
                "Number of prefetch requests dropped due to the cache line "
                "already being present in the cache"),
+      ADD_STAT(prefetch_request_dropped_due_to_dir_entry_presence,
+               statistics::units::Count::get(),
+               "Number of prefetch requests dropped due to the entry"
+               "already being present in the directory"),
       ADD_STAT(prefetch_request_dropped_due_to_timedout,
                statistics::units::Count::get(),
                "Number of prefetch requests dropped due to timeout"),

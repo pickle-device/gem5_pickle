@@ -111,6 +111,8 @@ class LLCPrefetchAgent: public ClockedObject
             statistics::Scalar \
                 prefetch_request_dropped_due_to_cache_line_presence;
             statistics::Scalar \
+                prefetch_request_dropped_due_to_dir_entry_presence;
+            statistics::Scalar \
                 prefetch_request_dropped_due_to_timedout;
             statistics::Scalar prefetch_request_sent;
             statistics::Formula prefetch_request_not_sent;
