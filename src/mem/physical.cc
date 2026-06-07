@@ -588,11 +588,13 @@ PhysicalMemory::unserializeStore(
         const size_t in_cap = ZSTD_DStreamInSize();
         std::vector<uint8_t> in_buf(in_cap);
 
-        ZSTD_outBuffer output = { pmem, range.size(), 0 };
-        size_t last_ret = 0;
-        bool eof = false;
+        const size_t page_size = 4096;
+        const size_t stage_cap = 64 * page_size;  // 256 KiB staging buffer
+        std::vector<uint8_t> stage_buf(stage_cap);
 
+        size_t pmem_offset = 0;  // how much we've written into pmem
         while (!eof) {
+            // read the next chunk of compressed data in
             ssize_t n = ::read(fd, in_buf.data(), in_cap);
             if (n < 0) {
                 ZSTD_freeDCtx(dctx);
@@ -604,14 +606,46 @@ PhysicalMemory::unserializeStore(
 
             ZSTD_inBuffer input = { in_buf.data(), (size_t)n, 0 };
             while (input.pos < input.size) {
+                ZSTD_outBuffer output = { stage_buf.data(), stage_cap, 0 };
+                // decompress chunk of data
                 last_ret = ZSTD_decompressStream(dctx, &output, &input);
                 if (ZSTD_isError(last_ret)) {
                     ZSTD_freeDCtx(dctx);
                     ::close(fd);
-                    fatal("ZSTD_decompressStream failed: %s\n",
-                        ZSTD_getErrorName(last_ret));
+                    fatal("ZSTD decompression error on '%s': %s\n",
+                        filename, ZSTD_getErrorName(last_ret));
                 }
-                if (last_ret == 0) break;  // frame complete
+                // Process each decompressed 4096-byte page
+                size_t processed = 0;
+                while (processed + page_size <= output.pos) {
+                    const uint8_t *page = stage_buf.data() + processed;
+                    // Fast all-zero check (compiler will vectorize this)
+                    bool all_zero = true;
+                    const uint64_t *qwords = (const uint64_t *)page;
+                    for (size_t j = 0; j < page_size / sizeof(uint64_t); j++) {
+                        if (qwords[j] != 0) { all_zero = false; break; }
+                    }
+                    if (!all_zero) {
+                        memcpy(pmem + pmem_offset, page, page_size);
+                    }
+                    // else: skip — mmap page stays zero, no host RAM allocated
+                    pmem_offset += page_size;
+                    processed += page_size;
+                }
+                // Handle tail (< 4096 bytes, only at end of stream)
+                if (processed < output.pos) {
+                    size_t tail = output.pos - processed;
+                    const uint8_t *page = stage_buf.data() + processed;
+                    bool all_zero = true;
+                    for (size_t j = 0; j < tail; j++) {
+                        if (page[j] != 0) { all_zero = false; break; }
+                    }
+                    if (!all_zero) {
+                        memcpy(pmem + pmem_offset, page, tail);
+                    }
+                    pmem_offset += tail;
+                }
+                if (last_ret == 0) break;
             }
         }
 
@@ -621,7 +655,7 @@ PhysicalMemory::unserializeStore(
         if (last_ret != 0) {
             fatal("ZSTD decompression: truncated frame on '%s'\n", filename);
         }
-        if (output.pos != range.size()) {
+        if (pmem_offset != range.size()) {
             fatal("ZSTD decompressed size mismatch on '%s': "
                 "got %llu, expected %llu\n",
                 filename, (unsigned long long)output.pos,
