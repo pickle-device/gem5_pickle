@@ -588,6 +588,8 @@ PhysicalMemory::unserializeStore(
         const size_t in_cap = ZSTD_DStreamInSize();
         std::vector<uint8_t> in_buf(in_cap);
 
+        size_t last_ret = 0;
+        bool eof = false;
         const size_t page_size = 4096;
         const size_t stage_cap = 64 * page_size;  // 256 KiB staging buffer
         std::vector<uint8_t> stage_buf(stage_cap);
@@ -658,7 +660,7 @@ PhysicalMemory::unserializeStore(
         if (pmem_offset != range.size()) {
             fatal("ZSTD decompressed size mismatch on '%s': "
                 "got %llu, expected %llu\n",
-                filename, (unsigned long long)output.pos,
+                filename, (unsigned long long) pmem_offset,
                 (unsigned long long)range.size());
         }
     } else if (compression_type == enums::CompressionType::GZIP) {
