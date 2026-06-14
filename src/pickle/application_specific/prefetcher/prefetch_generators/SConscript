@@ -44,6 +44,7 @@ Source('tc.cc')
 # npb
 Source('cg.cc')
 Source('is.cc')
+Source('ua.cc')
 
 # benchmarks
 Source('spmv.cc')

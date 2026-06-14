@@ -189,6 +189,46 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
             owner->getPrefetchDistanceOffsetFromSoftwareHint(),
             this
         );
+    } else if (job_descriptor->kernel_name == "ua_idel_kernel_1") {
+        prefetch_generator =
+            std::make_shared<UATransferDensePrefetchGenerator>(
+                "UATransferDensePrefetchGenerator1",
+                _job_id, _core_id,
+                owner->getSoftwareHintPrefetchDistance(),
+                owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+                this
+            );
+    } else if (job_descriptor->kernel_name == "ua_idmo_kernel_2") {
+        prefetch_generator =
+            std::make_shared<UATransferMortarPrefetchGenerator>(
+                "UATransferMortarPrefetchGenerator2",
+                _job_id, _core_id,
+                owner->getSoftwareHintPrefetchDistance(),
+                owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+                "transf",
+                false,
+                this
+            );
+    } else if (job_descriptor->kernel_name == "ua_idel_kernel_3") {
+        prefetch_generator =
+            std::make_shared<UATransferDensePrefetchGenerator>(
+                "UATransferDensePrefetchGenerator3",
+                _job_id, _core_id,
+                owner->getSoftwareHintPrefetchDistance(),
+                owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+                this
+            );
+    } else if (job_descriptor->kernel_name == "ua_idmo_kernel_4") {
+        prefetch_generator =
+            std::make_shared<UATransferMortarPrefetchGenerator>(
+                "UATransferMortarPrefetchGenerator4",
+                _job_id, _core_id,
+                owner->getSoftwareHintPrefetchDistance(),
+                owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+                "transfb",
+                false,
+                this
+            );
     } else {
         panic(
             "Unknown prefetch generator mode: %s\n",
@@ -433,6 +473,18 @@ PrefetcherWorkTracker::updateWorkItemQueue()
                 too_close = getCoreLatestWorkId() \
                             + prefetch_dropping_distance * 4 > work_id;
             } else if (job_descriptor->kernel_name == "tc_kernel") {
+                too_close = getCoreLatestWorkId() \
+                            + prefetch_dropping_distance > work_id;
+            } else if (job_descriptor->kernel_name == "ua_idel_kernel_1") {
+                too_close = getCoreLatestWorkId() \
+                            + prefetch_dropping_distance > work_id;
+            } else if (job_descriptor->kernel_name == "ua_idmo_kernel_2") {
+                too_close = getCoreLatestWorkId() \
+                            + prefetch_dropping_distance > work_id;
+            } else if (job_descriptor->kernel_name == "ua_idel_kernel_3") {
+                too_close = getCoreLatestWorkId() \
+                            + prefetch_dropping_distance > work_id;
+            } else if (job_descriptor->kernel_name == "ua_idmo_kernel_4") {
                 too_close = getCoreLatestWorkId() \
                             + prefetch_dropping_distance > work_id;
             } else {

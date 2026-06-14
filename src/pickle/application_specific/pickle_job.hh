@@ -151,6 +151,9 @@ class PickleJobDescriptor
             }
             return -1ULL;
         }
+        uint64_t get_num_arrays() const {
+            return arrays.size();
+        };
 }; // class PickleJobDescriptor
 
 }; // namespace gem5

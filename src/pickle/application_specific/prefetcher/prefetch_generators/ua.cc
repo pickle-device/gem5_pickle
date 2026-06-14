@@ -86,15 +86,15 @@ UATransferDensePrefetchGenerator::execute_kernel(Addr work_data)
     std::shared_ptr<WorkItem> workItem(new WorkItem(element_id));
 
     constexpr Addr BLOCK_SHIFT = 6;
-    constexpr Addr BLOCK_SIZE  = 1ULL << BLOCK_SHIFT;
-    constexpr Addr BLOCK_MASK  = ~(BLOCK_SIZE - 1);
+    constexpr Addr BLOCK_SIZE = 1ULL << BLOCK_SHIFT;
+    constexpr Addr BLOCK_MASK = ~(BLOCK_SIZE - 1);
 
     // Level 0: idel(:,:,:,ie)  (10 cache lines of int32)
     {
         const Addr base =
             work_tracker->job_descriptor->get_array(0).vaddr_start;
         const Addr slab_start = base + element_id * IDEL_BYTES_PER_IE;
-        const Addr slab_end   = slab_start + IDEL_BYTES_PER_IE;
+        const Addr slab_end = slab_start + IDEL_BYTES_PER_IE;
 
         for (Addr block = slab_start & BLOCK_MASK;
              block <= ((slab_end - 1) & BLOCK_MASK);
@@ -109,7 +109,7 @@ UATransferDensePrefetchGenerator::execute_kernel(Addr work_data)
         const Addr base =
             work_tracker->job_descriptor->get_array(1).vaddr_start;
         const Addr cube_start = base + element_id * TX_BYTES_PER_IE;
-        const Addr cube_end   = cube_start + TX_BYTES_PER_IE;
+        const Addr cube_end = cube_start + TX_BYTES_PER_IE;
 
         for (Addr block = cube_start & BLOCK_MASK;
              block <= ((cube_end - 1) & BLOCK_MASK);
@@ -146,16 +146,27 @@ UATransferMortarPrefetchGenerator::UATransferMortarPrefetchGenerator(
     const uint64_t _job_id, const uint64_t _core_id,
     const uint64_t _software_hint_distance,
     const uint64_t _prefetch_distance_offset_from_software_hint,
-    const CbcMode  _cbc_mode,
+    const std::string _function,
+    const bool _cbc_optimization_enabled,
     PrefetcherWorkTracker* _work_tracker
 ) : PrefetchGenerator(
         _name,
         _job_id, _core_id,
         _software_hint_distance, _prefetch_distance_offset_from_software_hint,
         _work_tracker
-    ),
-    cbc_mode(_cbc_mode)
+    )
 {
+    if (_cbc_optimization_enabled) {
+        if (_function == "transf" || _function == "transfb") {
+            cbc_mode = CbcMode::Transf;
+        } else if (_function == "transfb_c" || _function == "transfb_c_2") {
+            cbc_mode = CbcMode::TransfbC;
+        } else {
+            panic("Invalid function name %s\n", _function);
+        }
+    } else {
+        cbc_mode = CbcMode::Ignore;
+    }
 }
 
 std::shared_ptr<WorkItem>
@@ -282,15 +293,15 @@ UATransferMortarPrefetchGenerator::readCbcRow(
 {
     using namespace ua_constants;
     constexpr Addr BLOCK_SHIFT = 6;
-    constexpr Addr BLOCK_SIZE  = 1ULL << BLOCK_SHIFT;
-    constexpr Addr BLOCK_MASK  = ~(BLOCK_SIZE - 1);
+    constexpr Addr BLOCK_SIZE = 1ULL << BLOCK_SHIFT;
+    constexpr Addr BLOCK_MASK = ~(BLOCK_SIZE - 1);
 
     const Addr cbc_base =
         work_tracker->job_descriptor->get_array(2).vaddr_start;
-    const Addr row_start  = cbc_base + element_id * CBC_BYTES_PER_IE;
-    const Addr row_end    = row_start + CBC_BYTES_PER_IE;
+    const Addr row_start = cbc_base + element_id * CBC_BYTES_PER_IE;
+    const Addr row_end = row_start + CBC_BYTES_PER_IE;
     const Addr first_line = row_start & BLOCK_MASK;
-    const Addr last_line  = (row_end - 1) & BLOCK_MASK;
+    const Addr last_line = (row_end - 1) & BLOCK_MASK;
 
     for (uint64_t f = 0; f < NSIDES; f++) cbc_row[f] = 0;
 
