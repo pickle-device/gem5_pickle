@@ -364,8 +364,8 @@ UATransferMortarPrefetchGenerator::execute_kernel(Addr work_data)
                 );
                continue;
             }
-            is_conforming = (cbc_val == 3);
-            const uint64_t nnje = (is_conforming) ? 2 : 1;
+            is_conforming = (cbc_val != 3);
+            const uint64_t nnje = (is_conforming) ? 1 : 2;
             DPRINTF(
                 PickleDevicePrefetcherWorkTrackerDebug,
                 "cbc_val = 0x%llx is_conforming = %d nnje = 0x%llx\n",
