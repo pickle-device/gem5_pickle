@@ -387,9 +387,10 @@ UATransferMortarPrefetchGenerator::execute_kernel(Addr work_data)
                     for (uint64_t ije2=1; ije2 <= nnje; ije2++) {
                         for (uint64_t col=1; col <= LX1; col++) {
                             // idmo(i,col,ije1,ije2,iface,ie)
+                            const uint64_t i = (ije2==1) ? 1 : LX1;
                             const Addr col_idx_vaddr =
                                 idmo_base + idmo_flat_index(
-                                    1, 1, ije1, ije2, iface, element_id
+                                    i, col, ije1, ije2, iface, element_id
                                 ) * IDX_ITEM_SIZE;
                             lv1_addresses.push_back(col_idx_vaddr);
                             // ------------------------
@@ -529,10 +530,10 @@ UATransferMortarPrefetchGenerator::execute_kernel(Addr work_data)
                     } // for i
                 } else { // edge 2 is conforming
                     for (uint64_t i = 2; i <= LX1-1; i++) {
-                        // idmo(lx1,i,1,2,iface,ie)
+                        // idmo(lx1,i,1,1,iface,ie)
                         const Addr idx_vaddr =
                             idmo_base + idmo_flat_index(
-                                LX1, i, 1, 2, iface, element_id
+                                LX1, i, 1, 1, iface, element_id
                             ) * IDX_ITEM_SIZE;
                         lv2_addresses.push_back(idx_vaddr);
                         // ------------------------
@@ -588,10 +589,10 @@ UATransferMortarPrefetchGenerator::execute_kernel(Addr work_data)
                     } // for i
                 } else { // edge 3 is conforming
                     for (uint64_t i = 2; i <= LX1-1; i++) {
-                        // idmo(i,lx1,2,1,iface,ie)
+                        // idmo(i,lx1,1,1,iface,ie)
                         const Addr idx_vaddr =
                             idmo_base + idmo_flat_index(
-                                i, LX1, 2, 1, iface, element_id
+                                i, LX1, 1, 1, iface, element_id
                             ) * IDX_ITEM_SIZE;
                         lv2_addresses.push_back(idx_vaddr);
                         // ------------------------
