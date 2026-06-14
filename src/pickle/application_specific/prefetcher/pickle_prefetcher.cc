@@ -290,6 +290,12 @@ PicklePrefetcher::getBCDepthOptimizationEnabled() const
     return bc_depth_optimization_enabled;
 }
 
+bool
+PicklePrefetcher::getUACbcOptimizationEnabled() const
+{
+    return ua_cbc_optimization_enabled;
+}
+
 void
 PicklePrefetcher::switchOn()
 {
