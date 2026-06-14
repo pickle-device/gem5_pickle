@@ -82,4 +82,21 @@ PrefetchContext::setBCCurrentDepth(uint64_t core_id, uint64_t depth)
     bc_current_depth[core_id] = depth;
 }
 
+uint64_t
+PrefetchContext::getUANumElements(uint64_t core_id) const
+{
+    auto it = ua_num_elements.find(core_id);
+    if (it != ua_num_elements.end()) {
+        return it->second;
+    }
+    return 0;
+}
+
+void
+PrefetchContext::setUANumElements(uint64_t core_id, uint64_t num_elements)
+{
+    owner->prefetcherStats.numContextUpdates++;
+    ua_num_elements[core_id] = num_elements;
+}
+
 }; // namespace gem5

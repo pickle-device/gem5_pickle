@@ -60,6 +60,8 @@ class PrefetchContext
     std::unordered_map<uint64_t, uint64_t> sssp_current_distance_threshold;
     // The current depth in BC.
     std::unordered_map<uint64_t, uint64_t> bc_current_depth;
+    // Num elements in UA.
+    std::unordered_map<uint64_t, uint64_t> ua_num_elements;
   public:
     PrefetchContext();
     void setOwner(PicklePrefetcher* _owner);
@@ -67,6 +69,8 @@ class PrefetchContext
     void setSSSPCurrentDistanceThreshold(uint64_t core_id, uint64_t threshold);
     uint64_t getBCCurrentDepth(uint64_t core_id) const;
     void setBCCurrentDepth(uint64_t core_id, uint64_t depth);
+    uint64_t getUANumElements(uint64_t core_id) const;
+    void setUANumElements(uint64_t core_id, uint64_t num_elements);
 };  // class PrefetchContext
 
 }; // namespace gem5

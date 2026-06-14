@@ -229,6 +229,17 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
                 false,
                 this
             );
+    } else if (
+        job_descriptor->kernel_name == "ua_num_elements_update_kernel"
+    ) {
+        prefetch_generator =
+            std::make_shared<UANumElementsUpdateKernel>(
+                "UANumElementsUpdateKernel",
+                _job_id, _core_id,
+                owner->getSoftwareHintPrefetchDistance(),
+                owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+                this
+            );
     } else {
         panic(
             "Unknown prefetch generator mode: %s\n",
