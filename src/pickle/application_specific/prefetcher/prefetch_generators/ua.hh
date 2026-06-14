@@ -149,6 +149,13 @@ class UATransferMortarPrefetchGenerator: public PrefetchGenerator
         PrefetcherWorkTracker* _work_tracker
     );
 
+    void add_prefetch(
+      const Addr vaddr,
+      const uint64_t prefetch_level,
+      const uint64_t element_id,
+      std::shared_ptr<WorkItem> work_item
+    );
+
     std::shared_ptr<WorkItem> execute_kernel(Addr work_data) override;
 }; // class UATransferMortarPrefetchGenerator
 

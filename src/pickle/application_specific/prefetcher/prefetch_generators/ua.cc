@@ -70,6 +70,49 @@ idel_flat_index(uint64_t i, uint64_t j, uint64_t iface, uint64_t ie)
          + LX1 * LX1 * NSIDES * (uint64_t)(ie - 1);
 }
 
+static inline uint64_t
+cbc_flat_index(uint64_t iface, uint64_t ie)
+{
+    using namespace ua_constants;
+    return (uint64_t)(iface - 1) + NSIDES * (uint64_t)(ie - 1);
+}
+
+static inline uint64_t
+get_32bit_data(
+    const Addr vaddr, bool &success, PicklePrefetcher* owner
+) {
+    const Addr BLOCK_SHIFT = 6;
+    const Addr BLOCK_SIZE  = 1ULL << BLOCK_SHIFT;
+    Addr vaddr_block_aligned = (vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+    success = false;
+    PacketPtr pkt = owner->zeroCycleLoadWithVAddr(
+        vaddr_block_aligned, success
+    );
+    if (!success) {
+        return 0;
+    }
+    const Addr index = (vaddr - vaddr_block_aligned) / 4;
+    return pkt->getPtr<uint32_t>()[index];
+}
+
+static inline uint64_t
+get_64bit_data(
+    const Addr vaddr, bool &success, PicklePrefetcher* owner
+) {
+    const Addr BLOCK_SHIFT = 6;
+    const Addr BLOCK_SIZE  = 1ULL << BLOCK_SHIFT;
+    Addr vaddr_block_aligned = (vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+    success = false;
+    PacketPtr pkt = owner->zeroCycleLoadWithVAddr(
+        vaddr_block_aligned, success
+    );
+    if (!success) {
+        return 0;
+    }
+    const Addr index = (vaddr - vaddr_block_aligned) / 8;
+    return pkt->getPtr<uint64_t>()[index];
+}
+
 } // anonymous namespace
 
 // ===========================================================================
@@ -223,6 +266,30 @@ UATransferMortarPrefetchGenerator::UATransferMortarPrefetchGenerator(
 {
 }
 
+void
+UATransferMortarPrefetchGenerator::add_prefetch(
+    const Addr vaddr,
+    const uint64_t prefetch_level,
+    const uint64_t element_id,
+    std::shared_ptr<WorkItem> work_item
+)
+{
+    DPRINTF(
+        PickleDevicePrefetcherWorkTrackerDebug,
+        "Fetching lv%llu vaddr 0x%llx\n",
+        prefetch_level, vaddr
+    );
+    constexpr Addr BLOCK_SHIFT = 6;
+    const Addr vaddr_block_aligned = (vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+    work_item->addExpectedPrefetch(vaddr_block_aligned, prefetch_level);
+    warnIfOutsideRanges(element_id, vaddr_block_aligned);
+    DPRINTF(
+        PickleDevicePrefetcherWorkTrackerDebug,
+        "Fetching lv%llu vaddr 0x%llx\n",
+        prefetch_level, vaddr_block_aligned
+    );
+}
+
 std::shared_ptr<WorkItem>
 UATransferMortarPrefetchGenerator::execute_kernel(Addr work_data)
 {
@@ -250,13 +317,383 @@ UATransferMortarPrefetchGenerator::execute_kernel(Addr work_data)
     constexpr Addr BLOCK_SIZE  = 1ULL << BLOCK_SHIFT;
     constexpr Addr BLOCK_MASK  = ~(BLOCK_SIZE - 1);
 
+    std::vector<Addr> lv1_addresses;
     std::vector<uint64_t> lv1_indices;
+    std::vector<Addr> lv2_addresses;
+    std::vector<uint64_t> lv2_indices;
+    lv1_addresses.reserve(LX1 * LX1 * LNJE * LNJE * NSIDES);
     lv1_indices.reserve(LX1 * LX1 * LNJE * LNJE * NSIDES);
+    lv2_addresses.reserve(LX1 * LX1 * LNJE * LNJE * NSIDES);
+    lv2_indices.reserve(LX1 * LX1 * LNJE * LNJE * NSIDES);
+    bool is_edge_1_conforming = false;
+    bool is_edge_2_conforming = false;
+    bool is_edge_3_conforming = false;
+    bool is_edge_4_conforming = false;
+    bool success = false;
 
     if (cbc_optimization_enabled) {
-        panic("CBC optimization not implemented yet\n");
+        const Addr idmo_base =
+            work_tracker->job_descriptor->get_array(0).vaddr_start;
+        const Addr pmorx_base =
+            work_tracker->job_descriptor->get_array(1).vaddr_start;
+        const Addr cbc_base =
+            work_tracker->job_descriptor->get_array(2).vaddr_start;
+        bool is_conforming = false;
+        // iterate through faces, each can be conforming/non-conforming
+        for (uint64_t iface = 1; iface <= NSIDES; iface++) {
+            // level 1: load the cbc(iface, ie) value
+            const Addr cbc_vaddr =
+                cbc_base + cbc_flat_index(iface, element_id) * CBC_ITEM_SIZE;
+            const Addr cbc_vaddr_block_aligned =
+                (cbc_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+            workItem->addExpectedPrefetch(cbc_vaddr_block_aligned, 0);
+            warnIfOutsideRanges(element_id, cbc_vaddr_block_aligned);
+            DPRINTF(
+                PickleDevicePrefetcherWorkTrackerDebug,
+                "Fetching lv0 vaddr 0x%llx\n",
+                cbc_vaddr_block_aligned
+            );
+            uint64_t cbc_val = get_32bit_data(
+                cbc_vaddr, success, work_tracker->owner
+            );
+            if (!success) {
+                DPRINTF(
+                    PickleDevicePrefetcherTrace,
+                    "Failed to fetch level = 0, vaddr = 0x%llx\n",
+                    cbc_vaddr_block_aligned
+                );
+               continue;
+            }
+            is_conforming = (cbc_val == 3);
+            DPRINTF(
+                PickleDevicePrefetcherWorkTrackerDebug,
+                "cbc_val = 0x%llx is_conforming = %d\n",
+                cbc_val, is_conforming
+            );
+            // level 2: load the indices from idmo
+            if (!is_conforming) {
+                for (uint64_t ije1=1; ije1 <= LNJE; ije1++) {
+                    for (uint64_t ije2=1; ije2 <= LNJE; ije2++) {
+                        for (uint64_t col=1; col <= LX1; col++) {
+                            // idmo(i,col,ije1,ije2,iface,ie)
+                            const Addr col_idx_vaddr =
+                                idmo_base + idmo_flat_index(
+                                    1, 1, ije1, ije2, iface, element_id
+                                ) * IDX_ITEM_SIZE;
+                            lv1_addresses.push_back(col_idx_vaddr);
+                            // ------------------------
+                            for (uint64_t i = 2; i <= LX1-1; i++) {
+                                for (uint64_t j = 1; j <= LX1; j++) {
+                                    // idmo(j,col,ije1,ije2,iface,ie)
+                                    const Addr idx_vaddr =
+                                        idmo_base + idmo_flat_index(
+                                            j, col, ije1, ije2, iface,
+                                            element_id
+                                        ) * IDX_ITEM_SIZE;
+                                    lv1_addresses.push_back(idx_vaddr);
+                                    // ------------------------
+                                } // for j
+                            } // for i
+                        } // for col
+                    } // for ije2
+                } // for ije1
+            } else { // if conforming
+                // face interior
+                for (uint64_t col = 2; col <= LX1-1; col++) {
+                    for (uint64_t i = 2; i <= LX1-1; i++) {
+                        // idmo(i,col,1,1,iface,ie)
+                        const Addr idx_vaddr =
+                            idmo_base + idmo_flat_index(
+                                i, col, 1, 1, iface, element_id
+                            ) * IDX_ITEM_SIZE;
+                        lv1_addresses.push_back(idx_vaddr);
+                        // ------------------------
+                    } // for i
+                } // for col
+
+{
+                // check if edge 1 is conforming
+                // idmo(lx1,1,1,1,iface,ie)
+                const Addr edge_1_vaddr = idmo_base + idmo_flat_index(
+                    LX1, 1, 1, 1, iface, element_id
+                ) * IDX_ITEM_SIZE;
+                const Addr edge_1_vaddr_block_aligned =
+                    (edge_1_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+                workItem->addExpectedPrefetch(edge_1_vaddr_block_aligned, 1);
+                warnIfOutsideRanges(element_id, edge_1_vaddr_block_aligned);
+                DPRINTF(
+                    PickleDevicePrefetcherWorkTrackerDebug,
+                    "Fetching lv1 vaddr 0x%llx\n",
+                    edge_1_vaddr_block_aligned
+                );
+                uint64_t edge_1_val = get_32bit_data(
+                    edge_1_vaddr, success, work_tracker->owner
+                );
+                if (!success) {
+                    DPRINTF(
+                        PickleDevicePrefetcherTrace,
+                        "Failed to fetch level = 1, vaddr = 0x%llx\n",
+                        edge_1_vaddr_block_aligned
+                    );
+                    continue;
+                }
+                is_edge_1_conforming = (edge_1_val == 0);
+                DPRINTF(
+                    PickleDevicePrefetcherWorkTrackerDebug,
+                    "edge_1_val = 0x%llx is_edge_1_conforming = %d\n",
+                    edge_1_val, is_edge_1_conforming
+                );
+                if (!is_edge_1_conforming) {
+                    for (uint64_t i = 2; i <= LX1-1; i++) {
+                        for (uint64_t ije1 = 1; ije1 <= 2; ije1++) {
+                            for (uint64_t j = 1; j <= LX1; j++) {
+                                // idmo(j,1,1,ije1,iface,ie)
+                                const Addr idx_vaddr =
+                                    idmo_base + idmo_flat_index(
+                                        j, 1, 1, ije1, iface, element_id
+                                    ) * IDX_ITEM_SIZE;
+                                lv2_addresses.push_back(idx_vaddr);
+                                // ------------------------
+                            } // for j
+                        } // for ije1
+                    } // for i
+                } else { // edge 1 is conforming
+                    for (uint64_t i = 2; i <= LX1-1; i++) {
+                        // idmo(i,1,1,1,iface,ie)
+                        const Addr idx_vaddr =
+                            idmo_base + idmo_flat_index(
+                                i, 1, 1, 1, iface, element_id
+                            ) * IDX_ITEM_SIZE;
+                        lv2_addresses.push_back(idx_vaddr);
+                        // ------------------------
+                    } // for i
+                }
+}
+
+{
+                // check if edge 2 is conforming
+                // idmo(lx1,2,1,2,iface,ie)
+                const Addr edge_2_vaddr = idmo_base + idmo_flat_index(
+                    LX1, 2, 1, 2, iface, element_id
+                ) * IDX_ITEM_SIZE;
+                const Addr edge_2_vaddr_block_aligned =
+                    (edge_2_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+                workItem->addExpectedPrefetch(edge_2_vaddr_block_aligned, 1);
+                warnIfOutsideRanges(element_id, edge_2_vaddr_block_aligned);
+                DPRINTF(
+                    PickleDevicePrefetcherWorkTrackerDebug,
+                    "Fetching lv1 vaddr 0x%llx\n",
+                    edge_2_vaddr_block_aligned
+                );
+                uint64_t edge_2_val = get_32bit_data(
+                    edge_2_vaddr, success, work_tracker->owner
+                );
+                if (!success) {
+                    DPRINTF(
+                        PickleDevicePrefetcherTrace,
+                        "Failed to fetch level = 1, vaddr = 0x%llx\n",
+                        edge_2_vaddr_block_aligned
+                    );
+                    continue;
+                }
+                is_edge_2_conforming = (edge_2_val == 0);
+                DPRINTF(
+                    PickleDevicePrefetcherWorkTrackerDebug,
+                    "edge_2_val = 0x%llx is_edge_2_conforming = %d\n",
+                    edge_2_val, is_edge_2_conforming
+                );
+                if (!is_edge_2_conforming) {
+                    for (uint64_t i = 2; i <= LX1-1; i++) {
+                        for (uint64_t ije1 = 1; ije1 <= 2; ije1++) {
+                            for (uint64_t j = 1; j <= LX1; j++) {
+                                // idmo(lx1,j,ije1,2,iface,ie)
+                                const Addr idx_vaddr =
+                                    idmo_base + idmo_flat_index(
+                                        LX1, j, ije1, 2, iface, element_id
+                                    ) * IDX_ITEM_SIZE;
+                                lv2_addresses.push_back(idx_vaddr);
+                                // ------------------------
+                            } // for j
+                        } // for ije1
+                    } // for i
+                } else { // edge 2 is conforming
+                    for (uint64_t i = 2; i <= LX1-1; i++) {
+                        // idmo(lx1,i,1,2,iface,ie)
+                        const Addr idx_vaddr =
+                            idmo_base + idmo_flat_index(
+                                LX1, i, 1, 2, iface, element_id
+                            ) * IDX_ITEM_SIZE;
+                        lv2_addresses.push_back(idx_vaddr);
+                        // ------------------------
+                    } // for i
+                }
+}
+
+{
+                // check if edge 3 is conforming
+                // idmo(2,lx1,2,1,iface,ie)
+                const Addr edge_3_vaddr = idmo_base + idmo_flat_index(
+                    2, LX1, 2, 1, iface, element_id
+                ) * IDX_ITEM_SIZE;
+                const Addr edge_3_vaddr_block_aligned =
+                    (edge_3_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+                workItem->addExpectedPrefetch(edge_3_vaddr_block_aligned, 1);
+                warnIfOutsideRanges(element_id, edge_3_vaddr_block_aligned);
+                DPRINTF(
+                    PickleDevicePrefetcherWorkTrackerDebug,
+                    "Fetching lv1 vaddr 0x%llx\n",
+                    edge_3_vaddr_block_aligned
+                );
+                uint64_t edge_3_val = get_32bit_data(
+                    edge_3_vaddr, success, work_tracker->owner
+                );
+                if (!success) {
+                    DPRINTF(
+                        PickleDevicePrefetcherTrace,
+                        "Failed to fetch level = 1, vaddr = 0x%llx\n",
+                        edge_3_vaddr_block_aligned
+                    );
+                    continue;
+                }
+                is_edge_3_conforming = (edge_3_val == 0);
+                DPRINTF(
+                    PickleDevicePrefetcherWorkTrackerDebug,
+                    "edge_3_val = 0x%llx is_edge_3_conforming = %d\n",
+                    edge_3_val, is_edge_3_conforming
+                );
+                if (!is_edge_3_conforming) {
+                    for (uint64_t i = 2; i <= LX1-1; i++) {
+                        for (uint64_t ije1 = 1; ije1 <= 2; ije1++) {
+                            for (uint64_t j = 1; j <= LX1; j++) {
+                                // idmo(j,lx1,2,ije1,iface,ie)
+                                const Addr idx_vaddr =
+                                    idmo_base + idmo_flat_index(
+                                        j, LX1, 2, ije1, iface, element_id
+                                    ) * IDX_ITEM_SIZE;
+                                lv2_addresses.push_back(idx_vaddr);
+                                // ------------------------
+                            } // for j
+                        } // for ije1
+                    } // for i
+                } else { // edge 3 is conforming
+                    for (uint64_t i = 2; i <= LX1-1; i++) {
+                        // idmo(i,lx1,2,1,iface,ie)
+                        const Addr idx_vaddr =
+                            idmo_base + idmo_flat_index(
+                                i, LX1, 2, 1, iface, element_id
+                            ) * IDX_ITEM_SIZE;
+                        lv2_addresses.push_back(idx_vaddr);
+                        // ------------------------
+                    } // for i
+                }
+}
+
+{
+                // check if edge 4 is conforming
+                // idmo(1,lx1,1,1,iface,ie)
+                const Addr edge_4_vaddr = idmo_base + idmo_flat_index(
+                    1, LX1, 1, 1, iface, element_id
+                ) * IDX_ITEM_SIZE;
+                const Addr edge_4_vaddr_block_aligned =
+                    (edge_4_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+                workItem->addExpectedPrefetch(edge_4_vaddr_block_aligned, 1);
+                warnIfOutsideRanges(element_id, edge_4_vaddr_block_aligned);
+                DPRINTF(
+                    PickleDevicePrefetcherWorkTrackerDebug,
+                    "Fetching lv1 vaddr 0x%llx\n",
+                    edge_4_vaddr_block_aligned
+                );
+                uint64_t edge_4_val = get_32bit_data(
+                    edge_4_vaddr, success, work_tracker->owner
+                );
+                if (!success) {
+                    DPRINTF(
+                        PickleDevicePrefetcherTrace,
+                        "Failed to fetch level = 1, vaddr = 0x%llx\n",
+                        edge_4_vaddr_block_aligned
+                    );
+                    continue;
+                }
+                is_edge_4_conforming = (edge_4_val == 0);
+                DPRINTF(
+                    PickleDevicePrefetcherWorkTrackerDebug,
+                    "edge_4_val = 0x%llx is_edge_4_conforming = %d\n",
+                    edge_4_val, is_edge_4_conforming
+                );
+                if (!is_edge_4_conforming) {
+                    for (uint64_t i = 2; i <= LX1-1; i++) {
+                        for (uint64_t ije1 = 1; ije1 <= 2; ije1++) {
+                            for (uint64_t j = 1; j <= LX1; j++) {
+                                // idmo(1,j,ije1,1,iface,ie)
+                                const Addr idx_vaddr =
+                                    idmo_base + idmo_flat_index(
+                                        1, j, ije1, 1, iface, element_id
+                                    ) * IDX_ITEM_SIZE;
+                                lv2_addresses.push_back(idx_vaddr);
+                                // ------------------------
+                            } // for j
+                        } // for ije1
+                    } // for i
+                } else { // edge 4 is conforming
+                    for (uint64_t i = 2; i <= LX1-1; i++) {
+                        // idmo(1,i,1,1,iface,ie)
+                        const Addr idx_vaddr =
+                            idmo_base + idmo_flat_index(
+                                1, i, 1, 1, iface, element_id
+                            ) * IDX_ITEM_SIZE;
+                        lv2_addresses.push_back(idx_vaddr);
+                        // ------------------------
+                    } // for i
+                }
+}
+            }
+            // now we populate lv1 addresses to lv1_indices
+            for (const auto& lv1_address: lv1_addresses) {
+                add_prefetch(lv1_address, 1, element_id, workItem);
+                uint64_t lv1_val = get_32bit_data(
+                    lv1_address, success, work_tracker->owner
+                );
+                if (!success) {
+                    DPRINTF(
+                        PickleDevicePrefetcherTrace,
+                        "Failed to fetch level = 1, vaddr = 0x%llx\n",
+                        lv1_address
+                    );
+                    continue;
+                }
+                lv1_indices.push_back(lv1_val);
+            }
+            // now we populate lv2 addresses to lv2_indices
+            for (const auto& lv2_address: lv2_addresses) {
+                add_prefetch(lv2_address, 2, element_id, workItem);
+                uint64_t lv2_val = get_32bit_data(
+                    lv2_address, success, work_tracker->owner
+                );
+                if (!success) {
+                    DPRINTF(
+                        PickleDevicePrefetcherTrace,
+                        "Failed to fetch level = 2, vaddr = 0x%llx\n",
+                        lv2_address
+                    );
+                    continue;
+                }
+                lv2_indices.push_back(lv2_val);
+            }
+            // now we populate lv3 via pmorx(idmo(a,b,c,d,iface,ie))
+            const Addr next_level = lv2_indices.empty() ? 2 : 3;
+            for (const auto& lv1_idx_val : lv1_indices) {
+                Addr vaddr =
+                    pmorx_base + ((lv1_idx_val - 1) * LEAF_ITEM_SIZE);
+                add_prefetch(vaddr, next_level, element_id, workItem);
+            }
+            for (const auto& lv2_idx_val : lv2_indices) {
+                Addr vaddr =
+                    pmorx_base + ((lv2_idx_val - 1) * LEAF_ITEM_SIZE);
+                add_prefetch(vaddr, next_level, element_id, workItem);
+            }
+        }
     } else { // prefetch everything
-        // Level 0: idmo(:,:,:,ie)
+        // Level 0: idmo(:,:,:,:,:,ie)
         {
             const Addr idmo_base =
                 work_tracker->job_descriptor->get_array(0).vaddr_start;

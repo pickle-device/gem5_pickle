@@ -84,6 +84,7 @@ PicklePrefetcher::PicklePrefetcher(
     bc_depth_optimization_enabled(
         params.bc_depth_optimization_enabled
     ),
+    ua_cbc_optimization_enabled(params.ua_cbc_optimization_enabled),
     core_id_to_context_id(num_cores, InvalidContextID),
     prefetcher_initialized(false),
     num_received_jobs(0),

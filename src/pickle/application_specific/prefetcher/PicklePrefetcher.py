@@ -129,3 +129,9 @@ class PicklePrefetcher(ClockedObject):
         "prefetcher will track the current depth of the BFS traversal in BC "
         "to make prefetch decisions.",
     )
+
+    ua_cbc_optimization_enabled = Param.Bool(
+        True,
+        "Whether the prefetcher is aware of conforming/non-conforming faces "
+        "when prefetching.",
+    )

@@ -205,7 +205,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
                 _job_id, _core_id,
                 owner->getSoftwareHintPrefetchDistance(),
                 owner->getPrefetchDistanceOffsetFromSoftwareHint(),
-                false,
+                owner->getUACbcOptimizationEnabled(),
                 this
             );
     } else if (job_descriptor->kernel_name == "ua_idel_kernel_3") {
@@ -224,7 +224,7 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
                 _job_id, _core_id,
                 owner->getSoftwareHintPrefetchDistance(),
                 owner->getPrefetchDistanceOffsetFromSoftwareHint(),
-                false,
+                owner->getUACbcOptimizationEnabled(),
                 this
             );
     } else if (
