@@ -205,7 +205,6 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
                 _job_id, _core_id,
                 owner->getSoftwareHintPrefetchDistance(),
                 owner->getPrefetchDistanceOffsetFromSoftwareHint(),
-                "transf",
                 false,
                 this
             );
@@ -225,7 +224,6 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
                 _job_id, _core_id,
                 owner->getSoftwareHintPrefetchDistance(),
                 owner->getPrefetchDistanceOffsetFromSoftwareHint(),
-                "transfb",
                 false,
                 this
             );

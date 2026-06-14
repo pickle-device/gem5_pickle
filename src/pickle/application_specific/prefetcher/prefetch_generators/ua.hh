@@ -136,56 +136,20 @@ class UATransferDensePrefetchGenerator: public PrefetchGenerator
 // header comment for the three-mode dispatch).
 class UATransferMortarPrefetchGenerator: public PrefetchGenerator
 {
+  private:
+    bool cbc_optimization_enabled;
+
   public:
     UATransferMortarPrefetchGenerator(
         std::string _name,
         const uint64_t _job_id, const uint64_t _core_id,
         const uint64_t _software_hint_distance,
         const uint64_t _prefetch_distance_offset_from_software_hint,
-        // transf or transfb or transfb_c or transfb_c_2
-        const std::string _function,
         const bool _cbc_optimization_enabled,
         PrefetcherWorkTracker* _work_tracker
     );
 
     std::shared_ptr<WorkItem> execute_kernel(Addr work_data) override;
-
-  private:
-    CbcMode cbc_mode;
-
-    // Emit prefetches for every nonzero ig in [face_block_base,
-    // face_block_base + IDMO_BYTES_PER_FACE).
-    bool emitFaceFull(
-        uint64_t                   element_id,
-        uint64_t                   face_idx,
-        Addr                       face_block_base,
-        Addr                       leaf_base,
-        std::shared_ptr<WorkItem>& workItem,
-        uint64_t                   idmo_level,
-        uint64_t                   leaf_level
-    );
-
-    // Emit prefetches for a conforming face. `nc_edge_emits_work` selects
-    // between Transf semantics (nc edge -> 10 prefetches) and TransfbC
-    // semantics (nc edge -> 0 prefetches).
-    bool emitFaceConforming(
-        uint64_t                   element_id,
-        uint64_t                   face_idx,
-        Addr                       face_block_base,
-        Addr                       leaf_base,
-        bool                       nc_edge_emits_work,
-        std::shared_ptr<WorkItem>& workItem,
-        uint64_t                   idmo_level,
-        uint64_t                   leaf_level
-    );
-
-    // Read cbc(:, ie) into cbc_row. Returns false on load failure.
-    bool readCbcRow(
-        uint64_t                   element_id,
-        int32_t                    cbc_row[ua_constants::NSIDES],
-        std::shared_ptr<WorkItem>& workItem,
-        uint64_t                   cbc_level
-    );
 }; // class UATransferMortarPrefetchGenerator
 
 class UANumElementsUpdateKernel: public PrefetchGenerator
