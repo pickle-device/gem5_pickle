@@ -144,7 +144,7 @@ UATransferDensePrefetchGenerator::execute_kernel(Addr work_data)
         - prefetch_distance_offset_from_software_hint;
     const Addr work_item = element_id;
 
-    const uint64_t num_elements = prefetch_context->getUANumElements(core_id);
+    const uint64_t num_elements = prefetch_context->getUANumElements();
 
     PREFETCHER_TRACE_DEBUG(
         "Dense: work_data=0x%llx element_id=0x%llx num_elements=0x%llx\n",
@@ -300,7 +300,7 @@ UATransferMortarPrefetchGenerator::execute_kernel(Addr work_data)
         - prefetch_distance_offset_from_software_hint;
     const Addr work_item = element_id;
 
-    const uint64_t num_elements = prefetch_context->getUANumElements(core_id);
+    const uint64_t num_elements = prefetch_context->getUANumElements();
 
     PREFETCHER_TRACE_DEBUG(
         "Dense: work_data=0x%llx element_id=0x%llx num_elements=0x%llx\n",
@@ -796,11 +796,11 @@ UANumElementsUpdateKernel::UANumElementsUpdateKernel(
 std::shared_ptr<WorkItem>
 UANumElementsUpdateKernel::execute_kernel(Addr work_data)
 {
-    prefetch_context->setUANumElements(core_id, work_data);
+    prefetch_context->setUANumElements(work_data);
     PREFETCHER_TRACE_DEBUG(
         "UANumElementsUpdateKernel::execute_kernel "
-        "core_id=0x%llx work_data=0x%llx\n",
-        core_id, work_data
+        "work_data=0x%llx\n",
+        work_data
     );
     return nullptr;
 }

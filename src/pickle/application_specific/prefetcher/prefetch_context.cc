@@ -37,7 +37,7 @@ namespace gem5
 {
 
 PrefetchContext::PrefetchContext()
-  : owner(nullptr) {
+  : owner(nullptr), ua_num_elements(0) {
 }
 
 void
@@ -83,20 +83,16 @@ PrefetchContext::setBCCurrentDepth(uint64_t core_id, uint64_t depth)
 }
 
 uint64_t
-PrefetchContext::getUANumElements(uint64_t core_id) const
+PrefetchContext::getUANumElements() const
 {
-    auto it = ua_num_elements.find(core_id);
-    if (it != ua_num_elements.end()) {
-        return it->second;
-    }
-    return 0;
+    return ua_num_elements;
 }
 
 void
-PrefetchContext::setUANumElements(uint64_t core_id, uint64_t num_elements)
+PrefetchContext::setUANumElements(uint64_t num_elements)
 {
     owner->prefetcherStats.numContextUpdates++;
-    ua_num_elements[core_id] = num_elements;
+    ua_num_elements = num_elements;
 }
 
 }; // namespace gem5
