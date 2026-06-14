@@ -365,15 +365,16 @@ UATransferMortarPrefetchGenerator::execute_kernel(Addr work_data)
                continue;
             }
             is_conforming = (cbc_val == 3);
+            const uint64_t nnje = (is_conforming) ? 2 : 1;
             DPRINTF(
                 PickleDevicePrefetcherWorkTrackerDebug,
-                "cbc_val = 0x%llx is_conforming = %d\n",
-                cbc_val, is_conforming
+                "cbc_val = 0x%llx is_conforming = %d nnje = 0x%llx\n",
+                cbc_val, is_conforming, nnje
             );
             // level 2: load the indices from idmo
             if (!is_conforming) {
-                for (uint64_t ije1=1; ije1 <= LNJE; ije1++) {
-                    for (uint64_t ije2=1; ije2 <= LNJE; ije2++) {
+                for (uint64_t ije1=1; ije1 <= nnje; ije1++) {
+                    for (uint64_t ije2=1; ije2 <= nnje; ije2++) {
                         for (uint64_t col=1; col <= LX1; col++) {
                             // idmo(i,col,ije1,ije2,iface,ie)
                             const Addr col_idx_vaddr =
