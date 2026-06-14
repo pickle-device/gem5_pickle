@@ -167,7 +167,9 @@ UATransferDensePrefetchGenerator::execute_kernel(Addr work_data)
             }
             const Addr tx_index =
                 (index_addr - curr_block_vaddr) / IDX_ITEM_SIZE;
-            lv1_tx_indices.push_back(data_ptr[tx_index]);
+            // Fortran indices are 1-based indexed, but for addresses, we need
+            // 0-based indices. So, subtract 1 to get the 0-based index
+            lv1_tx_indices.push_back(data_ptr[tx_index] - 1);
             DPRINTF(
                 PickleDevicePrefetcherTrace,
                 "Work Item = 0x%llx, lv1_tx_index = %lld\n",

@@ -45,23 +45,20 @@
 // NAS UA Pickle prefetch generators
 // ---------------------------------------------------------------------------
 //
-// Two classes, mapped to six kernel slots emitted by pickle_ua_glue.cc:
+// Two classes, mapped to four kernel slots emitted by pickle_ua_glue.cc:
 //
 //   "ua_transf_tx"    -> UATransferDensePrefetchGenerator  (slot 0)
-//   "ua_transf_tmor"  -> UATransferMortarPrefetchGenerator (slot 1, Transf)
+//   "ua_transf_tmor"  -> UATransferMortarPrefetchGenerator (slot 1, transf)
 //   "ua_transfb_tx"   -> UATransferDensePrefetchGenerator  (slot 2)
-//   "ua_transfb_tmor" -> UATransferMortarPrefetchGenerator (slot 3, Transf)
-//   "ua_transfb_c"    -> UATransferMortarPrefetchGenerator (slot 4, TransfbC)
-//   "ua_transfb_c2"   -> UATransferMortarPrefetchGenerator (slot 5, TransfbC)
+//   "ua_transfb_tmor" -> UATransferMortarPrefetchGenerator (slot 3, transfb)
 //
-// The mortar generator has three dispatch modes selected at construction:
-//
-//   * Ignore   — no cbc reads, no per-face specialization. Emit prefetches
+// conforming face branch optimization:
+//   * False   — no cbc reads, no per-face specialization. Emit prefetches
 //                for every nonzero ig in the entire idmo slab. Use when the
 //                glue did not push the cbc array, or when measuring the
 //                "uninformed" baseline.
 //
-//   * Transf   — for transf / transfb (slots 1, 3). Read cbc(:, ie).
+//   * True    — for transf / transfb (slots 1, 3). Read cbc(:, ie).
 //                For each face f:
 //                   cbc(f, ie) == 3 (nonconforming face):
 //                     emit prefetches for the whole face block
@@ -69,29 +66,7 @@
 //                   cbc(f, ie) != 3 (conforming face):
 //                     emit 4 corners + 9 face-interior tmor prefetches;
 //                     probe the 4 edge-test positions; per edge emit either
-//                     10 prefetches (NC edge) or 3 prefetches (conf edge).
-//
-//   * TransfbC — for transfb_c / transfb_c_2 (slots 4, 5). Read cbc(:, ie).
-//                For each face f:
-//                   cbc(f, ie) == 3:  skip the face entirely (matches the
-//                                      application's outer guard).
-//                   cbc(f, ie) != 3:  same as Transf's conforming case, but
-//                                      NC edges contribute 0 prefetches
-//                                      (the application's edge guards use
-//                                      `.eq.0`, i.e., only conforming edges
-//                                      do work).
-//
-// Compared with the all-faces-full-slab fallback (Ignore mode):
-//
-//                                     Ignore      Transf     TransfbC
-//   tmor prefetches per face (conf,   ~100        ~25        ~25
-//     all edges conforming)
-//   tmor prefetches per face (conf,   ~100        ~53        ~13
-//     all edges NC)
-//   tmor prefetches per face (NC)     ~100        ~100       0
-//
-//   idmo lines read per face (conf)   7           4-7        4-7
-//   idmo lines read per face (NC)     7           7          0
+//                     10 prefetches (NC edge) or 3 prefetches (conf edge)
 //
 // (See README for arithmetic; LX1=5, LNJE=2, NSIDES=6.)
 // ---------------------------------------------------------------------------
@@ -162,13 +137,6 @@ class UATransferDensePrefetchGenerator: public PrefetchGenerator
 class UATransferMortarPrefetchGenerator: public PrefetchGenerator
 {
   public:
-    enum class CbcMode : uint8_t
-    {
-        Ignore   = 0,  // no cbc, no specialization
-        Transf   = 1,  // transf / transfb
-        TransfbC = 2,  // transfb_c / transfb_c_2
-    };
-
     UATransferMortarPrefetchGenerator(
         std::string _name,
         const uint64_t _job_id, const uint64_t _core_id,
