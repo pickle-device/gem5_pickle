@@ -47,9 +47,9 @@
 //
 // Two classes, mapped to six kernel slots emitted by pickle_ua_glue.cc:
 //
-//   "ua_transf_tx"    -> UATransferDensePrefetchGenerator (slot 0)
+//   "ua_transf_tx"    -> UATransferDensePrefetchGenerator  (slot 0)
 //   "ua_transf_tmor"  -> UATransferMortarPrefetchGenerator (slot 1, Transf)
-//   "ua_transfb_tx"   -> UATransferDensePrefetchGenerator (slot 2)
+//   "ua_transfb_tx"   -> UATransferDensePrefetchGenerator  (slot 2)
 //   "ua_transfb_tmor" -> UATransferMortarPrefetchGenerator (slot 3, Transf)
 //   "ua_transfb_c"    -> UATransferMortarPrefetchGenerator (slot 4, TransfbC)
 //   "ua_transfb_c2"   -> UATransferMortarPrefetchGenerator (slot 5, TransfbC)
@@ -112,25 +112,25 @@ class WorkItem;
 // NPB UA compile-time constants (from NPB3.4-OMP/UA/ua_data.f90).
 namespace ua_constants
 {
-    constexpr uint64_t LX1 = 5;
-    constexpr uint64_t LNJE = 2;
-    constexpr uint64_t NSIDES = 6;
-    constexpr uint64_t NXYZ = LX1 * LX1 * LX1;                  // 125
+    constexpr uint64_t LX1     = 5;
+    constexpr uint64_t LNJE    = 2;
+    constexpr uint64_t NSIDES  = 6;
+    constexpr uint64_t NXYZ    = LX1 * LX1 * LX1;                  // 125
 
-    constexpr uint64_t IDEL_ELEMS_PER_IE = LX1 * LX1 * NSIDES;   // 150
-    constexpr uint64_t IDMO_ELEMS_PER_IE = LX1 * LX1 * LNJE
-                                           * LNJE * NSIDES;     // 600
+    constexpr uint64_t IDEL_ELEMS_PER_IE   = LX1 * LX1 * NSIDES;   // 150
+    constexpr uint64_t IDMO_ELEMS_PER_IE   = LX1 * LX1 * LNJE
+                                              * LNJE * NSIDES;     // 600
     constexpr uint64_t IDMO_ELEMS_PER_FACE = LX1 * LX1 * LNJE
-                                           * LNJE;              // 100
+                                              * LNJE;              // 100
 
-    constexpr uint64_t IDX_ITEM_SIZE = 4;     // int32  (Fortran default int)
-    constexpr uint64_t LEAF_ITEM_SIZE = 8;     // double precision
-    constexpr uint64_t CBC_ITEM_SIZE = 4;     // int32  (cbc is integer)
+    constexpr uint64_t IDX_ITEM_SIZE   = 4;     // int32  (Fortran default int)
+    constexpr uint64_t LEAF_ITEM_SIZE  = 8;     // double precision
+    constexpr uint64_t CBC_ITEM_SIZE   = 4;     // int32  (cbc is integer)
 
     constexpr uint64_t IDEL_BYTES_PER_IE = IDEL_ELEMS_PER_IE * IDX_ITEM_SIZE;
     constexpr uint64_t IDMO_BYTES_PER_IE = IDMO_ELEMS_PER_IE * IDX_ITEM_SIZE;
     constexpr uint64_t IDMO_BYTES_PER_FACE =
-                IDMO_ELEMS_PER_FACE * IDX_ITEM_SIZE;
+      IDMO_ELEMS_PER_FACE * IDX_ITEM_SIZE;
     constexpr uint64_t TX_BYTES_PER_IE = NXYZ * LEAF_ITEM_SIZE;
     constexpr uint64_t CBC_BYTES_PER_IE = NSIDES * CBC_ITEM_SIZE;
 } // namespace ua_constants
@@ -219,6 +219,21 @@ class UATransferMortarPrefetchGenerator: public PrefetchGenerator
         uint64_t                   cbc_level
     );
 }; // class UATransferMortarPrefetchGenerator
+
+class UANumElementsUpdateKernel: public PrefetchGenerator
+{
+  public:
+    UANumElementsUpdateKernel(
+        std::string _name,
+        const uint64_t _job_id, const uint64_t _core_id,
+        const uint64_t _software_hint_distance,
+        const uint64_t _prefetch_distance_offset_from_software_hint,
+        PrefetcherWorkTracker* _work_tracker
+    );
+
+    // Function to update the prefetch context
+    std::shared_ptr<WorkItem> execute_kernel(Addr work_data) override;
+}; // class UANumElementsUpdateKernel
 
 } // namespace gem5
 

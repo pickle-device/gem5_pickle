@@ -42,6 +42,34 @@
 namespace gem5
 {
 
+
+namespace {
+
+// Fortran column-major flat offset within a single (iface, ie) block:
+//   idmo(i, j, ije1, ije2)  with 1-based indices in [1..LX1] x [1..LX1]
+//                                                 x [1..LNJE] x [1..LNJE]
+static inline uint64_t
+idmo_flat_offset(int i, int j, int ije1, int ije2)
+{
+    using namespace ua_constants;
+    return (uint64_t)(i - 1)
+         + LX1 * (uint64_t)(j - 1)
+         + LX1 * LX1 * (uint64_t)(ije1 - 1)
+         + LX1 * LX1 * LNJE * (uint64_t)(ije2 - 1);
+}
+
+static inline uint64_t
+idel_flat_index(uint64_t i, uint64_t j, uint64_t iface, uint64_t ie)
+{
+    using namespace ua_constants;
+    return (uint64_t)(i - 1)
+         + LX1 * (uint64_t)(j - 1)
+         + LX1 * LX1 * (uint64_t)(iface - 1)
+         + LX1 * LX1 * NSIDES * (uint64_t)(ie - 1);
+}
+
+} // anonymous namespace
+
 // ===========================================================================
 // UATransferDensePrefetchGenerator
 // ===========================================================================
@@ -69,10 +97,9 @@ UATransferDensePrefetchGenerator::execute_kernel(Addr work_data)
     const uint64_t element_id = work_data
         + software_hint_distance
         - prefetch_distance_offset_from_software_hint;
+    const Addr work_item = element_id;
 
-    const uint64_t idel_total_elems =
-        work_tracker->job_descriptor->get_array(0).num_elements();
-    const uint64_t num_elements = idel_total_elems / IDEL_ELEMS_PER_IE;
+    const uint64_t num_elements = prefetch_context->getUANumElements(core_id);
 
     PREFETCHER_TRACE_DEBUG(
         "Dense: work_data=0x%llx element_id=0x%llx num_elements=0x%llx\n",
@@ -86,36 +113,85 @@ UATransferDensePrefetchGenerator::execute_kernel(Addr work_data)
     std::shared_ptr<WorkItem> workItem(new WorkItem(element_id));
 
     constexpr Addr BLOCK_SHIFT = 6;
-    constexpr Addr BLOCK_SIZE = 1ULL << BLOCK_SHIFT;
-    constexpr Addr BLOCK_MASK = ~(BLOCK_SIZE - 1);
+    constexpr Addr BLOCK_SIZE  = 1ULL << BLOCK_SHIFT;
+    constexpr Addr BLOCK_MASK  = ~(BLOCK_SIZE - 1);
 
-    // Level 0: idel(:,:,:,ie)  (10 cache lines of int32)
+    std::vector<uint64_t> lv1_tx_indices;
+
+    // Level 0: idel(:,:,:,ie)
     {
-        const Addr base =
+        const Addr idel_base =
             work_tracker->job_descriptor->get_array(0).vaddr_start;
-        const Addr slab_start = base + element_id * IDEL_BYTES_PER_IE;
-        const Addr slab_end = slab_start + IDEL_BYTES_PER_IE;
+        const Addr idel_start =
+            idel_base + idel_flat_index(1, 1, 1, element_id) * IDX_ITEM_SIZE;
+        const Addr idel_end =
+            idel_base + idel_flat_index(LX1, LX1, NSIDES, element_id)
+                * IDX_ITEM_SIZE;
+        for (
+            Addr index_addr = idel_start;
+            index_addr < idel_end;
+            index_addr += IDX_ITEM_SIZE
+        )
+        {
+            Addr curr_block_vaddr = 1;
+            PacketPtr pkt = nullptr;
+            uint32_t* data_ptr = nullptr;
+            lv1_tx_indices.reserve(LX1 * LX1 * NSIDES);
 
-        for (Addr block = slab_start & BLOCK_MASK;
-             block <= ((slab_end - 1) & BLOCK_MASK);
-             block += BLOCK_SIZE) {
-            workItem->addExpectedPrefetch(block, 0);
-            warnIfOutsideRanges(element_id, block);
+            Addr index_vaddr_block_aligned = \
+                (index_addr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+            if (index_vaddr_block_aligned != curr_block_vaddr) {
+                bool success = false;
+                DPRINTF(
+                    PickleDevicePrefetcherWorkTrackerDebug,
+                    "Fetching lv0 vaddr 0x%llx\n",
+                    index_vaddr_block_aligned
+                );
+                pkt = work_tracker->owner->zeroCycleLoadWithVAddr(
+                    index_vaddr_block_aligned, success
+                );
+                if (!success) {
+                    DPRINTF(
+                        PickleDevicePrefetcherTrace,
+                        "Failed to fetch level = 0, Work Item = 0x%llx, "
+                        "vaddr = 0x%llx\n",
+                        work_item, index_vaddr_block_aligned
+                    );
+                    return nullptr;
+                }
+                curr_block_vaddr = index_vaddr_block_aligned;
+                data_ptr = pkt->getPtr<uint32_t>();
+                // We add expected prefetches
+                workItem->addExpectedPrefetch(curr_block_vaddr, 0);
+                warnIfOutsideRanges(element_id, curr_block_vaddr);
+            }
+            const Addr tx_index =
+                (index_addr - curr_block_vaddr) / IDX_ITEM_SIZE;
+            lv1_tx_indices.push_back(data_ptr[tx_index]);
+            DPRINTF(
+                PickleDevicePrefetcherTrace,
+                "Work Item = 0x%llx, lv1_tx_index = %lld\n",
+                work_item, lv1_tx_indices.back()
+            );
         }
     }
 
-    // Level 1: tx(:,:,:,ie)   (16 cache lines of double)
+    // Level 1: tx(idel(:,:,:,ie))
     {
-        const Addr base =
+        const Addr tx_base =
             work_tracker->job_descriptor->get_array(1).vaddr_start;
-        const Addr cube_start = base + element_id * TX_BYTES_PER_IE;
-        const Addr cube_end = cube_start + TX_BYTES_PER_IE;
-
-        for (Addr block = cube_start & BLOCK_MASK;
-             block <= ((cube_end - 1) & BLOCK_MASK);
-             block += BLOCK_SIZE) {
-            workItem->addExpectedPrefetch(block, 1);
-            warnIfOutsideRanges(element_id, block);
+        for (auto const& tx_index : lv1_tx_indices) {
+            const Addr tx_vaddr =
+                tx_base + tx_index * LEAF_ITEM_SIZE;
+            const Addr tx_vaddr_block_aligned =
+                (tx_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+            workItem->addExpectedPrefetch(tx_vaddr_block_aligned, 1);
+            warnIfOutsideRanges(element_id, tx_vaddr_block_aligned);
+            DPRINTF(
+                PickleDevicePrefetcherTrace,
+                "Work Item = 0x%llx, tx_addr = 0x%llx\n",
+                work_item, tx_vaddr_block_aligned
+            );
         }
     }
 
@@ -146,6 +222,7 @@ UATransferMortarPrefetchGenerator::UATransferMortarPrefetchGenerator(
     const uint64_t _job_id, const uint64_t _core_id,
     const uint64_t _software_hint_distance,
     const uint64_t _prefetch_distance_offset_from_software_hint,
+    // transf or transfb or transfb_c or transfb_c_2
     const std::string _function,
     const bool _cbc_optimization_enabled,
     PrefetcherWorkTracker* _work_tracker
@@ -157,12 +234,12 @@ UATransferMortarPrefetchGenerator::UATransferMortarPrefetchGenerator(
     )
 {
     if (_cbc_optimization_enabled) {
-        if (_function == "transf" || _function == "transfb") {
-            cbc_mode = CbcMode::Transf;
-        } else if (_function == "transfb_c" || _function == "transfb_c_2") {
+        if (_function == "transfb_c" || _function == "transfb_c_2") {
             cbc_mode = CbcMode::TransfbC;
+        } else if (_function == "transf" || _function == "transfb") {
+            cbc_mode = CbcMode::Transf;
         } else {
-            panic("Invalid function name %s\n", _function);
+            panic("Invalid function name: %s\n", _function.c_str());
         }
     } else {
         cbc_mode = CbcMode::Ignore;
@@ -178,9 +255,7 @@ UATransferMortarPrefetchGenerator::execute_kernel(Addr work_data)
         + software_hint_distance
         - prefetch_distance_offset_from_software_hint;
 
-    const uint64_t idmo_total_elems =
-        work_tracker->job_descriptor->get_array(0).num_elements();
-    const uint64_t num_elements = idmo_total_elems / IDMO_ELEMS_PER_IE;
+    const uint64_t num_elements = prefetch_context->getUANumElements(core_id);
 
     PREFETCHER_TRACE_DEBUG(
         "Mortar(mode=%d): work_data=0x%llx element_id=0x%llx "
@@ -293,15 +368,15 @@ UATransferMortarPrefetchGenerator::readCbcRow(
 {
     using namespace ua_constants;
     constexpr Addr BLOCK_SHIFT = 6;
-    constexpr Addr BLOCK_SIZE = 1ULL << BLOCK_SHIFT;
-    constexpr Addr BLOCK_MASK = ~(BLOCK_SIZE - 1);
+    constexpr Addr BLOCK_SIZE  = 1ULL << BLOCK_SHIFT;
+    constexpr Addr BLOCK_MASK  = ~(BLOCK_SIZE - 1);
 
-    const Addr cbc_base =
+    const Addr cbc_base   =
         work_tracker->job_descriptor->get_array(2).vaddr_start;
-    const Addr row_start = cbc_base + element_id * CBC_BYTES_PER_IE;
-    const Addr row_end = row_start + CBC_BYTES_PER_IE;
+    const Addr row_start  = cbc_base + element_id * CBC_BYTES_PER_IE;
+    const Addr row_end    = row_start + CBC_BYTES_PER_IE;
     const Addr first_line = row_start & BLOCK_MASK;
-    const Addr last_line = (row_end - 1) & BLOCK_MASK;
+    const Addr last_line  = (row_end - 1) & BLOCK_MASK;
 
     for (uint64_t f = 0; f < NSIDES; f++) cbc_row[f] = 0;
 
@@ -408,9 +483,8 @@ UATransferMortarPrefetchGenerator::emitFaceFull(
 // ---------------------------------------------------------------------------
 // Conforming-face emission with per-edge dispatch. Strategy:
 //
-//   1. Lazily load idmo cache lines only as values are needed.
-//   2. Always emit: 4 corner igs, 9 face-interior igs (in (1,1) plane).
-//   3. For each of the 4 edges:
+//   1. Always emit: 4 corner igs, 9 face-interior igs (in (1,1) plane).
+//   2. For each of the 4 edges:
 //        probe = idmo(corner-test position)
 //        if probe != 0 (edge is nonconforming):
 //          if nc_edge_emits_work:   emit 10 igs (idmo(j, *, ije1, ije2))
@@ -418,55 +492,11 @@ UATransferMortarPrefetchGenerator::emitFaceFull(
 //        else (edge is conforming):
 //          emit 3 igs from the (1,1) plane along that edge
 //
-// Line caching: at most 8 distinct idmo cache lines could be touched per
-// face block (worst-case alignment). We keep a small array-based cache.
-
-namespace {
-
-constexpr int kMaxFaceBlockLines = 8;
-
-struct IdmoLineCache
-{
-    Addr            vaddrs[kMaxFaceBlockLines];
-    const int32_t*  datas [kMaxFaceBlockLines];
-    int             size;
-
-    IdmoLineCache() : size(0) {
-        for (int i = 0; i < kMaxFaceBlockLines; i++) {
-            vaddrs[i] = (Addr)-1;
-            datas [i] = nullptr;
-        }
-    }
-
-    const int32_t* lookup(Addr line_vaddr) const {
-        for (int i = 0; i < size; i++) {
-            if (vaddrs[i] == line_vaddr) return datas[i];
-        }
-        return nullptr;
-    }
-
-    void insert(Addr line_vaddr, const int32_t* data) {
-        if (size >= kMaxFaceBlockLines) return; // shouldn't happen
-        vaddrs[size] = line_vaddr;
-        datas [size] = data;
-        size++;
-    }
-};
-
-// Fortran column-major flat offset within a single (iface, ie) block:
-//   idmo(i, j, ije1, ije2)  with 1-based indices in [1..LX1] x [1..LX1]
-//                                                 x [1..LNJE] x [1..LNJE]
-static inline uint64_t
-idmo_flat_offset(int i, int j, int ije1, int ije2)
-{
-    using namespace ua_constants;
-    return (uint64_t)(i - 1)
-         + LX1 * (uint64_t)(j - 1)
-         + LX1 * LX1 * (uint64_t)(ije1 - 1)
-         + LX1 * LX1 * LNJE * (uint64_t)(ije2 - 1);
-}
-
-} // anonymous namespace
+// Every idmo entry read goes through a fresh zeroCycleLoadWithVAddr call
+// on its enclosing cache line. Duplicate reads (multiple entries in the
+// same line, repeated lookups of the probe vs the surrounding entries)
+// just produce duplicate addExpectedPrefetch records — the downstream
+// prefetcher dedups, so we don't bother with a local cache.
 
 bool
 UATransferMortarPrefetchGenerator::emitFaceConforming(
@@ -484,13 +514,17 @@ UATransferMortarPrefetchGenerator::emitFaceConforming(
     constexpr Addr BLOCK_SIZE  = 1ULL << BLOCK_SHIFT;
     constexpr Addr BLOCK_MASK  = ~(BLOCK_SIZE - 1);
 
-    IdmoLineCache cache;
     bool any_failure = false;
 
-    // Load a line once, mark it as an expected prefetch, return data ptr.
-    auto load_line = [&](Addr line_vaddr) -> const int32_t* {
-        const int32_t* hit = cache.lookup(line_vaddr);
-        if (hit != nullptr) return hit;
+    // Fetch a single idmo entry (1-based Fortran indices). Each call issues
+    // its own zero-cycle load on the enclosing cache line and records its
+    // own expected prefetch. Repeated calls landing on the same line are
+    // fine; the downstream prefetcher dedups.
+    auto get_idmo = [&](int i, int j, int ije1, int ije2) -> int32_t {
+        const Addr vaddr      = face_block_base
+                              + idmo_flat_offset(i, j, ije1, ije2)
+                                * IDX_ITEM_SIZE;
+        const Addr line_vaddr = vaddr & BLOCK_MASK;
 
         bool success = false;
         PREFETCHER_WORK_TRACKER_DEBUG(
@@ -505,23 +539,11 @@ UATransferMortarPrefetchGenerator::emitFaceConforming(
                 element_id, line_vaddr
             );
             any_failure = true;
-            return nullptr;
+            return 0;
         }
         workItem->addExpectedPrefetch(line_vaddr, idmo_level);
         warnIfOutsideRanges(element_id, line_vaddr);
         const int32_t* data = pkt->getConstPtr<int32_t>();
-        cache.insert(line_vaddr, data);
-        return data;
-    };
-
-    // Fetch a single idmo entry (1-based Fortran indices).
-    auto get_idmo = [&](int i, int j, int ije1, int ije2) -> int32_t {
-        const Addr vaddr      = face_block_base
-                              + idmo_flat_offset(i, j, ije1, ije2)
-                                * IDX_ITEM_SIZE;
-        const Addr line_vaddr = vaddr & BLOCK_MASK;
-        const int32_t* data   = load_line(line_vaddr);
-        if (data == nullptr) return 0;
         return data[(vaddr - line_vaddr) / IDX_ITEM_SIZE];
     };
 
@@ -642,6 +664,33 @@ UATransferMortarPrefetchGenerator::emitFaceConforming(
     }
 
     return !any_failure;
+}
+
+UANumElementsUpdateKernel::UANumElementsUpdateKernel(
+    std::string _name,
+    const uint64_t _job_id, const uint64_t _core_id,
+    const uint64_t _software_hint_distance,
+    const uint64_t _prefetch_distance_offset_from_software_hint,
+    PrefetcherWorkTracker* _work_tracker
+) :
+    PrefetchGenerator(
+        _name, _job_id, _core_id,
+        _software_hint_distance, _prefetch_distance_offset_from_software_hint,
+        _work_tracker
+    )
+{
+}
+
+std::shared_ptr<WorkItem>
+UANumElementsUpdateKernel::execute_kernel(Addr work_data)
+{
+    prefetch_context->setUANumElements(core_id, work_data);
+    PREFETCHER_TRACE_DEBUG(
+        "UANumElementsUpdateKernel::execute_kernel "
+        "core_id=0x%llx work_data=0x%llx\n",
+        core_id, work_data
+    );
+    return nullptr;
 }
 
 } // namespace gem5
