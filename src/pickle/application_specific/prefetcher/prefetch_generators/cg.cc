@@ -198,6 +198,7 @@ CGSpMVPrefetchGenerator::execute_kernel(Addr work_data)
             "Row = %lld, rowstr_start_pos = %lld (1-based)\n",
             row_0based, rowstr_start_pos
         );
+        delete pkt;
     }
     // Read rowstr[future_row + 1] (end position, exclusive)
     {
@@ -241,6 +242,7 @@ CGSpMVPrefetchGenerator::execute_kernel(Addr work_data)
             "Row = %lld, rowstr_end_pos = %lld (1-based, exclusive)\n",
             row_0based, rowstr_end_pos
         );
+        delete pkt;
     }
 
     // ================================================================
@@ -277,6 +279,9 @@ CGSpMVPrefetchGenerator::execute_kernel(Addr work_data)
                     "Fetching lv2 colidx vaddr 0x%llx\n",
                     colidx_vaddr_aligned
                 );
+                if (pkt != nullptr) {
+                    delete pkt;
+                }
                 pkt = work_tracker->owner->zeroCycleLoadWithVAddr(
                     colidx_vaddr_aligned, success
                 );
@@ -303,6 +308,9 @@ CGSpMVPrefetchGenerator::execute_kernel(Addr work_data)
                 "Row = %lld, colidx[%lld] = %lld (1-based col)\n",
                 row_0based, pos, lv2_col_indices.back()
             );
+        }
+        if (pkt != nullptr) {
+            delete pkt;
         }
     }
 
