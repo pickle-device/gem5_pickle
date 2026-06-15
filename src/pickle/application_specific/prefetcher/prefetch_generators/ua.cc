@@ -92,7 +92,9 @@ get_32bit_data(
         return 0;
     }
     const Addr index = (vaddr - vaddr_block_aligned) / 4;
-    return pkt->getPtr<uint32_t>()[index];
+    uint64_t data = (uint64_t)(pkt->getPtr<uint32_t>()[index]);
+    delete pkt;
+    return data;
 }
 
 static inline uint64_t
@@ -110,7 +112,9 @@ get_64bit_data(
         return 0;
     }
     const Addr index = (vaddr - vaddr_block_aligned) / 8;
-    return pkt->getPtr<uint64_t>()[index];
+    uint64_t data = pkt->getPtr<uint64_t>()[index];
+    delete pkt;
+    return data;
 }
 
 } // anonymous namespace
@@ -173,16 +177,16 @@ UATransferDensePrefetchGenerator::execute_kernel(Addr work_data)
         const Addr idel_end =
             idel_base + idel_flat_index(LX1, LX1, NSIDES, element_id)
                 * IDX_ITEM_SIZE;
+
+        Addr curr_block_vaddr = 1;
+        PacketPtr pkt = nullptr;
+        uint32_t* data_ptr = nullptr;
         for (
             Addr index_addr = idel_start;
             index_addr < idel_end;
             index_addr += IDX_ITEM_SIZE
         )
         {
-            Addr curr_block_vaddr = 1;
-            PacketPtr pkt = nullptr;
-            uint32_t* data_ptr = nullptr;
-
             Addr index_vaddr_block_aligned = \
                 (index_addr >> BLOCK_SHIFT) << BLOCK_SHIFT;
             if (index_vaddr_block_aligned != curr_block_vaddr) {
@@ -192,6 +196,9 @@ UATransferDensePrefetchGenerator::execute_kernel(Addr work_data)
                     "Fetching lv0 vaddr 0x%llx\n",
                     index_vaddr_block_aligned
                 );
+                if (pkt != nullptr) {
+                    delete pkt;
+                }
                 pkt = work_tracker->owner->zeroCycleLoadWithVAddr(
                     index_vaddr_block_aligned, success
                 );
@@ -220,6 +227,9 @@ UATransferDensePrefetchGenerator::execute_kernel(Addr work_data)
                 "Work Item = 0x%llx, lv1_tx_index = %lld\n",
                 work_item, lv1_tx_indices.back()
             );
+        }
+        if (pkt != nullptr) {
+            delete pkt;
         }
     }
 
@@ -706,16 +716,15 @@ UATransferMortarPrefetchGenerator::execute_kernel(Addr work_data)
                 idmo_base + idmo_flat_index(
                     LX1, LX1, LNJE, LNJE, NSIDES, element_id
                 ) * IDX_ITEM_SIZE;
+            Addr curr_block_vaddr = 1;
+            PacketPtr pkt = nullptr;
+            uint32_t* data_ptr = nullptr;
             for (
                 Addr index_addr = idmo_start;
                 index_addr < idmo_end;
                 index_addr += IDX_ITEM_SIZE
             )
             {
-                Addr curr_block_vaddr = 1;
-                PacketPtr pkt = nullptr;
-                uint32_t* data_ptr = nullptr;
-
                 Addr index_vaddr_block_aligned = \
                     (index_addr >> BLOCK_SHIFT) << BLOCK_SHIFT;
                 if (index_vaddr_block_aligned != curr_block_vaddr) {
@@ -725,6 +734,9 @@ UATransferMortarPrefetchGenerator::execute_kernel(Addr work_data)
                         "Fetching lv0 vaddr 0x%llx\n",
                         index_vaddr_block_aligned
                     );
+                    if (pkt != nullptr) {
+                        delete pkt;
+                    }
                     pkt = work_tracker->owner->zeroCycleLoadWithVAddr(
                         index_vaddr_block_aligned, success
                     );
@@ -754,6 +766,9 @@ UATransferMortarPrefetchGenerator::execute_kernel(Addr work_data)
                     "Work Item = 0x%llx, lv1_pmorx_index = %lld\n",
                     work_item, lv1_indices.back()
                 );
+            }
+            if (pkt != nullptr) {
+                delete pkt;
             }
         }
 
