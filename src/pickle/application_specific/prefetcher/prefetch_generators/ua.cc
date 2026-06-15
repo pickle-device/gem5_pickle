@@ -757,10 +757,7 @@ UATransferMortarPrefetchGenerator::execute_kernel(Addr work_data)
                 }
                 const Addr pmorx_index =
                     (index_addr - curr_block_vaddr) / IDX_ITEM_SIZE;
-                // Fortran indices are 1-based indexed, but for addresses,
-                // we need 0-based indices. So, subtract 1 to get the
-                // 0-based index
-                lv1_indices.push_back(data_ptr[pmorx_index] - 1);
+                lv1_indices.push_back(data_ptr[pmorx_index]);
                 DPRINTF(
                     PickleDevicePrefetcherTrace,
                     "Work Item = 0x%llx, lv1_pmorx_index = %lld\n",
@@ -776,11 +773,19 @@ UATransferMortarPrefetchGenerator::execute_kernel(Addr work_data)
         {
             const Addr pmorx_base =
                 work_tracker->job_descriptor->get_array(1).vaddr_start;
+            const Addr pmorx_end =
+                work_tracker->job_descriptor->get_array(1).vaddr_end;
             for (auto const& pmorx_index : lv1_indices) {
+                // Fortran indices are 1-based indexed, but for addresses,
+                // we need 0-based indices. So, subtract 1 to get the
+                // 0-based index
                 const Addr pmorx_vaddr =
-                    pmorx_base + pmorx_index * LEAF_ITEM_SIZE;
+                    pmorx_base + (pmorx_index - 1) * LEAF_ITEM_SIZE;
                 const Addr pmorx_vaddr_block_aligned =
                     (pmorx_vaddr >> BLOCK_SHIFT) << BLOCK_SHIFT;
+                if (pmorx_vaddr_block_aligned > pmorx_end) {
+                    continue;
+                }
                 workItem->addExpectedPrefetch(pmorx_vaddr_block_aligned, 1);
                 warnIfOutsideRanges(element_id, pmorx_vaddr_block_aligned);
                 DPRINTF(
