@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from abc import ABCMeta
+from typing import Optional
 
 from m5.objects import (
     SimObject,
@@ -48,6 +49,7 @@ class AbstractSystemBoard(System, AbstractBoard):
         processor: "AbstractProcessor",
         memory: "AbstractMemorySystem",
         cache_hierarchy: "AbstractCacheHierarchy",
+        memory_over_cxl: Optional["AbstractMemorySystem"] = None,
     ):
         System.__init__(self)
         AbstractBoard.__init__(
@@ -56,6 +58,7 @@ class AbstractSystemBoard(System, AbstractBoard):
             processor=processor,
             memory=memory,
             cache_hierarchy=cache_hierarchy,
+            memory_over_cxl=memory_over_cxl,
         )
 
     @overrides(SimObject)

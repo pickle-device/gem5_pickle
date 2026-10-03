@@ -96,6 +96,7 @@ class ArmBoard(ArmSystem, AbstractBoard, KernelDiskWorkload):
         cache_hierarchy: AbstractCacheHierarchy,
         platform: VExpress_GEM5_Base = VExpress_GEM5_Foundation(),
         release: ArmRelease = ArmDefaultRelease(),
+        memory_over_cxl: Optional["AbstractMemorySystem"] = None,
     ) -> None:
         # The platform and the clk has to be set before calling the super class
         self._platform = platform
@@ -108,6 +109,7 @@ class ArmBoard(ArmSystem, AbstractBoard, KernelDiskWorkload):
             processor=processor,
             memory=memory,
             cache_hierarchy=cache_hierarchy,
+            memory_over_cxl=memory_over_cxl,
         )
 
         # This board requires ARM ISA to work.
@@ -169,26 +171,69 @@ class ArmBoard(ArmSystem, AbstractBoard, KernelDiskWorkload):
         # Once the realview is setup, we can continue setting up the memory
         # ranges. ArmBoard's memory can only be setup once realview is
         # initialized.
-        memory = self.get_memory()
-        mem_size = memory.get_size()
+        local_memory = self.get_memory()
+        local_mem_size = local_memory.get_size()
+        if self.has_memory_over_cxl():
+            cxl_memory = self.get_memory_over_cxl()
+            cxl_mem_size = cxl_memory.get_size()
 
         # The following code is taken from configs/example/arm/devices.py. It
         # sets up all the memory ranges for the board.
-        self.mem_ranges = []
+        self._local_mem_ranges = []
+        self._cxl_mem_ranges = []
         success = False
+        prev_local_mem_end = 0
         for mem_range in self.realview._mem_regions:
-            size_in_range = min(mem_size, mem_range.size())
-            self.mem_ranges.append(
+            size_in_range = min(local_mem_size, mem_range.size())
+            self._local_mem_ranges.append(
                 AddrRange(start=mem_range.start, size=size_in_range)
             )
-
-            mem_size -= size_in_range
-            if mem_size == 0:
+            prev_local_mem_end = self._local_mem_ranges[-1].end
+            local_mem_size -= size_in_range
+            if local_mem_size == 0:
                 success = True
                 break
 
+        if self.has_memory_over_cxl():
+            for mem_range in self.realview._mem_regions:
+                if mem_range.end <= prev_local_mem_end:
+                    continue
+                mem_range_start = max(mem_range.start, prev_local_mem_end)
+                size_in_range = min(
+                    cxl_mem_size, mem_range.end - mem_range_start
+                )
+                self._cxl_mem_ranges.append(
+                    AddrRange(start=mem_range_start, size=size_in_range)
+                )
+                cxl_mem_size -= size_in_range
+                if cxl_mem_size == 0:
+                    success = True
+                    break
+
+        self.mem_ranges = self._local_mem_ranges + self._cxl_mem_ranges
+
         if success:
-            memory.set_memory_range(self.mem_ranges)
+            local_memory.set_memory_range(self._local_mem_ranges)
+            print("local_mem_ranges")
+            for mem_range in self._local_mem_ranges:
+                print(
+                    hex(mem_range.start),
+                    "-",
+                    hex(mem_range.end),
+                    "size: ",
+                    hex(mem_range.size()),
+                )
+            if self.has_memory_over_cxl():
+                cxl_memory.set_memory_range(self._cxl_mem_ranges)
+                print("cxl_mem_ranges")
+                for mem_range in self._cxl_mem_ranges:
+                    print(
+                        hex(mem_range.start),
+                        "-",
+                        hex(mem_range.end),
+                        "size: ",
+                        hex(mem_range.size()),
+                    )
         else:
             raise ValueError("Memory size too big for platform capabilities")
 

@@ -61,12 +61,14 @@ class TestBoard(AbstractSystemBoard):
         generator: AbstractGenerator,
         memory: AbstractMemorySystem,
         cache_hierarchy: Optional[AbstractCacheHierarchy],
+        memory_over_cxl: Optional["AbstractMemorySystem"] = None,
     ):
         super().__init__(
             clk_freq=clk_freq,  # Only used if cache hierarchy or GUPS-gen
             processor=generator,
             memory=memory,
             cache_hierarchy=cache_hierarchy,
+            memory_over_cxl=memory_over_cxl,
         )
         self._set_fullsystem(False)
 
@@ -114,7 +116,15 @@ class TestBoard(AbstractSystemBoard):
         # The simple board just has one memory range that is the size of the
         # memory.
         self.mem_ranges = [AddrRange(memory.get_size())]
-        memory.set_memory_range(self.mem_ranges)
+        memory.set_memory_range([self.mem_ranges[0]])
+        if self.has_memory_over_cxl():
+            self.mem_ranges.append(
+                AddrRange(
+                    start=self.mem_ranges[-1].end,
+                    size=self.memory_over_cxl.get_size(),
+                )
+            )
+            self.memory_over_cxl.set_memory_range([self.mem_ranges[1]])
 
     @overrides(AbstractSystemBoard)
     def has_dma_ports(self) -> bool:

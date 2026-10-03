@@ -37,6 +37,7 @@ from typing import (
 )
 
 from m5.objects import (
+    NULL,
     AddrRange,
     ClockDomain,
     IOXBar,
@@ -81,6 +82,8 @@ class AbstractBoard:
         processor: "AbstractProcessor",
         memory: "AbstractMemorySystem",
         cache_hierarchy: Optional["AbstractCacheHierarchy"],
+        # Default to None for backward compatibility with existing boards
+        memory_over_cxl: Optional["AbstractMemorySystem"] = None,
     ) -> None:
         """
         :param clk_freq: The clock frequency for this board.
@@ -102,6 +105,11 @@ class AbstractBoard:
         # Set the processor, memory, and cache hierarchy.
         self.processor = processor
         self.memory = memory
+        if memory_over_cxl:
+            self._has_cxl_memory = True
+            self.memory_over_cxl = memory_over_cxl
+        else:
+            self._has_cxl_memory = False
         self._cache_hierarchy = cache_hierarchy
         if cache_hierarchy is not None:
             self.cache_hierarchy = cache_hierarchy
@@ -122,6 +130,22 @@ class AbstractBoard:
         # been called.
         self._connect_things_called = False
 
+    def has_memory_over_cxl(self) -> bool:
+        """Check if the board has memory over CXL.
+
+        :returns: True if the board has memory over CXL, False otherwise.
+        """
+        return self._has_cxl_memory
+
+    def get_memory_over_cxl(self) -> "AbstractMemorySystem":
+        """Get the memory over CXL connected to the board.
+
+        :returns: The memory over CXL.
+        """
+        if not self.has_memory_over_cxl():
+            raise Exception("Board does not have memory over CXL.")
+        return self.memory_over_cxl
+
     def get_processor(self) -> "AbstractProcessor":
         """Get the processor connected to the board.
 
@@ -129,12 +153,18 @@ class AbstractBoard:
         """
         return self.processor
 
-    def get_memory(self) -> "AbstractMemory":
+    def get_memory(self) -> "AbstractMemorySystem":
         """Get the memory (RAM) connected to the board.
 
         :returns: The memory system.
         """
         return self.memory
+
+    def get_total_memory_size(self) -> int:
+        mem_size = self.get_memory().get_size()
+        if self.has_memory_over_cxl():
+            mem_size += self.get_memory_over_cxl().get_size()
+        return mem_size
 
     def get_mem_ports(self) -> Sequence[Tuple[AddrRange, Port]]:
         """Get the memory ports exposed on this board
@@ -145,6 +175,15 @@ class AbstractBoard:
             in ascending order.
         """
         return self.get_memory().get_mem_ports()
+
+    def get_memory_over_cxl_ports(self) -> Sequence[Tuple[AddrRange, Port]]:
+        """Get the memory over CXL ports exposed on this board.
+
+        :returns: A list of tuples of (address range, port).
+        """
+        if not self.has_memory_over_cxl():
+            raise Exception("Board does not have memory over CXL.")
+        return self.get_memory_over_cxl().get_mem_ports()
 
     def get_cache_hierarchy(self) -> Optional["AbstractCacheHierarchy"]:
         """Get the cache hierarchy connected to the board.
