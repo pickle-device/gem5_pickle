@@ -80,7 +80,8 @@ MemCtrl::MemCtrl(const MemCtrlParams &p) :
     backendLatency(p.static_backend_latency),
     commandWindow(p.command_window),
     prevArrival(0),
-    stats(*this)
+    stats(*this),
+    activeDataTrackerEnabled(false)
 {
     DPRINTF(MemCtrl, "Setting up controller\n");
 
@@ -147,6 +148,8 @@ MemCtrl::recvAtomicLogic(PacketPtr pkt, MemInterface* mem_intr)
 
     panic_if(pkt->cacheResponding(), "Should not see packets where cache "
              "is responding");
+
+    ProfileQueuedAccess(pkt->getAddr(), pkt->getSize());
 
     // do the actual memory access and turn the packet into a response
     mem_intr->access(pkt);
@@ -267,6 +270,7 @@ MemCtrl::addToReadQueue(PacketPtr pkt,
                 unsigned int pkt_count, MemInterface* mem_intr)
 {
     ProfileAddingToQueueEvent();
+    ProfileQueuedAccess(pkt->getAddr(), pkt->getSize());
 
     // only add to the read queue here. whenever the request is
     // eventually done, set the readyTime, and call schedule()
@@ -384,6 +388,7 @@ MemCtrl::addToWriteQueue(PacketPtr pkt, unsigned int pkt_count,
                                 MemInterface* mem_intr)
 {
     ProfileAddingToQueueEvent();
+    ProfileQueuedAccess(pkt->getAddr(), pkt->getSize());
 
     // only add to the write queue here. whenever the request is
     // eventually done, set the readyTime, and call schedule()
@@ -1323,6 +1328,15 @@ MemCtrl::CtrlStats::CtrlStats(MemCtrl &_ctrl)
     ADD_STAT(avgUtilization, statistics::units::Ratio::get(),
              "Ratio of ticks that the memory system serving read requests"),
 
+    ADD_STAT(
+        totalActiveDataBlocks,
+        statistics::units::Count::get(),
+        "Total number of active 64-byte data blocks in the memory system"),
+    ADD_STAT(
+        avgAccessCountPerBlock,
+        statistics::units::Count::get(),
+        "Average number of times each 64-byte data block is accessed"),
+
     ADD_STAT(avgRdBWSys, statistics::units::Rate<
                 statistics::units::Byte, statistics::units::Second>::get(),
              "Average system read bandwidth in Byte/s"),
@@ -1461,6 +1475,14 @@ MemCtrl::CtrlStats::regStats()
 }
 
 void
+MemCtrl::CtrlStats::preDumpStats()
+{
+    statistics::Group::preDumpStats();
+    totalActiveDataBlocks = ctrl.getActiveDataCount();
+    avgAccessCountPerBlock = ctrl.getAverageActiveDataCount();
+}
+
+void
 MemCtrl::recvFunctional(PacketPtr pkt)
 {
     bool found = recvFunctionalLogic(pkt, dram);
@@ -1484,6 +1506,7 @@ bool
 MemCtrl::recvFunctionalLogic(PacketPtr pkt, MemInterface* mem_intr)
 {
     if (mem_intr->getAddrRange().contains(pkt->getAddr())) {
+        ProfileQueuedAccess(pkt->getAddr(), pkt->getSize());
         // rely on the abstract memory
         mem_intr->functionalAccess(pkt);
         return true;
@@ -1553,6 +1576,61 @@ MemCtrl::drainResume()
 
     // update the mode
     isTimingMode = system()->isTimingMode();
+}
+
+void
+MemCtrl::enableActiveDataTracker()
+{
+    activeDataTrackerEnabled = true;
+}
+
+void
+MemCtrl::disableActiveDataTracker()
+{
+    activeDataTrackerEnabled = false;
+}
+
+void
+MemCtrl::ProfileQueuedAccess(Addr paddr, uint64_t size_in_bytes)
+{
+    constexpr uint64_t cache_line_size = 64;
+    constexpr uint64_t log_cache_line_size = 6;
+    if (!activeDataTrackerEnabled || size_in_bytes == 0)
+        return;
+    for (
+        Addr block_addr = \
+            (paddr >> log_cache_line_size) << log_cache_line_size;
+        block_addr < (paddr + size_in_bytes);
+        block_addr += cache_line_size
+    ) {
+        const Addr block_id = block_addr >> log_cache_line_size;
+        active_block_count[block_id]++;
+    }
+}
+
+uint64_t
+MemCtrl::getActiveDataCount()
+{
+    return active_block_count.size();
+}
+
+double
+MemCtrl::getAverageActiveDataCount()
+{
+    if (active_block_count.empty()) {
+        return 0.0;
+    }
+    uint64_t total_count = 0;
+    for (const auto& [block_addr, count] : active_block_count) {
+        total_count += count;
+    }
+    return (double)total_count / active_block_count.size();
+}
+
+void
+MemCtrl::clearActiveDataCount()
+{
+    active_block_count.clear();
 }
 
 AddrRangeList

@@ -42,6 +42,7 @@ from m5.citations import add_citation
 from m5.objects.QoSMemCtrl import *
 from m5.params import *
 from m5.proxy import *
+from m5.SimObject import PyBindMethod
 
 
 # Enum for memory scheduling algorithms, currently First-Come
@@ -67,6 +68,16 @@ class MemCtrl(QoSMemCtrl):
     dram = Param.MemInterface(
         "Memory interface, can be a DRAMor an NVM interface "
     )
+
+    # Active data tracker: tracking how much data is active during
+    # the whole simulation. We track at the granularity of cache blocks, i.e.
+    # 64 bytes.
+    cxx_exports = [
+        PyBindMethod("enableActiveDataTracker"),
+        PyBindMethod("disableActiveDataTracker"),
+        PyBindMethod("getActiveDataCount"),
+        PyBindMethod("clearActiveDataCount"),
+    ]
 
     # read and write buffer depths are set in the interface
     # the controller will read these values when instantiated

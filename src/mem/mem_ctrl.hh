@@ -48,7 +48,7 @@
 
 #include <deque>
 #include <string>
-#include <unordered_set>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -570,6 +570,7 @@ class MemCtrl : public qos::MemCtrl
         CtrlStats(MemCtrl &ctrl);
 
         void regStats() override;
+        void preDumpStats() override;
 
         MemCtrl &ctrl;
 
@@ -601,6 +602,10 @@ class MemCtrl : public qos::MemCtrl
         // Tracking if we can serve more read requests but we don't have any
         statistics::Scalar totalReadIdleTicks;
         statistics::Formula avgUtilization;
+
+        // Tracking active data
+        statistics::Scalar totalActiveDataBlocks;
+        statistics::Scalar avgAccessCountPerBlock;
 
         // Average bandwidth
         statistics::Formula avgRdBWSys;
@@ -803,6 +808,27 @@ class MemCtrl : public qos::MemCtrl
     virtual void init() override;
     virtual void startup() override;
     virtual void drainResume() override;
+
+    bool activeDataTrackerEnabled;
+    // block_addr -> count
+    // useful to track multiple requests to the same block
+    // we only count requests that were sent to the read/write queues
+    std::unordered_map<Addr, uint64_t> active_block_count;
+    // Enable active data tracker
+    void enableActiveDataTracker();
+    // Disable active data tracker
+    void disableActiveDataTracker();
+    // Profile an access to the memory controller
+    void ProfileQueuedAccess(Addr paddr, uint64_t size_in_bytes);
+    // How many distinct blocks have been fetched from the memory system.
+    // Useful for tracking the allocation behavior of an application.
+    uint64_t getActiveDataCount();
+    // For each block, how many times the DRAM has to fetch data
+    // to serve the request. Useful for locality analysis. E.g., if it is
+    // very large, it implies that the LLC is not big enough.
+    double getAverageActiveDataCount();
+    // Clear active data count. Must be done after collecting stats.
+    void clearActiveDataCount();
 
   protected:
 
