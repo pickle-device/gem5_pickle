@@ -336,6 +336,11 @@ class ArmSystem(System):
         NULL,
         "Enable support for the Arm semihosting by settings this parameter",
     )
+    specify_numa_node_in_device_tree = Param.Bool(
+        True,
+        "Specify numa node in device tree, the numa node id is the index of "
+        "the memory range",
+    )
 
     # Set to true if simulation provides a PSCI implementation
     # This flag will be checked when auto-generating
@@ -362,7 +367,7 @@ class ArmSystem(System):
         # creating a node called '/' which will then be merged with the
         # root instead of appended.
 
-        def generateMemNode(mem_range):
+        def generateMemNode(mem_range, numa_node):
             node = FdtNode(f"memory@{int(mem_range.start):x}")
             node.append(FdtPropertyStrings("device_type", ["memory"]))
             node.append(
@@ -372,6 +377,7 @@ class ArmSystem(System):
                     + state.sizeCells(mem_range.size()),
                 )
             )
+            node.append(FdtPropertyWords("numa-node-id", numa_node))
             return node
 
         root = FdtNode("/")
@@ -379,8 +385,11 @@ class ArmSystem(System):
         root.append(state.sizeCellsProperty())
 
         # Add memory nodes
-        for mem_range in self.mem_ranges:
-            root.append(generateMemNode(mem_range))
+        for i, mem_range in enumerate(self.mem_ranges):
+            if self.specify_numa_node_in_device_tree:
+                root.append(generateMemNode(mem_range, i))
+            else:
+                root.append(generateMemNode(mem_range, 0))
 
         for node in self.recurseDeviceTree(state):
             # Merge root nodes instead of adding them (for children

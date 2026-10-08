@@ -289,6 +289,7 @@ class BaseCPU(ClockedObject):
 
             freq = int(self.clk_domain.unproxy(self).clock[0].frequency)
             node.append(FdtPropertyWords("clock-frequency", freq))
+            node.append(FdtPropertyWords("numa-node-id", 0))
 
             # Unique key for this CPU
             phandle_key = self.createPhandleKey(i)
