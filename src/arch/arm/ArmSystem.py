@@ -399,4 +399,30 @@ class ArmSystem(System):
             else:
                 root.append(node)
 
+        # CPU (system register) architected timer
+        cpu_timer = FdtNode("timer")
+        cpu_timer.appendCompatible(["arm,armv8-timer"])
+        cpu_timer.append(
+            FdtPropertyWords(
+                "interrupts",
+                [
+                    1,
+                    13,
+                    8,  # secure physical
+                    1,
+                    14,
+                    8,  # non-secure physical
+                    1,
+                    11,
+                    8,  # virtual
+                    1,
+                    10,
+                    8,  # hypervisor
+                ],
+            )
+        )
+        cpu_timer.append(FdtProperty("always-on"))
+
+        root.append(cpu_timer)
+
         return root

@@ -277,11 +277,19 @@ KvmKernelGicV3::writeCpu(const ArmISA::Affinity &aff,
                          ArmISA::MiscRegIndex misc_reg,
                          RegVal data)
 {
+    if (misc_reg == ArmISA::MISCREG_ICC_CTLR_EL1) {
+        // KVM only lets userspace change CBPR (bit 0) and EOImode (bit 1).
+        // The read-only fields (PRIbits, IDbits, SEIS, A3V, RSS) must keep
+        // the values KVM reports, or the write fails with EINVAL.
+        const RegVal cur = readCpu(aff, misc_reg);
+        const RegVal writable = 0x3;
+        data = (cur & ~writable) | (data & writable);
+    }
     std::optional<ArmISA::MiscRegNum64> sys_reg =
         ArmISA::encodeAArch64SysReg(misc_reg);
     panic_if(!sys_reg.has_value(), "Invalid system register");
     setGicReg<RegVal>(KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS, aff,
-                      sys_reg.value().packed(), data);
+                  sys_reg.value().packed(), data);
 }
 
 template <class Types>

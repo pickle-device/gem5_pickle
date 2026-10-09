@@ -269,7 +269,7 @@ class ArmBoard(ArmSystem, AbstractBoard, KernelDiskWorkload):
             # generic timer from the DTB and we need to inform the MuxingKvmGic
             # class to use the gem5 GIC instead of relying on the host one
             GenericTimer.generateDeviceTree = SimObject.generateDeviceTree
-            self.realview.gic.simulate_gic = True
+            # self.realview.gic.simulate_gic = True
 
         # IO devices has to setup before incorporating the caches in the case
         # of ruby caches. Otherwise the DMA controllers are incorrectly
