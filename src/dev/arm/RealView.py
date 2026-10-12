@@ -1624,21 +1624,19 @@ class VExpress_GEM5_V1_HDLcd(VExpress_GEM5_V1_Base):
 
 
 class VExpress_GEM5_V2_Base(VExpress_GEM5_Base):
-    gic = kvm_gicv3_class(
+    gic = Gicv3(
         dist_addr=0x2C000000,
         redist_addr=0x2C010000,
         maint_int=ArmPPI(num=25),
-        gicv4=False,
-        # its=Gicv3Its(pio_addr=0x2E010000),
-        its=NULL,
-        it_lines=960,
+        gicv4=True,
+        its=Gicv3Its(pio_addr=0x2E010000),
     )
 
     # Limiting to 128 since it will otherwise overlap with PCI space
     gic.cpu_max = 128
 
     def _on_chip_devices(self):
-        return super()._on_chip_devices() + [self.gic]
+        return super()._on_chip_devices() + [self.gic, self.gic.its]
 
     def setupBootLoader(self, cur_sys, loc, boot_loader=None):
         if boot_loader is None:
