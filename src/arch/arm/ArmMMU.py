@@ -59,6 +59,12 @@ class ArmTableWalker(ClockedObject):
     port = RequestPort("Table Walker port")
 
     sys = Param.System(Parent.any, "system object parameter")
+    local_memory_physical_address_ranges = VectorParam.AddrRange(
+        [], "Local memory physical address ranges"
+    )
+    cxl_memory_physical_address_ranges = VectorParam.AddrRange(
+        [], "CXL memory physical address ranges"
+    )
 
 
 # Stage 2 translation objects, only used when virtualisation is being used

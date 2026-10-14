@@ -1065,6 +1065,7 @@ class TableWalker : public ClockedObject
     void readDataTimed(ThreadContext *tc, Addr desc_addr,
                        Stage2Walk *translation, int num_bytes,
                        Request::Flags flags);
+    void profileMemoryAccess(Addr paddr);
 
   protected:
 
@@ -1124,6 +1125,9 @@ class TableWalker : public ClockedObject
         statistics::Histogram pendingWalks;
         statistics::Vector pageSizes;
         statistics::Vector2d requestOrigin;
+        // Local/CXL memory accesses
+        statistics::Scalar localAccesses;
+        statistics::Scalar cxlAccesses;
     } stats;
 
     mutable unsigned pendingReqs;
@@ -1170,6 +1174,9 @@ class TableWalker : public ClockedObject
     bool uncacheableFromAttrs(uint8_t attrs);
 
     static LookupLevel toLookupLevel(uint8_t lookup_level_as_int);
+
+    std::vector<AddrRange> localRanges;
+    std::vector<AddrRange> cxlRanges;
 
   private:
 

@@ -71,6 +71,8 @@ TableWalker::TableWalker(const Params &p)
       stats(this),
       pendingReqs(0),
       pendingChangeTick(curTick()),
+      localRanges(p.local_memory_physical_address_ranges),
+      cxlRanges(p.cxl_memory_physical_address_ranges),
       doL1DescEvent([this]{ doL1DescriptorWrapper(); }, name()),
       doL2DescEvent([this]{ doL2DescriptorWrapper(); }, name()),
       doL0LongDescEvent([this]{ doL0LongDescriptorWrapper(); }, name()),
@@ -220,6 +222,8 @@ TableWalker::Port::handleRespPacket(PacketPtr pkt, Tick delay)
     // Get the DMA sender state.
     auto *state = dynamic_cast<TableWalkerState*>(pkt->senderState);
     assert(state);
+
+    owner.profileMemoryAccess(pkt->getAddr());
 
     handleResp(state, pkt->getAddr(), pkt->req->getSize(), delay);
 
@@ -2526,6 +2530,23 @@ TableWalker::readDataTimed(ThreadContext *tc, Addr desc_addr,
     translation->translateTiming(tc);
 }
 
+void
+TableWalker::profileMemoryAccess(Addr paddr)
+{
+    for (auto &range : localRanges) {
+        if (range.contains(paddr)) {
+            stats.localAccesses++;
+            return;
+        }
+    }
+    for (auto &range : cxlRanges) {
+        if (range.contains(paddr)) {
+            stats.cxlAccesses++;
+            return;
+        }
+    }
+}
+
 TableWalker::Stage2Walk::Stage2Walk(TableWalker &_parent,
         uint8_t *_data, Event *_event, Addr vaddr, BaseMMU::Mode _mode,
         MMU::ArmTranslationType tran_type)
@@ -2593,7 +2614,11 @@ TableWalker::TableWalkerStats::TableWalkerStats(statistics::Group *parent)
     ADD_STAT(pageSizes, statistics::units::Count::get(),
              "Table walker page sizes translated"),
     ADD_STAT(requestOrigin, statistics::units::Count::get(),
-             "Table walker requests started/completed, data/inst")
+             "Table walker requests started/completed, data/inst"),
+    ADD_STAT(localAccesses, statistics::units::Count::get(),
+             "Count walker's accesses to local memory"),
+    ADD_STAT(cxlAccesses, statistics::units::Count::get(),
+             "Count walker's accesses to CXL memory")
 {
     walksShortDescriptor
         .flags(statistics::nozero);
