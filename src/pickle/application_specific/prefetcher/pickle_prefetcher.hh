@@ -139,7 +139,8 @@ class PicklePrefetcher: public ClockedObject
             const uint64_t cpuId, const ContextID contextId
         );
         void receivePrefetch(
-            const uint64_t vaddr, std::unique_ptr<uint8_t[]> p
+            const uint64_t vaddr, const uint64_t paddr,
+            std::unique_ptr<uint8_t[]> p
         );
         // Notify the prefetcher that an address translation only request is
         // completed

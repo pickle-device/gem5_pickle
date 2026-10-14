@@ -491,13 +491,13 @@ PicklePrefetcher::receiveAddressTranslationOnlyResponse(
 
 void
 PicklePrefetcher::receivePrefetch(
-  const uint64_t vaddr, std::unique_ptr<uint8_t[]> p
+  const uint64_t vaddr, const uint64_t paddr, std::unique_ptr<uint8_t[]> p
 )
 {
     prefetcherStats.numPrefetches++;
-    if (isInLocalMemory(vaddr)) {
+    if (isInLocalMemory(paddr)) {
         prefetcherStats.numPrefetchRequestsSentToLocalMemory++;
-    } else if (isInCXLMemory(vaddr)) {
+    } else if (isInCXLMemory(paddr)) {
         prefetcherStats.numPrefetchRequestsSentToCXLMemory++;
     }
     DPRINTF(

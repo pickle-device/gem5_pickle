@@ -306,7 +306,7 @@ PickleDevice::PickleDeviceRequestPort::recvTimingResp(PacketPtr pkt)
     uint8_t* data = new uint8_t[req->getSize()];
     std::memcpy(data, pkt_data, req->getSize());
     owner->pickle_prefetcher->receivePrefetch(
-        req->getVaddr(), std::unique_ptr<uint8_t[]>(data)
+        req->getVaddr(), req->getPaddr(),std::unique_ptr<uint8_t[]>(data)
     );
     owner->request_manager->handleRequestCompletion(pkt);
     return true;
@@ -775,7 +775,7 @@ PickleDevice::enqueueResponse(PacketPtr pkt, uint8_t internal_port_id)
 void
 PickleDevice::handleRequestTranslationFault(Addr vaddr)
 {
-    pickle_prefetcher->receivePrefetch(vaddr, nullptr);
+    pickle_prefetcher->receivePrefetch(vaddr, 0, nullptr);
 }
 
 void
