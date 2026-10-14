@@ -74,6 +74,7 @@ class PickleDevice;
 class PicklePrefetcher: public ClockedObject
 {
     private:
+        bool cxl_memory_awareness_enabled;
         int64_t software_hint_prefetch_distance;
         int64_t prefetch_distance_offset_from_software_hint;
         PrefetchMode prefetch_mode;
@@ -102,6 +103,8 @@ class PicklePrefetcher: public ClockedObject
         // there is a work tracker for each prefetch kernel for each core
         std::shared_ptr<PrefetcherWorkTrackerCollective> \
             prefetcher_work_tracker_collective;
+        std::vector<AddrRange> local_memory_physical_address_ranges;
+        std::vector<AddrRange> cxl_memory_physical_address_ranges;
         std::vector<ContextID> core_id_to_context_id;
         bool prefetcher_initialized;
         uint64_t num_received_jobs;
@@ -124,6 +127,9 @@ class PicklePrefetcher: public ClockedObject
         uint64_t getPrefetchMode() const;
         uint64_t getBulkPrefetchChunkSize() const;
         uint64_t getBulkPrefetchNumPrefetchesPerHint() const;
+        bool isCXLMemoryAwarenessEnabled() const;
+        bool isInLocalMemory(Addr paddr) const;
+        bool isInCXLMemory(Addr paddr) const;
         bool getSSSPThresholdOptimizationEnabled() const;
         bool getBCDepthOptimizationEnabled() const;
         bool getUACbcOptimizationEnabled() const;
@@ -166,6 +172,8 @@ class PicklePrefetcher: public ClockedObject
             statistics::Scalar numWorkedDroppedDueToCoreTooClose;
             statistics::Scalar numContextUpdates;
             statistics::Scalar numPrefetches;
+            statistics::Scalar numPrefetchRequestsSentToLocalMemory;
+            statistics::Scalar numPrefetchRequestsSentToCXLMemory;
             statistics::Scalar numUnknownPrefetches;
             statistics::Histogram histInQueueLength;
             statistics::Histogram histOutQueueLength;

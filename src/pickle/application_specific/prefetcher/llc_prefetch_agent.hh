@@ -115,6 +115,8 @@ class LLCPrefetchAgent: public ClockedObject
             statistics::Scalar \
                 prefetch_request_dropped_due_to_timedout;
             statistics::Scalar prefetch_request_sent;
+            statistics::Scalar prefetch_request_sent_to_local_memory;
+            statistics::Scalar prefetch_request_sent_to_cxl_memory;
             statistics::Formula prefetch_request_not_sent;
             statistics::Histogram prefetch_request_queue_length;
         } agent_stats;

@@ -47,6 +47,7 @@ PicklePrefetcher::PicklePrefetcher(
   const PicklePrefetcherParams &params
 )
   : ClockedObject(params),
+    cxl_memory_awareness_enabled(params.cxl_memory_awareness_enabled),
     software_hint_prefetch_distance(params.software_hint_prefetch_distance),
     prefetch_distance_offset_from_software_hint(
         params.prefetch_distance_offset_from_software_hint
@@ -85,6 +86,12 @@ PicklePrefetcher::PicklePrefetcher(
         params.bc_depth_optimization_enabled
     ),
     ua_cbc_optimization_enabled(params.ua_cbc_optimization_enabled),
+    local_memory_physical_address_ranges(
+        params.local_memory_physical_address_ranges
+    ),
+    cxl_memory_physical_address_ranges(
+        params.cxl_memory_physical_address_ranges
+    ),
     core_id_to_context_id(num_cores, InvalidContextID),
     prefetcher_initialized(false),
     num_received_jobs(0),
@@ -124,6 +131,18 @@ PicklePrefetcher::PicklePrefetcher(
         "Num prefetches per hint must be positive when prefetch_mode is BULK ",
         "(num_prefetches_per_hint=%ld)\n",
         bulk_prefetch_num_prefetches_per_hint
+    );
+
+    panic_if(
+        cxl_memory_awareness_enabled &&
+        (cxl_memory_physical_address_ranges.empty() &&
+         local_memory_physical_address_ranges.empty()),
+        "CXL memory awareness is enabled, but no physical address ranges "
+        "are specified for local memory or CXL memory. Update the "
+        "local_memory_physical_address_ranges and/or "
+        "cxl_memory_physical_address_ranges parameters in the "
+        "PicklePrefetcher configuration to specify the physical address "
+        "ranges for local memory and/or CXL memory.\n"
     );
 
     prefetcher_work_tracker_collective =
@@ -276,6 +295,40 @@ uint64_t
 PicklePrefetcher::getBulkPrefetchNumPrefetchesPerHint() const
 {
     return static_cast<uint64_t>(bulk_prefetch_num_prefetches_per_hint);
+}
+
+bool
+PicklePrefetcher::isCXLMemoryAwarenessEnabled() const
+{
+    return cxl_memory_awareness_enabled;
+}
+
+bool
+PicklePrefetcher::isInLocalMemory(Addr paddr) const
+{
+    if (!cxl_memory_awareness_enabled) {
+        return true;
+    }
+    for (const auto& range: local_memory_physical_address_ranges) {
+        if (range.contains(paddr)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool
+PicklePrefetcher::isInCXLMemory(Addr paddr) const
+{
+    if (!cxl_memory_awareness_enabled) {
+        return false;
+    }
+    for (const auto& range: cxl_memory_physical_address_ranges) {
+        if (range.contains(paddr)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool
@@ -442,6 +495,11 @@ PicklePrefetcher::receivePrefetch(
 )
 {
     prefetcherStats.numPrefetches++;
+    if (isInLocalMemory(vaddr)) {
+        prefetcherStats.numPrefetchRequestsSentToLocalMemory++;
+    } else if (isInCXLMemory(vaddr)) {
+        prefetcherStats.numPrefetchRequestsSentToCXLMemory++;
+    }
     DPRINTF(
         PickleDevicePrefetcherDebug,
         "Receiving Packet: vaddr = 0x%llx\n", vaddr
@@ -562,6 +620,14 @@ PicklePrefetcher::PrefetcherStats::PrefetcherStats(
     ADD_STAT(
         numPrefetches, statistics::units::Count::get(),
         "Number of prefetch requests generated"
+    ),
+    ADD_STAT(
+        numPrefetchRequestsSentToLocalMemory, statistics::units::Count::get(),
+        "Number of prefetch requests sent to the local memory"
+    ),
+    ADD_STAT(
+        numPrefetchRequestsSentToCXLMemory, statistics::units::Count::get(),
+        "Number of prefetch requests sent to the CXL memory"
     ),
     ADD_STAT(
         numUnknownPrefetches, statistics::units::Count::get(),

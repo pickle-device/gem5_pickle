@@ -203,6 +203,11 @@ LLCPrefetchAgent::processOutgoingRequestQueue()
         if (success) {
             prefetch_request_queue.pop();
             agent_stats.prefetch_request_sent++;
+            if (prefetcher->isInLocalMemory(paddr)) {
+                agent_stats.prefetch_request_sent_to_local_memory++;
+            } else if (prefetcher->isInCXLMemory(paddr)) {
+                agent_stats.prefetch_request_sent_to_cxl_memory++;
+            }
             agent_stats.prefetch_request_queue_length.sample(
                 prefetch_request_queue.size()
             );
@@ -342,6 +347,12 @@ LLCPrefetchAgent::LLCPrefetchAgentStats::LLCPrefetchAgentStats(
                "Number of prefetch requests dropped due to timeout"),
       ADD_STAT(prefetch_request_sent, statistics::units::Count::get(),
                "Number of prefetch requests sent to the memory system"),
+      ADD_STAT(prefetch_request_sent_to_local_memory,
+               statistics::units::Count::get(),
+               "Number of prefetch requests sent to the local memory"),
+      ADD_STAT(prefetch_request_sent_to_cxl_memory,
+               statistics::units::Count::get(),
+               "Number of prefetch requests sent to the CXL memory"),
       ADD_STAT(prefetch_request_not_sent, statistics::units::Count::get(),
                "Number of prefetch requests not sent to the memory system "
                "due to our errors. Should be 0.",

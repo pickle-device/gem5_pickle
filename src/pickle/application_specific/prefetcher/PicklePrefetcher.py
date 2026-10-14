@@ -49,6 +49,24 @@ class PicklePrefetcher(ClockedObject):
     cxx_class = "gem5::PicklePrefetcher"
     cxx_exports = [PyBindMethod("switchOn"), PyBindMethod("switchOff")]
 
+    # CXL parameters
+    cxl_memory_awareness_enabled = Param.Bool(
+        True,
+        "Whether the prefetcher is aware of CXL memory.",
+    )
+    cxl_link_latency = Param.Cycles(
+        200,
+        "The latency of the CXL link in cycles.",
+    )
+    local_memory_physical_address_ranges = VectorParam.AddrRange(
+        [],
+        "The physical address range backed by local memory.",
+    )
+    cxl_memory_physical_address_ranges = VectorParam.AddrRange(
+        [],
+        "The physical address range backed by CXL memory.",
+    )
+
     # Prefetch strategy parameters
     software_hint_prefetch_distance = Param.Int(1, "Prefetch distance")
     prefetch_distance_offset_from_software_hint = Param.Int(
