@@ -115,7 +115,9 @@ class RubyCacheBlockTracker : public ProbeListenerObject
     {
       public:
         UsefulnessAttributionStats(
-          statistics::Group *parent, const Addr _cache_line_size
+          statistics::Group *parent, const Addr _cache_line_size,
+          const std::vector<AddrRange> &_local_memory_physical_address_ranges,
+          const std::vector<AddrRange> &_cxl_memory_physical_address_ranges
         );
         void regStats() override;
         void preDumpStats() override;
@@ -133,7 +135,9 @@ class RubyCacheBlockTracker : public ProbeListenerObject
           const Addr block_addr, const RequestorID requestor_id
         );
       private:
-         void updateUsefulnessStatsForBlock(const Addr block_addr);
+        void updateUsefulnessStatsForBlock(const Addr block_addr);
+        bool isInLocalMemory(const Addr addr) const;
+        bool isInCXLMemory(const Addr addr) const;
 
       public:
         /* OVERALL STATS */
@@ -147,10 +151,38 @@ class RubyCacheBlockTracker : public ProbeListenerObject
           numUsefulBlocksBroughtIntoCachePerPrefetcher;
         std::map<RequestorID, statistics::Scalar *>
           numUselessBlocksBroughtIntoCachePerPrefetcher;
+        /* CXL AWARENESS STATS */
+        statistics::Scalar \
+          numUsefulBlocksBroughtIntoCacheFromLocalMemoryByCpus;
+        statistics::Scalar \
+          numUselessBlocksBroughtIntoCacheFromLocalMemoryByCpus;
+        statistics::Scalar \
+          numUsefulBlocksBroughtIntoCacheFromCXLMemoryByCpus;
+        statistics::Scalar \
+          numUselessBlocksBroughtIntoCacheFromCXLMemoryByCpus;
+        statistics::Scalar \
+          numUsefulBlocksBroughtIntoCacheFromLocalMemoryByPrefetchers;
+        statistics::Scalar \
+          numUselessBlocksBroughtIntoCacheFromLocalMemoryByPrefetchers;
+        statistics::Scalar \
+          numUsefulBlocksBroughtIntoCacheFromCXLMemoryByPrefetchers;
+        statistics::Scalar \
+          numUselessBlocksBroughtIntoCacheFromCXLMemoryByPrefetchers;
+        std::map<RequestorID, statistics::Scalar *>
+          numUsefulBlocksBroughtIntoCacheFromLocalMemoryPerPrefetcher;
+        std::map<RequestorID, statistics::Scalar *>
+          numUselessBlocksBroughtIntoCacheFromLocalMemoryPerPrefetcher;
+        std::map<RequestorID, statistics::Scalar *>
+          numUsefulBlocksBroughtIntoCacheFromCXLMemoryPerPrefetcher;
+        std::map<RequestorID, statistics::Scalar *>
+          numUselessBlocksBroughtIntoCacheFromCXLMemoryPerPrefetcher;
 
       private:
         /* SYSTEM*/
         const Addr cache_line_offset;
+        /* MEMORY RANGES */
+        std::vector<AddrRange> local_memory_physical_address_ranges;
+        std::vector<AddrRange> cxl_memory_physical_address_ranges;
         /* REQUESTORS */
         std::map<RequestorID, std::string> cpuRequestorIDs;
         std::map<RequestorID, std::string> prefetcherRequestorIDs;

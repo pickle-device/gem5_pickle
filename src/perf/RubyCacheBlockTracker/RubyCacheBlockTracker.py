@@ -76,6 +76,12 @@ class RubyCacheBlockTracker(ProbeListenerObject):
 
     system = Param.System(Parent.any, "System this is part of")
     ruby_system = Param.RubySystem("RubySystem")
+    local_memory_physical_address_ranges = VectorParam.AddrRange(
+        [], "Physical address ranges backed by local memory."
+    )
+    cxl_memory_physical_address_ranges = VectorParam.AddrRange(
+        [], "Physical address ranges backed by CXL memory."
+    )
 
     # For CPU, the requests are issued by the sequencer. However, the sequencer
     # reuses the requestor ID of the core. Thus, we have separate

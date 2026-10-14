@@ -67,7 +67,12 @@ RubyCacheBlockTracker::RubyCacheBlockTracker(const Params &p)
   : ProbeListenerObject(p),
     system(p.system),
     cache_line_offset(log2(p.system->cacheLineSize())),
-    usefulnessAttributionStats(this, p.system->cacheLineSize()),
+    usefulnessAttributionStats(
+        this,
+        p.system->cacheLineSize(),
+        p.local_memory_physical_address_ranges,
+        p.cxl_memory_physical_address_ranges
+    ),
     trackerStats(this)
 {
     inform("Cache line offset %d\n", cache_line_offset);
@@ -356,7 +361,9 @@ RubyCacheBlockTracker::getAllRequestorIDs() const
 
 RubyCacheBlockTracker::UsefulnessAttributionStats::UsefulnessAttributionStats(
     statistics::Group *parent,
-    const Addr _cache_line_size
+    const Addr _cache_line_size,
+    const std::vector<AddrRange> &_local_memory_physical_address_ranges,
+    const std::vector<AddrRange> &_cxl_memory_physical_address_ranges
 ) : statistics::Group(parent),
     ADD_STAT(
         numUsefulBlocksBroughtIntoCacheByCpus, statistics::units::Count::get(),
@@ -382,7 +389,57 @@ RubyCacheBlockTracker::UsefulnessAttributionStats::UsefulnessAttributionStats(
         statistics::units::Count::get(),
         "Number of eviction events that we don't know who brought the block in"
     ),
-    cache_line_offset(log2(_cache_line_size))
+    ADD_STAT(
+        numUsefulBlocksBroughtIntoCacheFromLocalMemoryByCpus,
+        statistics::units::Count::get(),
+        "Number of useful blocks that are brought into cache from local "
+        "by CPUs"
+    ),
+    ADD_STAT(
+        numUselessBlocksBroughtIntoCacheFromLocalMemoryByCpus,
+        statistics::units::Count::get(),
+        "Number of useless blocks that are brought into cache from local "
+        "by CPUs"
+    ),
+    ADD_STAT(
+        numUsefulBlocksBroughtIntoCacheFromCXLMemoryByCpus,
+        statistics::units::Count::get(),
+        "Number of useful blocks that are brought into cache from CXL "
+        "by CPUs"
+    ),
+    ADD_STAT(
+        numUselessBlocksBroughtIntoCacheFromCXLMemoryByCpus,
+        statistics::units::Count::get(),
+        "Number of useless blocks that are brought into cache from CXL "
+        "by CPUs"
+    ),
+    ADD_STAT(
+        numUsefulBlocksBroughtIntoCacheFromLocalMemoryByPrefetchers,
+        statistics::units::Count::get(),
+        "Number of useful blocks that are brought into cache from local "
+        "by prefetchers"
+    ),
+    ADD_STAT(
+        numUselessBlocksBroughtIntoCacheFromLocalMemoryByPrefetchers,
+        statistics::units::Count::get(),
+        "Number of useless blocks that are brought into cache from local "
+        "by prefetchers"
+    ),
+    ADD_STAT(
+        numUsefulBlocksBroughtIntoCacheFromCXLMemoryByPrefetchers,
+        statistics::units::Count::get(),
+        "Number of useful blocks that are brought into cache from CXL "
+        "by prefetchers"
+    ),
+    ADD_STAT(
+        numUselessBlocksBroughtIntoCacheFromCXLMemoryByPrefetchers,
+        statistics::units::Count::get(),
+        "Number of useless blocks that are brought into cache from CXL "
+        "by prefetchers"
+    ),
+    cache_line_offset(log2(_cache_line_size)),
+    local_memory_physical_address_ranges(_local_memory_physical_address_ranges),
+    cxl_memory_physical_address_ranges(_cxl_memory_physical_address_ranges)
 {
     inform("Cache line offset %d\n", cache_line_offset);
 }
@@ -420,6 +477,54 @@ RubyCacheBlockTracker::UsefulnessAttributionStats::regStats()
                 statistics::units::Count::get(),
                 csprintf(
                     "Number of useless blocks that are brought into cache by "
+                    "prefetcher %s", name.c_str()
+                ).c_str()
+            );
+        numUsefulBlocksBroughtIntoCacheFromLocalMemoryPerPrefetcher[id] =
+            new statistics::Scalar(
+                this,
+                csprintf(
+                    "useful_blocks_brought_into_cache_from_local_memory_by_prefetcher_%d", id
+                ).c_str(),
+                statistics::units::Count::get(),
+                csprintf(
+                    "Number of useful blocks that are brought into cache from local memory by "
+                    "prefetcher %s", name.c_str()
+                ).c_str()
+            );
+        numUselessBlocksBroughtIntoCacheFromLocalMemoryPerPrefetcher[id] =
+            new statistics::Scalar(
+                this,
+                csprintf(
+                    "useless_blocks_brought_into_cache_from_local_memory_by_prefetcher_%d", id
+                ).c_str(),
+                statistics::units::Count::get(),
+                csprintf(
+                    "Number of useless blocks that are brought into cache from local memory by "
+                    "prefetcher %s", name.c_str()
+                ).c_str()
+            );
+        numUsefulBlocksBroughtIntoCacheFromCXLMemoryPerPrefetcher[id] =
+            new statistics::Scalar(
+                this,
+                csprintf(
+                    "useful_blocks_brought_into_cache_from_cxl_memory_by_prefetcher_%d", id
+                ).c_str(),
+                statistics::units::Count::get(),
+                csprintf(
+                    "Number of useful blocks that are brought into cache from CXL memory by "
+                    "prefetcher %s", name.c_str()
+                ).c_str()
+            );
+        numUselessBlocksBroughtIntoCacheFromCXLMemoryPerPrefetcher[id] =
+            new statistics::Scalar(
+                this,
+                csprintf(
+                    "useless_blocks_brought_into_cache_from_cxl_memory_by_prefetcher_%d", id
+                ).c_str(),
+                statistics::units::Count::get(),
+                csprintf(
+                    "Number of useless blocks that are brought into cache from CXL memory by "
                     "prefetcher %s", name.c_str()
                 ).c_str()
             );
@@ -544,25 +649,92 @@ UsefulnessAttributionStats::updateUsefulnessStatsForBlock(
     if (cpuRequestorIDs.find(first_requestor_id) != cpuRequestorIDs.end()) {
         if (usage_count > 0) {
             numUsefulBlocksBroughtIntoCacheByCpus++;
+            if (isInLocalMemory(block_addr)) {
+                numUsefulBlocksBroughtIntoCacheFromLocalMemoryByCpus++;
+            } else if (isInCXLMemory(block_addr)) {
+                numUsefulBlocksBroughtIntoCacheFromCXLMemoryByCpus++;
+            }
         } else {
             // Should not happen by definition :D
             numUselessBlocksBroughtIntoCacheByCpus++;
+            if (isInLocalMemory(block_addr)) {
+                numUselessBlocksBroughtIntoCacheFromLocalMemoryByCpus++;
+            } else if (isInCXLMemory(block_addr)) {
+                numUselessBlocksBroughtIntoCacheFromCXLMemoryByCpus++;
+            }
         }
     }
     if (prefetcherRequestorIDs.find(first_requestor_id) !=
         prefetcherRequestorIDs.end()) {
         if (usage_count > 0) {
             numUsefulBlocksBroughtIntoCacheByPrefetchers++;
+            if (isInLocalMemory(block_addr)) {
+                numUsefulBlocksBroughtIntoCacheFromLocalMemoryByPrefetchers++;
+            } else if (isInCXLMemory(block_addr)) {
+                numUsefulBlocksBroughtIntoCacheFromCXLMemoryByPrefetchers++;
+            }
             (*numUsefulBlocksBroughtIntoCachePerPrefetcher[
                 first_requestor_id
             ])++;
+            if (isInLocalMemory(block_addr)) {
+                numUsefulBlocksBroughtIntoCacheFromLocalMemoryByPrefetchers++;
+                (*numUsefulBlocksBroughtIntoCacheFromLocalMemoryPerPrefetcher[
+                    first_requestor_id
+                ])++;
+            } else if (isInCXLMemory(block_addr)) {
+                numUsefulBlocksBroughtIntoCacheFromCXLMemoryByPrefetchers++;
+                (*numUsefulBlocksBroughtIntoCacheFromCXLMemoryPerPrefetcher[
+                    first_requestor_id
+                ])++;
+            }
         } else {
             numUselessBlocksBroughtIntoCacheByPrefetchers++;
+            if (isInLocalMemory(block_addr)) {
+                numUselessBlocksBroughtIntoCacheFromLocalMemoryByPrefetchers++;
+            } else if (isInCXLMemory(block_addr)) {
+                numUselessBlocksBroughtIntoCacheFromCXLMemoryByPrefetchers++;
+            }
             (*numUselessBlocksBroughtIntoCachePerPrefetcher[
                 first_requestor_id
             ])++;
+            if (isInLocalMemory(block_addr)) {
+                numUselessBlocksBroughtIntoCacheFromLocalMemoryByPrefetchers++;
+                (*numUselessBlocksBroughtIntoCacheFromLocalMemoryPerPrefetcher[
+                    first_requestor_id
+                ])++;
+            } else if (isInCXLMemory(block_addr)) {
+                numUselessBlocksBroughtIntoCacheFromCXLMemoryByPrefetchers++;
+                (*numUselessBlocksBroughtIntoCacheFromCXLMemoryPerPrefetcher[
+                    first_requestor_id
+                ])++;
+            }
         }
     }
+}
+
+
+bool
+RubyCacheBlockTracker::
+UsefulnessAttributionStats::isInLocalMemory(const Addr addr) const
+{
+    for (const auto &range : local_memory_physical_address_ranges) {
+        if (range.contains(addr)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool
+RubyCacheBlockTracker::
+UsefulnessAttributionStats::isInCXLMemory(const Addr addr) const
+{
+    for (const auto &range : cxl_memory_physical_address_ranges) {
+        if (range.contains(addr)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 RubyCacheBlockTracker::TrackerStats::TrackerStats(statistics::Group *parent)
