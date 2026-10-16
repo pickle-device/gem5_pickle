@@ -668,11 +668,6 @@ UsefulnessAttributionStats::updateUsefulnessStatsForBlock(
         prefetcherRequestorIDs.end()) {
         if (usage_count > 0) {
             numUsefulBlocksBroughtIntoCacheByPrefetchers++;
-            if (isInLocalMemory(block_addr)) {
-                numUsefulBlocksBroughtIntoCacheFromLocalMemoryByPrefetchers++;
-            } else if (isInCXLMemory(block_addr)) {
-                numUsefulBlocksBroughtIntoCacheFromCXLMemoryByPrefetchers++;
-            }
             (*numUsefulBlocksBroughtIntoCachePerPrefetcher[
                 first_requestor_id
             ])++;
@@ -689,11 +684,6 @@ UsefulnessAttributionStats::updateUsefulnessStatsForBlock(
             }
         } else {
             numUselessBlocksBroughtIntoCacheByPrefetchers++;
-            if (isInLocalMemory(block_addr)) {
-                numUselessBlocksBroughtIntoCacheFromLocalMemoryByPrefetchers++;
-            } else if (isInCXLMemory(block_addr)) {
-                numUselessBlocksBroughtIntoCacheFromCXLMemoryByPrefetchers++;
-            }
             (*numUselessBlocksBroughtIntoCachePerPrefetcher[
                 first_requestor_id
             ])++;
