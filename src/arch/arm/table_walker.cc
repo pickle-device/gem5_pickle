@@ -68,6 +68,7 @@ TableWalker::TableWalker(const Params &p)
       currState(NULL), pending(false),
       numSquashable(p.num_squash_per_cycle),
       release(nullptr),
+      uniqueBlocksCountActive(false),
       stats(this),
       pendingReqs(0),
       pendingChangeTick(curTick()),
@@ -2536,12 +2537,18 @@ TableWalker::profileMemoryAccess(Addr paddr)
     for (auto &range : localRanges) {
         if (range.contains(paddr)) {
             stats.localAccesses++;
+            if (uniqueBlocksCountActive) {
+                stats.recordLocalBlockAccess(paddr >> 6);
+            }
             return;
         }
     }
     for (auto &range : cxlRanges) {
         if (range.contains(paddr)) {
             stats.cxlAccesses++;
+            if (uniqueBlocksCountActive) {
+                stats.recordCxlBlockAccess(paddr >> 6);
+            }
             return;
         }
     }
@@ -2618,7 +2625,19 @@ TableWalker::TableWalkerStats::TableWalkerStats(statistics::Group *parent)
     ADD_STAT(localAccesses, statistics::units::Count::get(),
              "Count walker's accesses to local memory"),
     ADD_STAT(cxlAccesses, statistics::units::Count::get(),
-             "Count walker's accesses to CXL memory")
+             "Count walker's accesses to CXL memory"),
+    ADD_STAT(uniqueBlocksFromLocalAccesses, statistics::units::Count::get(),
+             "Count number of unique blocks in local memory that the walker "
+             "accesses"),
+    ADD_STAT(averageAccessesPerUniqueBlockFromLocalAccesses,
+             statistics::units::Count::get(),
+             "Average accesses per unique block in local memory"),
+    ADD_STAT(uniqueBlocksFromCxlAccesses, statistics::units::Count::get(),
+             "Count number of unique blocks in CXL memory that the walker "
+             "accesses"),
+    ADD_STAT(averageAccessesPerUniqueBlockFromCxlAccesses,
+             statistics::units::Count::get(),
+             "Average accesses per unique block in CXL memory")
 {
     walksShortDescriptor
         .flags(statistics::nozero);
@@ -2682,6 +2701,63 @@ TableWalker::TableWalkerStats::TableWalkerStats(statistics::Group *parent)
     requestOrigin.subname(1,"Completed");
     requestOrigin.ysubname(0,"Data");
     requestOrigin.ysubname(1,"Inst");
+}
+
+void
+TableWalker::enableUniqueBlocksCount()
+{
+    uniqueBlocksCountActive = true;
+}
+
+void
+TableWalker::disableUniqueBlocksCount()
+{
+    uniqueBlocksCountActive = false;
+}
+
+void
+TableWalker::clearUniqueBlocksCount()
+{
+    stats.localUniqueBlocks.clear();
+    stats.cxlUniqueBlocks.clear();
+}
+
+void
+TableWalker::TableWalkerStats::recordLocalBlockAccess(Addr addr)
+{
+    localUniqueBlocks[addr]++;
+}
+
+void
+TableWalker::TableWalkerStats::recordCxlBlockAccess(Addr addr)
+{
+    cxlUniqueBlocks[addr]++;
+}
+
+void
+TableWalker::TableWalkerStats::preDumpStats()
+{
+    statistics::Group::preDumpStats();
+    averageAccessesPerUniqueBlockFromLocalAccesses = 0;
+    uint64_t numLocalAccesses = 0;
+    for (auto &block : localUniqueBlocks) {
+        numLocalAccesses += block.second;
+    }
+    if (localUniqueBlocks.size() > 0) {
+        averageAccessesPerUniqueBlockFromLocalAccesses =
+            numLocalAccesses / localUniqueBlocks.size();
+    }
+    uint64_t numCXLAccesses = 0;
+    for (auto &block : cxlUniqueBlocks) {
+        numCXLAccesses += block.second;
+    }
+    averageAccessesPerUniqueBlockFromCxlAccesses = 0;
+    if (cxlUniqueBlocks.size() > 0) {
+        averageAccessesPerUniqueBlockFromCxlAccesses =
+            numCXLAccesses / cxlUniqueBlocks.size();
+    }
+    uniqueBlocksFromLocalAccesses = localUniqueBlocks.size();
+    uniqueBlocksFromCxlAccesses = cxlUniqueBlocks.size();
 }
 
 } // namespace gem5

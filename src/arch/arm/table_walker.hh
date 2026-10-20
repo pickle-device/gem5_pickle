@@ -39,6 +39,7 @@
 #define __ARCH_ARM_TABLE_WALKER_HH__
 
 #include <list>
+#include <unordered_map>
 
 #include "arch/arm/faults.hh"
 #include "arch/arm/mmu.hh"
@@ -1108,10 +1109,22 @@ class TableWalker : public ClockedObject
     uint8_t _physAddrRange;
     bool _haveLargeAsid64;
 
+  public:
+    bool uniqueBlocksCountActive;
+    void enableUniqueBlocksCount();
+    void disableUniqueBlocksCount();
+    void clearUniqueBlocksCount();
+
+  protected:
     /** Statistics */
     struct TableWalkerStats : public statistics::Group
     {
         TableWalkerStats(statistics::Group *parent);
+        void preDumpStats() override;
+        void recordLocalBlockAccess(Addr addr);
+        void recordCxlBlockAccess(Addr addr);
+        std::unordered_map<Addr, uint64_t> localUniqueBlocks;
+        std::unordered_map<Addr, uint64_t> cxlUniqueBlocks;
         statistics::Scalar walks;
         statistics::Scalar walksShortDescriptor;
         statistics::Scalar walksLongDescriptor;
@@ -1128,6 +1141,10 @@ class TableWalker : public ClockedObject
         // Local/CXL memory accesses
         statistics::Scalar localAccesses;
         statistics::Scalar cxlAccesses;
+        statistics::Scalar uniqueBlocksFromLocalAccesses;
+        statistics::Scalar averageAccessesPerUniqueBlockFromLocalAccesses;
+        statistics::Scalar uniqueBlocksFromCxlAccesses;
+        statistics::Scalar averageAccessesPerUniqueBlockFromCxlAccesses;
     } stats;
 
     mutable unsigned pendingReqs;

@@ -44,6 +44,7 @@ from m5.objects.BaseMMU import BaseMMU
 from m5.objects.ClockedObject import ClockedObject
 from m5.params import *
 from m5.proxy import *
+from m5.SimObject import PyBindMethod
 
 
 # Basic stage 1 translation objects
@@ -51,6 +52,12 @@ class ArmTableWalker(ClockedObject):
     type = "ArmTableWalker"
     cxx_class = "gem5::ArmISA::TableWalker"
     cxx_header = "arch/arm/table_walker.hh"
+    cxx_exports = [
+        PyBindMethod("enableUniqueBlocksCount"),
+        PyBindMethod("disableUniqueBlocksCount"),
+        PyBindMethod("clearUniqueBlocksCount"),
+    ]
+
     is_stage2 = Param.Bool(False, "Is this object for stage 2 translation?")
     num_squash_per_cycle = Param.Unsigned(
         2, "Number of outstanding walks that can be squashed per cycle"
