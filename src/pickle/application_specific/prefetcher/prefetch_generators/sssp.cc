@@ -115,6 +115,7 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
         PREFETCHER_TRACE_DEBUG(
             "Work Item = 0x%llx, node_id = %lld\n", work_vaddr, lv1_node_id
         );
+        delete pkt;
     }
     // level 1.1: we fetch dist[u] to decide if we want to prefetch the
     // neighbor list of the node or not
@@ -165,6 +166,7 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
             "Work Item = 0x%llx, dist[%lld] = %u\n",
             work_vaddr, lv1_node_id, dist_value
         );
+        delete pkt;
         // We only prefetch the neighbor list if the distance is bigger than
         // the threshold
         const uint32_t distance_threshold =
@@ -221,6 +223,7 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
             "Work Item = 0x%llx, edge_start_ptr = 0x%llx\n",
             work_vaddr, lv2_start_ptr_vaddr
         );
+        delete pkt;
     }
     {
         bool success = false;
@@ -258,6 +261,7 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
             "Work Item = 0x%llx, edge_end_ptr = 0x%llx\n",
             work_vaddr, lv2_end_ptr_vaddr
         );
+        delete pkt;
     }
     // level 3: we fetch the edge indices and its weights
     // Different from other workloads, the out_neighbor array of SSSP contain
@@ -285,6 +289,9 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
                 PREFETCHER_WORK_TRACKER_DEBUG(
                     "Fetching lv3 vaddr 0x%llx\n", edge_vaddr_block_aligned
                 );
+                if (pkt != nullptr) {
+                    delete pkt;
+                }
                 pkt = work_tracker->owner->zeroCycleLoadWithVAddr(
                     edge_vaddr_block_aligned, success
                 );
@@ -315,6 +322,9 @@ SSSPPrefetchKernel1Generator::execute_kernel(Addr work_data)
                 "Work Item = 0x%llx, edge_index = %lld, edge_weight = %lld\n",
                 work_vaddr, lv3_edge_indices.back(), edge_weight
             );
+        }
+        if (pkt != nullptr) {
+            delete pkt;
         }
     }
 
@@ -412,6 +422,7 @@ SSSPPrefetchKernel2Generator::execute_kernel(Addr work_data)
         PREFETCHER_TRACE_DEBUG(
             "Work Item = 0x%llx, node_id = %lld\n", work_vaddr, lv1_node_id
         );
+        delete pkt;
     }
     // level 2: we fetch the start pointer and the end pointer of the neighbor
     // edge list
@@ -453,6 +464,7 @@ SSSPPrefetchKernel2Generator::execute_kernel(Addr work_data)
             "Work Item = 0x%llx, edge_start_ptr = 0x%llx\n",
             work_vaddr, lv2_start_ptr_vaddr
         );
+        delete pkt;
     }
     {
         bool success = false;
@@ -490,6 +502,7 @@ SSSPPrefetchKernel2Generator::execute_kernel(Addr work_data)
             "Work Item = 0x%llx, edge_end_ptr = 0x%llx\n",
             work_vaddr, lv2_end_ptr_vaddr
         );
+        delete pkt;
     }
     // level 3: we fetch the edge indices and its weights
     // Different from other workloads, the out_neighbor array of SSSP contain
@@ -517,6 +530,9 @@ SSSPPrefetchKernel2Generator::execute_kernel(Addr work_data)
                 PREFETCHER_WORK_TRACKER_DEBUG(
                     "Fetching lv3 vaddr 0x%llx\n", edge_vaddr_block_aligned
                 );
+                if (pkt != nullptr) {
+                    delete pkt;
+                }
                 pkt = work_tracker->owner->zeroCycleLoadWithVAddr(
                     edge_vaddr_block_aligned, success
                 );
@@ -547,6 +563,9 @@ SSSPPrefetchKernel2Generator::execute_kernel(Addr work_data)
                 "Work Item = 0x%llx, edge_index = %lld, edge_weight = %lld\n",
                 work_vaddr, lv3_edge_indices.back(), edge_weight
             );
+        }
+        if (pkt != nullptr) {
+            delete pkt;
         }
     }
 

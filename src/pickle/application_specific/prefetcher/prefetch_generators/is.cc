@@ -161,6 +161,7 @@ ISRankingPrefetchGenerator::execute_kernel(Addr work_data)
             "Work Item = 0x%llx, key_value = %lld\n",
             work_vaddr, lv1_key_value
         );
+        delete pkt;
     }
 
     // Level 2: prefetch key_buff1[key_value]

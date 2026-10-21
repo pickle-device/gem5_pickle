@@ -148,6 +148,7 @@ SPMVPrefetchGenerator::execute_kernel(Addr work_data)
             "Work Item = 0x%llx, row_start = 0x%llx\n",
             work_id, row_start
         );
+        delete pkt;
     }
     {
         bool success = false;
@@ -187,6 +188,7 @@ SPMVPrefetchGenerator::execute_kernel(Addr work_data)
             "Work Item = 0x%llx, row_end = 0x%llx\n",
             work_id, row_end
         );
+        delete pkt;
     }
     if (row_start == row_end) {
         // empty row
@@ -224,6 +226,9 @@ SPMVPrefetchGenerator::execute_kernel(Addr work_data)
                     "Fetching col vaddr 0x%llx\n",
                     col_vaddr_block_aligned
                 );
+                if (pkt != nullptr) {
+                    delete pkt;
+                }
                 pkt = work_tracker->owner->zeroCycleLoadWithVAddr(
                     col_vaddr_block_aligned, success
                 );
@@ -251,6 +256,9 @@ SPMVPrefetchGenerator::execute_kernel(Addr work_data)
                 "Work Item = 0x%llx, col_index = %lld\n",
                 work_id, col_indices.back()
             );
+        }
+        if (pkt != nullptr) {
+            delete pkt;
         }
     }
 

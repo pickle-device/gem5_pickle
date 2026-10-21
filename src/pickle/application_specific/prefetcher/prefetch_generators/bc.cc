@@ -112,6 +112,7 @@ BCPrefetchKernel1Generator::execute_kernel(Addr work_data)
         PREFETCHER_TRACE_DEBUG(
             "Work Item = 0x%llx, node_id = %lld\n", work_vaddr, lv1_node_id
         );
+        delete pkt;
     }
     // level 2: we fetch the start pointer and the end pointer of the neighbor
     // edge list
@@ -150,6 +151,7 @@ BCPrefetchKernel1Generator::execute_kernel(Addr work_data)
             "Work Item = 0x%llx, edge_start_ptr = 0x%llx\n",
             work_vaddr, lv2_start_ptr_vaddr
         );
+        delete pkt;
     }
     {
         bool success = false;
@@ -185,6 +187,7 @@ BCPrefetchKernel1Generator::execute_kernel(Addr work_data)
             "Work Item = 0x%llx, edge_end_ptr = 0x%llx\n",
             work_vaddr, lv2_end_ptr_vaddr
         );
+        delete pkt;
     }
     // level 3: we fetch the edge indices
     {
@@ -207,6 +210,9 @@ BCPrefetchKernel1Generator::execute_kernel(Addr work_data)
                 PREFETCHER_WORK_TRACKER_DEBUG(
                     "Fetching lv3 vaddr 0x%llx\n", edge_vaddr_block_aligned
                 );
+                if (pkt != nullptr) {
+                    delete pkt;
+                }
                 pkt = work_tracker->owner->zeroCycleLoadWithVAddr(
                     edge_vaddr_block_aligned, success
                 );
@@ -232,6 +238,9 @@ BCPrefetchKernel1Generator::execute_kernel(Addr work_data)
                 "Work Item = 0x%llx, edge_index = %lld\n",
                 work_vaddr, lv3_edge_indices.back()
             );
+        }
+        if (pkt != nullptr) {
+            delete pkt;
         }
     }
 
@@ -292,6 +301,7 @@ BCPrefetchKernel1Generator::execute_kernel(Addr work_data)
                     "Work Item = 0x%llx, depth = %u\n",
                     work_vaddr, depth
                 );
+                delete pkt;
             }
         }
         // if depth optimization is not enabled, we prefetch the path_counts of
@@ -429,6 +439,7 @@ BCPrefetchKernel2Generator::execute_kernel(Addr work_data)
         PREFETCHER_TRACE_DEBUG(
             "Work Item = 0x%llx, node_id = %lld\n", work_vaddr, lv1_node_id
         );
+        delete pkt;
     }
 
     // level 1.1: since for each node, the core also accesses its path_counts,
@@ -514,6 +525,7 @@ BCPrefetchKernel2Generator::execute_kernel(Addr work_data)
             "Work Item = 0x%llx, edge_start_ptr = 0x%llx\n",
             work_vaddr, lv2_start_ptr_vaddr
         );
+        delete pkt;
     }
     {
         bool success = false;
@@ -549,6 +561,7 @@ BCPrefetchKernel2Generator::execute_kernel(Addr work_data)
             "Work Item = 0x%llx, edge_end_ptr = 0x%llx\n",
             work_vaddr, lv2_end_ptr_vaddr
         );
+        delete pkt;
     }
     // level 3: we fetch the edge indices
     {
@@ -571,6 +584,9 @@ BCPrefetchKernel2Generator::execute_kernel(Addr work_data)
                 PREFETCHER_WORK_TRACKER_DEBUG(
                     "Fetching lv3 vaddr 0x%llx\n", edge_vaddr_block_aligned
                 );
+                if (pkt != nullptr) {
+                    delete pkt;
+                }
                 pkt = work_tracker->owner->zeroCycleLoadWithVAddr(
                     edge_vaddr_block_aligned, success
                 );
@@ -596,6 +612,9 @@ BCPrefetchKernel2Generator::execute_kernel(Addr work_data)
                 "Work Item = 0x%llx, edge_index = %lld\n",
                 work_vaddr, lv3_edge_indices.back()
             );
+        }
+        if (pkt != nullptr) {
+            delete pkt;
         }
     }
 

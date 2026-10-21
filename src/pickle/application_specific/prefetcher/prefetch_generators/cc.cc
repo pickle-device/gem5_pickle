@@ -142,6 +142,7 @@ CCPrefetchGenerator::execute_kernel(Addr work_data)
             "Work Item = 0x%llx, edge_start_ptr = 0x%llx\n",
             node_id, lv1_start_edge_vaddr
         );
+        delete pkt;
     }
     {
         bool success = false;
@@ -179,6 +180,7 @@ CCPrefetchGenerator::execute_kernel(Addr work_data)
             "Work Item = 0x%llx, edge_end_ptr = 0x%llx\n",
             node_id, lv1_end_edge_vaddr
         );
+        delete pkt;
     }
     // Level 2: we fetch the outgoing neighbors from out_neighbors array
     {
@@ -204,6 +206,9 @@ CCPrefetchGenerator::execute_kernel(Addr work_data)
                     "Fetching lv2 vaddr 0x%llx\n",
                     edge_vaddr_block_aligned
                 );
+                if (pkt != nullptr) {
+                    delete pkt;
+                }
                 pkt = work_tracker->owner->zeroCycleLoadWithVAddr(
                     edge_vaddr_block_aligned, success
                 );
@@ -230,6 +235,9 @@ CCPrefetchGenerator::execute_kernel(Addr work_data)
                 "Work Item = 0x%llx, edge_index = %lld\n",
                 node_id, lv2_edge_indices.back()
             );
+        }
+        if (pkt != nullptr) {
+            delete pkt;
         }
     }
 

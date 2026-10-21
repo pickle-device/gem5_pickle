@@ -109,6 +109,7 @@ BFSPrefetchGenerator::execute_kernel(Addr work_data)
             "Work Item = 0x%llx, node_id = %lld\n",
             work_vaddr, lv1_node_id
         );
+        delete pkt;
     }
     // level 2: we fetch the start and the end of the edge indices
     {
@@ -150,6 +151,7 @@ BFSPrefetchGenerator::execute_kernel(Addr work_data)
             "Work Item = 0x%llx, edge_start_ptr = 0x%llx\n",
             work_vaddr, lv2_start_edge_vaddr
         );
+        delete pkt;
     }
     {
         bool success = false;
@@ -190,6 +192,7 @@ BFSPrefetchGenerator::execute_kernel(Addr work_data)
             "Work Item = 0x%llx, edge_end_ptr = 0x%llx\n",
             work_vaddr, lv2_end_edge_vaddr
         );
+        delete pkt;
     }
     // level 3: we fetch the edge indices
     {
@@ -214,6 +217,9 @@ BFSPrefetchGenerator::execute_kernel(Addr work_data)
                     "Fetching lv3 vaddr 0x%llx\n",
                     edge_vaddr_block_aligned
                 );
+                if (pkt != nullptr) {
+                    delete pkt;
+                }
                 pkt = work_tracker->owner->zeroCycleLoadWithVAddr(
                     edge_vaddr_block_aligned, success
                 );
@@ -241,6 +247,9 @@ BFSPrefetchGenerator::execute_kernel(Addr work_data)
                 "Work Item = 0x%llx, edge_index = %lld\n",
                 work_vaddr, lv3_edge_indices.back()
             );
+        }
+        if (pkt != nullptr) {
+            delete pkt;
         }
     }
 
