@@ -367,17 +367,28 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvTimingReq(PacketPtr pkt)
             uint64_t data = -1;
             Addr paddr = pkt->req->getPaddr();
             switch (paddr) {
-                case 0x10110010:
-                    data = owner->getDeviceState() != PickleDeviceState::SLEEP;
+                case 0x10110010: // corresponds to use_pdev in libpickledevice
+                                 // 0: no pdev
+                                 // 1: pickle
+                                 // 2: maple
+                    if (owner->getDeviceState() != PickleDeviceState::SLEEP) {
+                        if (owner->getPrefetcher()->isUsedAsMaple()) {
+                            data = 2;
+                        } else {
+                            data = 1;
+                        }
+                    } else {
+                        data = 0;
+                    }
                     break;
-                case 0x10110018:
+                case 0x10110018: // prefetch_distance in libpickledevice
                     data = owner->getPrefetcher()\
                                 ->getSoftwareHintPrefetchDistance();
                     break;
-                case 0x10110020:
+                case 0x10110020: // prefetch_mode in libpickledevice
                     data = owner->getPrefetcher()->getPrefetchMode();
                     break;
-                case 0x10110028:
+                case 0x10110028: // chunk_size in libpickledevice
                     data = owner->getPrefetcher()->getBulkPrefetchChunkSize();
                     break;
             };
@@ -504,17 +515,28 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvAtomic(PacketPtr pkt)
             uint64_t data = -1;
             Addr paddr = pkt->req->getPaddr();
             switch (paddr) {
-                case 0x10110010:
-                    data = owner->getDeviceState() != PickleDeviceState::SLEEP;
+                case 0x10110010: // corresponds to use_pdev in libpickledevice
+                                 // 0: no pdev
+                                 // 1: pickle
+                                 // 2: maple
+                    if (owner->getDeviceState() != PickleDeviceState::SLEEP) {
+                        if (owner->getPrefetcher()->isUsedAsMaple()) {
+                            data = 2;
+                        } else {
+                            data = 1;
+                        }
+                    } else {
+                        data = 0;
+                    }
                     break;
-                case 0x10110018:
+                case 0x10110018: // prefetch_distance in libpickledevice
                     data = owner->getPrefetcher()\
                                 ->getSoftwareHintPrefetchDistance();
                     break;
-                case 0x10110020:
+                case 0x10110020: // prefetch_mode in libpickledevice
                     data = owner->getPrefetcher()->getPrefetchMode();
                     break;
-                case 0x10110028:
+                case 0x10110028: // chunk_size in libpickledevice
                     data = owner->getPrefetcher()->getBulkPrefetchChunkSize();
                     break;
             };
@@ -612,17 +634,28 @@ PickleDevice::PickleDeviceUncacheableSnoopPort::recvFunctional(PacketPtr pkt)
             uint64_t data = -1;
             Addr paddr = pkt->req->getPaddr();
             switch (paddr) {
-                case 0x10110010:
-                    data = owner->getDeviceState() != PickleDeviceState::SLEEP;
+                case 0x10110010: // corresponds to use_pdev in libpickledevice
+                                 // 0: no pdev
+                                 // 1: pickle
+                                 // 2: maple
+                    if (owner->getDeviceState() != PickleDeviceState::SLEEP) {
+                        if (owner->getPrefetcher()->isUsedAsMaple()) {
+                            data = 2;
+                        } else {
+                            data = 1;
+                        }
+                    } else {
+                        data = 0;
+                    }
                     break;
-                case 0x10110018:
+                case 0x10110018: // prefetch_distance in libpickledevice
                     data = owner->getPrefetcher()\
                                 ->getSoftwareHintPrefetchDistance();
                     break;
-                case 0x10110020:
+                case 0x10110020: // prefetch_mode in libpickledevice
                     data = owner->getPrefetcher()->getPrefetchMode();
                     break;
-                case 0x10110028:
+                case 0x10110028: // chunk_size in libpickledevice
                     data = owner->getPrefetcher()->getBulkPrefetchChunkSize();
                     break;
             };

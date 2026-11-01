@@ -47,6 +47,7 @@ PicklePrefetcher::PicklePrefetcher(
   const PicklePrefetcherParams &params
 )
   : ClockedObject(params),
+    use_as_maple(params.use_as_maple),
     cxl_memory_awareness_enabled(params.cxl_memory_awareness_enabled),
     software_hint_prefetch_distance(params.software_hint_prefetch_distance),
     prefetch_distance_offset_from_software_hint(
@@ -183,6 +184,18 @@ PicklePrefetcher::startup()
     for (auto agent: llc_prefetch_agents) {
         agent->setPicklePrefetcher(this);
     }
+}
+
+bool
+PicklePrefetcher::isActivated() const
+{
+    return prefetcher_initialized;
+}
+
+bool
+PicklePrefetcher::isUsedAsMaple() const
+{
+    return use_as_maple;
 }
 
 void

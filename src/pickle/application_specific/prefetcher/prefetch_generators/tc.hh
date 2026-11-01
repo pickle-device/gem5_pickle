@@ -55,7 +55,7 @@ class TCPrefetchGenerator: public PrefetchGenerator
 
     // Function to generate prefetch requests
     std::shared_ptr<WorkItem> execute_kernel(Addr work_data) override;
-}; // class CCPrefetchGenerator
+}; // class TCPrefetchGenerator
 
 } // namespace gem5
 

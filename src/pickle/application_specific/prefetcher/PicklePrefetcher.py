@@ -49,6 +49,13 @@ class PicklePrefetcher(ClockedObject):
     cxx_class = "gem5::PicklePrefetcher"
     cxx_exports = [PyBindMethod("switchOn"), PyBindMethod("switchOff")]
 
+    # Since we use Pickle and Maple using the same Pickle implementation,
+    # we need to specify the prefetcher type
+    use_as_maple = Param.Bool(
+        False,
+        "Whether the prefetcher is used as Maple.",
+    )
+
     # CXL parameters
     cxl_memory_awareness_enabled = Param.Bool(
         True,

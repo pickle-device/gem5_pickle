@@ -46,6 +46,7 @@
 #include "pickle/application_specific/pickle_job.hh"
 #include "pickle/application_specific/prefetcher/llc_prefetch_agent.hh"
 #include "pickle/application_specific/prefetcher/prefetch_generators/all_prefetch_generators.hh"
+#include "pickle/application_specific/prefetcher/prefetch_generators/maple/all_maple_prefetch_generators.hh"
 #include "pickle/application_specific/prefetcher/prefetch_request.hh"
 #include "pickle/application_specific/prefetcher/prefetcher_work_tracker.hh"
 #include "pickle/application_specific/prefetcher/work_item.hh"
@@ -74,6 +75,7 @@ class PickleDevice;
 class PicklePrefetcher: public ClockedObject
 {
     private:
+        bool use_as_maple;
         bool cxl_memory_awareness_enabled;
         int64_t software_hint_prefetch_distance;
         int64_t prefetch_distance_offset_from_software_hint;
@@ -121,7 +123,8 @@ class PicklePrefetcher: public ClockedObject
         void configure(std::shared_ptr<PickleJobDescriptor> job);
         void switchOn();
         void switchOff();
-        bool isActivated() const { return prefetcher_initialized; }
+        bool isActivated() const;
+        bool isUsedAsMaple() const;
         uint64_t getSoftwareHintPrefetchDistance() const;
         uint64_t getPrefetchDistanceOffsetFromSoftwareHint() const;
         uint64_t getPrefetchMode() const;

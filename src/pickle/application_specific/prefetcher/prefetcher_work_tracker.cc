@@ -238,6 +238,87 @@ PrefetcherWorkTracker::PrefetcherWorkTracker(
                 owner->getPrefetchDistanceOffsetFromSoftwareHint(),
                 this
             );
+    } else if (job_descriptor->kernel_name == "maple_kernel") {
+        prefetch_generator =
+            std::make_shared<MaplePrefetchGenerator>(
+                "MaplePrefetchGenerator",
+                _job_id, _core_id,
+                owner->getSoftwareHintPrefetchDistance(),
+                owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+                this
+            );
+    } else if (job_descriptor->kernel_name == "bc_maple_kernel_1") {
+        prefetch_generator =
+            std::make_shared<BCMaplePrefetchKernel1Generator>(
+                "BCMaplePrefetchKernel1Generator",
+                _job_id, _core_id,
+                owner->getSoftwareHintPrefetchDistance(),
+                owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+                this
+            );
+    } else if (job_descriptor->kernel_name == "bc_maple_kernel_2") {
+        prefetch_generator =
+            std::make_shared<BCMaplePrefetchKernel2Generator>(
+                "BCMaplePrefetchKernel2Generator",
+                _job_id, _core_id,
+                owner->getSoftwareHintPrefetchDistance(),
+                owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+                this
+            );
+    } else if (job_descriptor->kernel_name == "bfs_maple_kernel") {
+        prefetch_generator =
+            std::make_shared<BFSMaplePrefetchGenerator>(
+                "BFSMaplePrefetchGenerator",
+                _job_id, _core_id,
+                owner->getSoftwareHintPrefetchDistance(),
+                owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+                this
+            );
+    } else if (job_descriptor->kernel_name == "cc_maple_kernel") {
+        prefetch_generator =
+            std::make_shared<CCMaplePrefetchGenerator>(
+                "CCMaplePrefetchGenerator",
+                _job_id, _core_id,
+                owner->getSoftwareHintPrefetchDistance(),
+                owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+                this
+            );
+    } else if (job_descriptor->kernel_name == "pr_maple_kernel") {
+        prefetch_generator =
+            std::make_shared<PRMaplePrefetchGenerator>(
+                "PRMaplePrefetchGenerator",
+                _job_id, _core_id,
+                owner->getSoftwareHintPrefetchDistance(),
+                owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+                this
+            );
+    } else if (job_descriptor->kernel_name == "sssp_maple_kernel_1") {
+        prefetch_generator =
+            std::make_shared<SSSPMaplePrefetchKernel1Generator>(
+                "SSSPMaplePrefetchKernel1Generator",
+                _job_id, _core_id,
+                owner->getSoftwareHintPrefetchDistance(),
+                owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+                this
+            );
+    } else if (job_descriptor->kernel_name == "sssp_maple_kernel_2") {
+        prefetch_generator =
+            std::make_shared<SSSPMaplePrefetchKernel2Generator>(
+                "SSSPMaplePrefetchKernel2Generator",
+                _job_id, _core_id,
+                owner->getSoftwareHintPrefetchDistance(),
+                owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+                this
+            );
+    } else if (job_descriptor->kernel_name == "tc_maple_kernel") {
+        prefetch_generator =
+            std::make_shared<TCMaplePrefetchGenerator>(
+                "TCMaplePrefetchGenerator",
+                _job_id, _core_id,
+                owner->getSoftwareHintPrefetchDistance(),
+                owner->getPrefetchDistanceOffsetFromSoftwareHint(),
+                this
+            );
     } else {
         panic(
             "Unknown prefetch generator mode: %s\n",
